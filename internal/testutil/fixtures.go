@@ -16,7 +16,6 @@ func SampleConfig() *config.Config {
 		Version:            "1.0.0-test",
 		WorkingDir:         "/tmp",
 		DataDir:            "/tmp/veloria-test-data",
-		TemplatesDir:       "/tmp/veloria-test-templates",
 		HTTPHandlerTimeout: 0,
 		DBHost:             "localhost",
 		DBPort:             5432,
