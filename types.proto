@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package types;
+
+option go_package = "veloria/internal/types";
+
+// SearchResponse contains search results stored outside the database.
+message SearchResponse {
+  reserved 1, 2, 5;
+  reserved "term", "repo", "duration_ms";
+  repeated SearchResult results = 3;
+  int32 total = 4;
+}
+
+// SearchResult represents search results from a single extension (plugin/theme/core).
+message SearchResult {
+  string slug = 1;
+  string name = 2;
+  string version = 3;
+  int64 active_installs = 4;
+  repeated FileMatch matches = 5;
+  int32 total_matches = 6;
+  int64 downloaded = 7;
+}
+
+// FileMatch represents all matches within a single file.
+message FileMatch {
+  string filename = 1;
+  repeated Match matches = 2;
+  bool auto_generated = 3;
+}
+
+// Match represents a single line match within a file.
+message Match {
+  string line = 1;
+  int32 line_number = 2;
+  repeated string before = 3;
+  repeated string after = 4;
+}

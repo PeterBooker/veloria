@@ -1,0 +1,180 @@
+package web
+
+import (
+	"github.com/google/uuid"
+
+	searchmodel "veloria/internal/search/model"
+	"veloria/internal/manager"
+	"veloria/internal/user"
+)
+
+// PageData contains common data for all pages.
+type PageData struct {
+	User                 *user.User
+	EnabledProviders     []string
+	SearchEnabled        bool
+	SearchDisabledReason string
+	CurrentPath          string
+}
+
+// LoginData contains data for the login page.
+type LoginData struct {
+	PageData
+	Error string
+}
+
+// SearchSummary contains metadata for listing searches.
+type SearchSummary struct {
+	Search       searchmodel.Search
+	MatchCount   int
+	MatchesKnown bool
+}
+
+// RepoSummary contains aggregated stats for a repository.
+type RepoSummary struct {
+	Repo           string
+	Title          string
+	Total          int
+	Indexed        int
+	IndexedPercent int
+}
+
+// HomeData contains data for the home page template.
+type HomeData struct {
+	PageData
+	RecentSearches []SearchSummary
+}
+
+// SearchesData contains data for the searches page template.
+type SearchesData struct {
+	PageData
+	Searches   []SearchSummary
+	Page       int
+	TotalPages int
+}
+
+// MySearchesData contains data for the my searches page template.
+type MySearchesData struct {
+	PageData
+	Searches   []SearchSummary
+	Page       int
+	TotalPages int
+}
+
+// SearchResultsData contains data for search results partial.
+type SearchResultsData struct {
+	PageData
+	Search  searchmodel.Search
+	Results *manager.SearchResponse
+	Error   string
+}
+
+// SearchViewData contains data for the single search view.
+type SearchViewData struct {
+	PageData
+	Search             searchmodel.Search
+	Results            *manager.SearchResponse
+	ExtensionSummaries []ExtensionResultSummary
+	TotalMatches       int
+	DurationMs         int64
+	Error              string
+}
+
+// ExtensionResultSummary contains summary info for one extension in search results (no match details).
+type ExtensionResultSummary struct {
+	Slug           string
+	Name           string
+	Version        string
+	ActiveInstalls int
+	TotalMatches   int
+}
+
+// ExtensionResultsData contains data for rendering a single extension's detailed matches.
+type ExtensionResultsData struct {
+	SearchID   string
+	SearchRepo string
+	Result     *manager.SearchResult
+}
+
+// SearchContextLine represents a single line of context.
+type SearchContextLine struct {
+	Number  int
+	Text    string
+	IsMatch bool
+}
+
+// SearchContextData contains data for the match context modal.
+type SearchContextData struct {
+	Repo     string
+	Slug     string
+	Filename string
+	Lines    []SearchContextLine
+	Error    string
+}
+
+// ReposData contains data for the repos listing page.
+type ReposData struct {
+	PageData
+	RepoSummaries []RepoSummary
+}
+
+// RepoItem represents an item in a repository list.
+type RepoItem struct {
+	ID         uuid.UUID
+	Name       string
+	Slug       string
+	Version    string
+	Indexed    bool
+	Downloaded int
+	FileCount  int
+	TotalSize  int64
+}
+
+// LineSeries represents a single series for a line chart.
+type LineSeries struct {
+	Points string
+	Max    int64
+}
+
+// RepoData contains data for a single repository view.
+type RepoData struct {
+	PageData
+	RepoSummary        RepoSummary
+	Items              []RepoItem
+	Page               int
+	TotalPages         int
+	ActiveInstallsLine LineSeries
+	FileCountLine      LineSeries
+	FileSizeLine       LineSeries
+	LargestFiles       []LargestRepoFile
+}
+
+// FileStat represents a file with its size for display.
+type FileStat struct {
+	Path string
+	Size int64
+}
+
+// LargestRepoFile represents a large file with its parent extension info.
+type LargestRepoFile struct {
+	Path string
+	Size int64
+	Slug string
+	Name string
+}
+
+// ExtensionData contains data for single extension views.
+type ExtensionData struct {
+	PageData
+	RepoType         string
+	Name             string
+	Slug             string
+	Version          string
+	ShortDescription string
+	ActiveInstalls   int
+	Downloaded       int
+	Indexed          bool
+	FileCount        int
+	TotalSize        int64
+	LargestFiles     []FileStat
+}

@@ -1,0 +1,233 @@
+{{define "repo.html"}}
+{{template "base.html" .}}
+{{end}}
+
+{{define "title"}}{{.RepoSummary.Title}} - Veloria{{end}}
+
+{{define "content"}}
+<!-- Heading -->
+<div class="mb-6 lg:px-7 py-6 lg:py-0 lg:pt-5">
+    <nav class="text-sm text-gray-400 mb-3">
+        <a href="/repos" class="hover:text-brand-600 transition-colors">Repositories</a>
+        <span class="mx-2">/</span>
+        <span class="text-gray-700 font-medium">{{.RepoSummary.Title}}</span>
+    </nav>
+    <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-xl bg-white/60 border border-white/50 flex items-center justify-center">
+            {{if eq .RepoSummary.Repo "plugins"}}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#3b82f6">
+                <path d="M10.5 4v4h3V4H15v4h1.5a1 1 0 011 1v4l-3 4v2a1 1 0 01-1 1h-3a1 1 0 01-1-1v-2l-3-4V9a1 1 0 011-1H9V4h1.5zm.5 12.5v2h2v-2l3-4v-3H8v3l3 4z"></path>
+            </svg>
+            {{else if eq .RepoSummary.Repo "themes"}}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#3b82f6" fill-rule="evenodd" clip-rule="evenodd">
+                <path d="M16.375 4.5H4.625a.125.125 0 0 0-.125.125v8.254l2.859-1.54a.75.75 0 0 1 .68-.016l2.384 1.142 2.89-2.074a.75.75 0 0 1 .874 0l2.313 1.66V4.625a.125.125 0 0 0-.125-.125Zm.125 9.398-2.75-1.975-2.813 2.02a.75.75 0 0 1-.76.067l-2.444-1.17L4.5 14.583v1.792c0 .069.056.125.125.125h11.75a.125.125 0 0 0 .125-.125v-2.477ZM4.625 3C3.728 3 3 3.728 3 4.625v11.75C3 17.273 3.728 18 4.625 18h11.75c.898 0 1.625-.727 1.625-1.625V4.625C18 3.728 17.273 3 16.375 3H4.625ZM20 8v11c0 .69-.31 1-.999 1H6v1.5h13.001c1.52 0 2.499-.982 2.499-2.5V8H20Z"></path>
+            </svg>
+            {{else}}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#3b82f6">
+                <path d="M12 4c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8Zm6.5 8c0 .6 0 1.2-.2 1.8h-2.7c0-.6.2-1.1.2-1.8s0-1.2-.2-1.8h2.7c.2.6.2 1.1.2 1.8Zm-.9-3.2h-2.4c-.3-.9-.7-1.8-1.1-2.4-.1-.2-.2-.4-.3-.5 1.6.5 3 1.6 3.8 3ZM12.8 17c-.3.5-.6 1-.8 1.3-.2-.3-.5-.8-.8-1.3-.3-.5-.6-1.1-.8-1.7h3.3c-.2.6-.5 1.2-.8 1.7Zm-2.9-3.2c-.1-.6-.2-1.1-.2-1.8s0-1.2.2-1.8H14c.1.6.2 1.1.2 1.8s0 1.2-.2 1.8H9.9ZM11.2 7c.3-.5.6-1 .8-1.3.2.3.5.8.8 1.3.3.5.6 1.1.8 1.7h-3.3c.2-.6.5-1.2.8-1.7Zm-1-1.2c-.1.2-.2.3-.3.5-.4.7-.8 1.5-1.1 2.4H6.4c.8-1.4 2.2-2.5 3.8-3Zm-1.8 8H5.7c-.2-.6-.2-1.1-.2-1.8s0-1.2.2-1.8h2.7c0 .6-.2 1.1-.2 1.8s0 1.2.2 1.8Zm-2 1.4h2.4c.3.9.7 1.8 1.1 2.4.1.2.2.4.3.5-1.6-.5-3-1.6-3.8-3Zm7.4 3c.1-.2.2-.3.3-.5.4-.7.8-1.5 1.1-2.4h2.4c-.8 1.4-2.2 2.5-3.8 3Z"></path>
+            </svg>
+            {{end}}
+        </div>
+        <div>
+            <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-gray-900">{{.RepoSummary.Title}}</h1>
+            <p class="text-sm text-gray-600">WordPress {{.RepoSummary.Repo}} repository</p>
+        </div>
+    </div>
+</div>
+
+<!-- Outer Glass Container -->
+<div class="glass-outer p-5 lg:p-7 flex-1 flex flex-col min-h-0">
+    <!-- Stats Card -->
+    <div class="glass-inner p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Index Status</h2>
+            <span class="text-sm text-gray-500">{{.RepoSummary.IndexedPercent}}% complete</span>
+        </div>
+        <div class="grid grid-cols-2 gap-6 mb-4">
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Total Items</p>
+                <p class="text-2xl font-bold text-gray-900">{{formatCompact .RepoSummary.Total}}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Indexed</p>
+                <p class="text-2xl font-bold text-brand-600">{{formatCompact .RepoSummary.Indexed}}</p>
+            </div>
+        </div>
+        <div class="h-2 bg-gray-200/70 rounded-full overflow-hidden">
+            {{if gt .RepoSummary.Total 0}}
+            <div class="h-full rounded-full" style="width: {{.RepoSummary.IndexedPercent}}%; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+            {{else}}
+            <div class="h-full bg-gray-300 rounded-full"></div>
+            {{end}}
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    {{if or .ActiveInstallsLine.Points .FileCountLine.Points .FileSizeLine.Points}}
+    <div class="grid grid-cols-1 gap-4 mb-6">
+        {{if .ActiveInstallsLine.Points}}
+        <div class="glass-inner p-6">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-lg font-semibold text-gray-900">Active Installs</h3>
+                <span class="text-xs text-gray-400">Max {{formatCompact (int .ActiveInstallsLine.Max)}}</span>
+            </div>
+            <div class="relative h-32">
+                <svg viewBox="0 0 100 40" class="w-full h-32" preserveAspectRatio="none">
+                    <path d="M0 40H100 M0 20H100 M0 0H100" stroke="rgba(0,0,0,0.06)" stroke-width="0.5" fill="none" />
+                    <polyline points="{{.ActiveInstallsLine.Points}}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </div>
+        </div>
+        {{end}}
+
+        {{if or .FileCountLine.Points .FileSizeLine.Points}}
+        <div class="glass-inner p-6">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-lg font-semibold text-gray-900">File Stats</h3>
+            </div>
+            <div class="flex items-center gap-4 text-xs text-gray-500 mb-4">
+                <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-brand-500"></span>Total size</span>
+                <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-brand-300"></span>File count</span>
+            </div>
+            <div class="relative h-32">
+                <svg viewBox="0 0 100 40" class="w-full h-32" preserveAspectRatio="none">
+                    <path d="M0 40H100 M0 20H100 M0 0H100" stroke="rgba(0,0,0,0.06)" stroke-width="0.5" fill="none" />
+                    {{if .FileSizeLine.Points}}
+                    <polyline points="{{.FileSizeLine.Points}}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    {{end}}
+                    {{if .FileCountLine.Points}}
+                    <polyline points="{{.FileCountLine.Points}}" fill="none" stroke="#93c5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    {{end}}
+                </svg>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+
+    {{if .LargestFiles}}
+    <!-- Largest Files -->
+    <div class="glass-inner overflow-hidden mb-6">
+        <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
+            <h2 class="text-lg font-semibold text-gray-900">Largest Files</h2>
+            <p class="text-sm text-gray-500">Top {{len .LargestFiles}} largest files across all {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
+        </div>
+
+        <div class="p-6">
+            {{$maxSize := 0}}
+            {{range .LargestFiles}}
+                {{if gt .Size $maxSize}}{{$maxSize = .Size}}{{end}}
+            {{end}}
+
+            <div class="space-y-3">
+                {{$repo := .RepoSummary.Repo}}
+                {{range $i, $file := .LargestFiles}}
+                {{if lt $i 50}}
+                <a href="/repos/{{$repo}}/{{$file.Slug}}" class="group block">
+                    <div class="flex items-center justify-between text-sm mb-1">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <span class="text-brand-600 font-medium flex-shrink-0">{{$file.Slug}}</span>
+                            <span class="text-gray-400">/</span>
+                            <span class="text-gray-600 truncate" title="{{$file.Path}}">{{$file.Path}}</span>
+                        </div>
+                        <span class="text-gray-500 ml-2 flex-shrink-0">{{formatBytes $file.Size}}</span>
+                    </div>
+                    <div class="h-2 bg-gray-200/70 rounded-full overflow-hidden">
+                        <div class="h-full rounded-full transition-all duration-300 group-hover:opacity-80"
+                             style="width: {{if gt $maxSize 0}}{{printf "%.1f" (divideFloat $file.Size $maxSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+                    </div>
+                </a>
+                {{end}}
+                {{end}}
+            </div>
+        </div>
+    </div>
+    {{end}}
+
+    <!-- Items List -->
+    <div class="glass-inner overflow-hidden">
+        <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
+            <h2 class="text-lg font-semibold text-gray-900">
+                {{if eq .RepoSummary.Repo "plugins"}}Plugins{{else if eq .RepoSummary.Repo "themes"}}Themes{{else}}Core Versions{{end}}
+            </h2>
+        </div>
+
+        {{if .Items}}
+        <div>
+            {{$repo := .RepoSummary.Repo}}
+            {{range .Items}}
+            <a href="/repos/{{$repo}}/{{.Slug}}" class="px-6 py-4 flex items-center justify-between hover:bg-white/40 transition-colors block" style="border-bottom: 1px solid rgba(255,255,255,0.3);">
+                <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-lg bg-white/60 border border-white/50 flex items-center justify-center">
+                        {{if .Indexed}}
+                        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        {{else}}
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        {{end}}
+                    </div>
+                    <div>
+                        <h3 class="text-gray-900 font-medium">{{.Name}}</h3>
+                        <p class="text-sm text-gray-400">{{.Slug}}</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    {{if .FileCount}}
+                    <span class="text-sm text-gray-400">{{formatCompact .FileCount}} files</span>
+                    {{end}}
+                    {{if .TotalSize}}
+                    <span class="text-sm text-gray-400">{{formatBytes .TotalSize}}</span>
+                    {{end}}
+                    <span class="text-sm text-gray-500">v{{.Version}}</span>
+                    {{if .Indexed}}
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 text-green-600 text-xs font-medium border border-green-200">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        Indexed
+                    </span>
+                    {{else}}
+                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-medium border border-gray-200">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                        Pending
+                    </span>
+                    {{end}}
+                </div>
+            </a>
+            {{end}}
+        </div>
+
+        <!-- Pagination -->
+        {{if gt .TotalPages 1}}
+        <div class="px-6 py-4 flex items-center justify-between" style="border-top: 1px solid rgba(255,255,255,0.5);">
+            <p class="text-sm text-gray-500">
+                Page {{.Page}} of {{.TotalPages}}
+            </p>
+            <div class="flex items-center gap-2">
+                {{if gt .Page 1}}
+                <a href="?page={{add .Page -1}}" class="px-3 py-1.5 rounded-lg bg-white/40 border border-white/50 text-gray-600 text-sm hover:bg-white/60 transition-colors">
+                    Previous
+                </a>
+                {{end}}
+                {{if lt .Page .TotalPages}}
+                <a href="?page={{add .Page 1}}" class="px-3 py-1.5 rounded-lg bg-white/40 border border-white/50 text-gray-600 text-sm hover:bg-white/60 transition-colors">
+                    Next
+                </a>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+        {{else}}
+        <div class="px-6 py-12 text-center">
+            <p class="text-gray-500">No items found in this repository.</p>
+        </div>
+        {{end}}
+    </div>
+
+    <!-- Footer -->
+    {{template "footer" .}}
+</div>
+{{end}}

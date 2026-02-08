@@ -1,0 +1,96 @@
+name: Build & Deploy
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-prod
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GOEXPERIMENT: jsonv2,greenteagc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '~1.25.6'
+
+      - name: Cache Go Modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o veloria ./cmd/veloria
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o veloria-indexer ./cmd/veloria-indexer
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o veloria-migrate ./cmd/veloria-migrate
+
+      - name: Deploy
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+
+          # Upload binaries with temporary names
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+            veloria "${USER}@${HOST}:/opt/veloria/veloria.new"
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+            veloria-indexer "${USER}@${HOST}:/opt/veloria/veloria-indexer.new"
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
+            veloria-migrate "${USER}@${HOST}:/opt/veloria/veloria-migrate.new"
+
+          # Atomic swap & restart
+          ssh -i ~/.ssh/deploy_key "${USER}@${HOST}" << 'ENDSSH'
+            set -e
+            cd /opt/veloria
+
+            chmod +x veloria.new veloria-indexer.new veloria-migrate.new
+
+            # Keep previous versions for rollback
+            for bin in veloria veloria-indexer veloria-migrate; do
+              if [ -f "$bin" ]; then
+                cp "$bin" "${bin}.prev"
+              fi
+            done
+
+            # Atomic swap
+            mv veloria.new veloria
+            mv veloria-indexer.new veloria-indexer
+            mv veloria-migrate.new veloria-migrate
+
+            sudo systemctl restart veloria
+            sleep 3
+
+            # Health check
+            if curl -sf --max-time 5 http://localhost:80/up > /dev/null; then
+              echo "✅ Deploy successful — health check passed"
+            else
+              echo "❌ Health check failed — rolling back"
+              for bin in veloria veloria-indexer veloria-migrate; do
+                if [ -f "${bin}.prev" ]; then
+                  mv "${bin}.prev" "$bin"
+                fi
+              done
+              sudo systemctl restart veloria
+              exit 1
+            fi
+          ENDSSH

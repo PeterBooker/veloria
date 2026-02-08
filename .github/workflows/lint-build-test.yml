@@ -1,0 +1,46 @@
+name: Go Lint, Build and Test
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore: [ '.github/**', 'docs/**', 'README.md' ]
+  pull_request:
+    paths-ignore: [ '.github/**', 'docs/**', 'README.md' ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GOEXPERIMENT: jsonv2,greenteagc
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '~1.25.6'
+
+      - name: Cache Go Modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        run: go test -v ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.6
+
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: -exclude-generated ./...

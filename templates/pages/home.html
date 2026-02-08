@@ -1,0 +1,251 @@
+{{define "home.html"}}
+{{template "base.html" .}}
+{{end}}
+
+{{define "title"}}Veloria - Search WordPress Code{{end}}
+
+{{define "content"}}
+<!-- Heading -->
+<div class="mb-6 lg:px-7 py-6 lg:py-0 lg:pt-5">
+    <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-gray-900 mb-2">Search WordPress Source Code</h1>
+    <p class="text-sm text-gray-600 max-w-lg">Explore core, plugins, and themes with powerful regex patterns. Find exactly what you're looking for.</p>
+</div>
+
+{{if not .SearchEnabled}}
+<div class="lg:px-7 mb-4">
+    <div class="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-700 text-sm">
+        <strong>Search temporarily unavailable.</strong>
+        {{if .SearchDisabledReason}}{{.SearchDisabledReason}}{{else}}Please try again later.{{end}}
+    </div>
+</div>
+{{end}}
+
+<!-- Outer Glass Container -->
+<div class="glass-outer p-5 lg:p-7 flex-1 flex flex-col min-h-0">
+    <!-- Two-column layout -->
+    <div class="flex flex-col xl:flex-row gap-6 xl:items-start flex-1">
+        <!-- Left: Search panel -->
+        <div class="flex-1 min-w-0 order-1">
+            <div class="glass-inner p-5 lg:p-6">
+                <!-- Search input -->
+                <form id="search-form"
+                      hx-post="/search"
+                      hx-target="#results"
+                      hx-indicator="#loading"
+                      hx-swap="innerHTML"
+                      class="relative" {{if not .SearchEnabled}}aria-disabled="true"{{end}}>
+                    <div class="search-wrapper p-1.5">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <div class="flex-1 flex items-center gap-3 px-4">
+                                <svg class="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <path d="m21 21-4.3-4.3"></path>
+                                </svg>
+                                <label for="regex-search" class="sr-only">Enter regex pattern</label>
+                                <input id="regex-search"
+                                       type="text"
+                                       name="term"
+                                       placeholder="Enter regex pattern..."
+                                       class="flex-1 bg-transparent py-3 text-gray-800 placeholder-gray-400 focus:outline-none text-sm font-mono"
+                                       aria-describedby="search-tip"
+                                       required {{if not .SearchEnabled}}disabled{{end}}>
+                            </div>
+                            <button type="submit"
+                                    class="px-6 py-3 rounded-xl font-semibold text-sm text-white transition-all duration-200 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 hover:shadow-lg hover:shadow-blue-500/25 active:scale-[0.97] disabled:opacity-50"
+                                    style="background: linear-gradient(135deg, #3b82f6, #2563eb);"
+                                    {{if not .SearchEnabled}}disabled{{end}}>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                                </svg>
+                                <span>Search</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Controls -->
+                <div class="mt-5 flex flex-col gap-4">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                        <fieldset>
+                            <legend class="sr-only">Select source type</legend>
+                            <div class="control-pill flex divide-x divide-white/30" role="radiogroup" aria-label="Source type">
+                                <div>
+                                    <input type="radio" name="repo" value="plugins" id="repo-plugins" checked class="sr-only peer" form="search-form" {{if not .SearchEnabled}}disabled{{end}}>
+                                    <label for="repo-plugins" class="block px-4 py-2 text-xs font-medium cursor-pointer text-gray-500 hover:text-gray-700 peer-checked:bg-brand-600 peer-checked:text-white transition">Plugins</label>
+                                </div>
+                                <div>
+                                    <input type="radio" name="repo" value="themes" id="repo-themes" class="sr-only peer" form="search-form" {{if not .SearchEnabled}}disabled{{end}}>
+                                    <label for="repo-themes" class="block px-4 py-2 text-xs font-medium cursor-pointer text-gray-500 hover:text-gray-700 peer-checked:bg-brand-600 peer-checked:text-white transition">Themes</label>
+                                </div>
+                                <div>
+                                    <input type="radio" name="repo" value="cores" id="repo-cores" class="sr-only peer" form="search-form" {{if not .SearchEnabled}}disabled{{end}}>
+                                    <label for="repo-cores" class="block px-4 py-2 text-xs font-medium cursor-pointer text-gray-500 hover:text-gray-700 peer-checked:bg-brand-600 peer-checked:text-white transition">Core</label>
+                                </div>
+                            </div>
+                        </fieldset>
+                        <fieldset>
+                            <legend class="sr-only">Select visibility</legend>
+                            <div class="control-pill flex divide-x divide-white/30" role="radiogroup" aria-label="Visibility">
+                                <div>
+                                    <input type="radio" name="visibility" value="public" id="vis-public" checked class="sr-only peer" form="search-form" {{if not .SearchEnabled}}disabled{{end}}>
+                                    <label for="vis-public" class="block px-4 py-2 text-xs font-medium cursor-pointer text-gray-500 hover:text-gray-700 peer-checked:bg-brand-600 peer-checked:text-white transition">Public</label>
+                                </div>
+                                <div>
+                                    <input type="radio" name="visibility" value="private" id="vis-private" class="sr-only peer" form="search-form" {{if not .SearchEnabled}}disabled{{end}}>
+                                    <label for="vis-private" class="block px-4 py-2 text-xs font-medium cursor-pointer text-gray-500 hover:text-gray-700 peer-checked:bg-brand-600 peer-checked:text-white transition">Private</label>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <label for="filetype" class="text-xs text-gray-500 font-medium">File type:</label>
+                            <select name="filetype" id="filetype" form="search-form"
+                                    class="rounded-lg border border-white/50 bg-white/40 text-gray-600 text-xs px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent" {{if not .SearchEnabled}}disabled{{end}}>
+                                <option value="">All files</option>
+                                <option value="php">PHP (.php)</option>
+                                <option value="js">JavaScript (.js)</option>
+                                <option value="css">CSS (.css)</option>
+                                <option value="html">HTML (.html)</option>
+                                <option value="json">JSON (.json)</option>
+                                <option value="xml">XML (.xml)</option>
+                                <option value="txt">Text (.txt)</option>
+                                <option value="md">Markdown (.md)</option>
+                                <option value="sql">SQL (.sql)</option>
+                            </select>
+                        </div>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="case_sensitive" form="search-form"
+                                   class="w-4 h-4 rounded border-gray-300 bg-white/60 text-brand-600 focus:ring-brand-400" {{if not .SearchEnabled}}disabled{{end}}>
+                            <span class="text-xs text-gray-500 font-medium">Case sensitive</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="exclude_minified" form="search-form"
+                                   class="w-4 h-4 rounded border-gray-300 bg-white/60 text-brand-600 focus:ring-brand-400" {{if not .SearchEnabled}}disabled{{end}}>
+                            <span class="text-xs text-gray-500 font-medium whitespace-nowrap">Exclude minified</span>
+                        </label>
+                        <span id="search-tip" class="text-[11px] text-gray-400 hidden sm:block ml-auto">Regex patterns supported</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="loading" class="htmx-indicator items-center justify-center gap-3 py-8 text-gray-400">
+                <div class="w-5 h-5 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin"></div>
+                <span class="text-sm">Searching...</span>
+            </div>
+
+            <!-- Results -->
+            <div id="results"></div>
+
+            <!-- Empty state -->
+            <div id="empty-state" class="mt-8 text-center">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/30 border border-white/50 mb-5" aria-hidden="true">
+                    <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                        <path d="M3 5V19A9 3 0 0 0 21 19V5"></path>
+                        <path d="M3 12A9 3 0 0 0 21 12"></path>
+                    </svg>
+                </div>
+                {{if .SearchEnabled}}
+                <h3 class="text-base text-gray-600 font-semibold mb-1.5">Ready to search</h3>
+                <p class="text-xs text-gray-500 max-w-md mx-auto mb-8">Enter a regex pattern above to search through WordPress source code.</p>
+                {{else}}
+                <h3 class="text-base text-gray-600 font-semibold mb-1.5">Search disabled</h3>
+                <p class="text-xs text-gray-500 max-w-md mx-auto mb-8">
+                    {{if .SearchDisabledReason}}{{.SearchDisabledReason}}{{else}}Search is temporarily unavailable.{{end}}
+                </p>
+                {{end}}
+
+                <h4 class="sr-only">Example search patterns</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl mx-auto">
+                    <button type="button"
+                            onclick="document.getElementById('regex-search').value = '\\$wpdb->(?:query|prepare)'"
+                            class="example-card p-4 text-left group focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50"
+                            aria-label="Use example pattern: SQL Queries" {{if not .SearchEnabled}}disabled{{end}}>
+                        <span class="text-[11px] text-gray-500 group-hover:text-brand-500 transition font-semibold uppercase tracking-wide">SQL Queries</span>
+                        <code class="block mt-2 text-xs text-gray-600 font-mono truncate">\$wpdb->(?:query|prepare)</code>
+                    </button>
+                    <button type="button"
+                            onclick="document.getElementById('regex-search').value = 'do_action\\(.*\\)'"
+                            class="example-card p-4 text-left group focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50"
+                            aria-label="Use example pattern: Hooks" {{if not .SearchEnabled}}disabled{{end}}>
+                        <span class="text-[11px] text-gray-500 group-hover:text-brand-500 transition font-semibold uppercase tracking-wide">Hooks</span>
+                        <code class="block mt-2 text-xs text-gray-600 font-mono truncate">do_action\(.*\)</code>
+                    </button>
+                    <button type="button"
+                            onclick="document.getElementById('regex-search').value = 'sanitize_[a-z_]+\\('"
+                            class="example-card p-4 text-left group focus:outline-none focus:ring-2 focus:ring-brand-400 disabled:opacity-50"
+                            aria-label="Use example pattern: Sanitization" {{if not .SearchEnabled}}disabled{{end}}>
+                        <span class="text-[11px] text-gray-500 group-hover:text-brand-500 transition font-semibold uppercase tracking-wide">Sanitization</span>
+                        <code class="block mt-2 text-xs text-gray-600 font-mono truncate">sanitize_[a-z_]+\(</code>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Recent Searches -->
+        {{if .RecentSearches}}
+        <aside class="w-full xl:w-72 shrink-0 order-2" aria-labelledby="recent-searches-heading">
+            <div class="glass-inner p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <h3 id="recent-searches-heading" class="text-sm font-semibold text-gray-700">Recent Searches</h3>
+                    </div>
+                    <a href="/searches" class="text-[11px] text-brand-500 hover:text-brand-600 font-semibold transition">Full list &rarr;</a>
+                </div>
+                <ul class="space-y-2.5" role="list">
+                    {{range .RecentSearches}}
+                    <li>
+                        <a href="/search/{{.Search.ID}}"
+                           class="glass-inset block p-3 group focus:outline-none focus:ring-2 focus:ring-brand-400">
+                            <div class="font-mono text-xs text-gray-600 truncate group-hover:text-gray-900 transition">
+                                {{.Search.Term}}
+                            </div>
+                            <div class="flex items-center justify-between mt-2">
+                                <span class="inline-flex items-center gap-1.5 text-[11px] text-gray-500 capitalize">
+                                    {{if eq .Search.Repo "plugins"}}
+                                    <span class="w-1.5 h-1.5 rounded-full bg-brand-400"></span>
+                                    {{else if eq .Search.Repo "themes"}}
+                                    <span class="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+                                    {{else}}
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                    {{end}}
+                                    {{.Search.Repo}}
+                                </span>
+                                <span class="text-[11px] text-gray-400">{{timeAgo .Search.CreatedAt}}</span>
+                            </div>
+                            <div class="mt-1.5 text-[11px] text-gray-400">
+                                {{if .MatchesKnown}}
+                                <span class="text-brand-500 font-bold">{{formatNumber .MatchCount}}</span> matches
+                                {{else}}
+                                <span>Matches unavailable</span>
+                                {{end}}
+                            </div>
+                        </a>
+                    </li>
+                    {{end}}
+                </ul>
+            </div>
+        </aside>
+        {{end}}
+    </div>
+
+    <!-- Footer -->
+    {{template "footer" .}}
+</div>
+
+<script>
+    // Hide empty state when results are loaded
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target.id === 'results' && evt.detail.target.innerHTML.trim() !== '') {
+            document.getElementById('empty-state').style.display = 'none';
+        }
+    });
+</script>
+{{end}}

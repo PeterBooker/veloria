@@ -1,0 +1,83 @@
+{{define "login.html"}}
+{{template "base.html" .}}
+{{end}}
+
+{{define "title"}}Sign In - Veloria{{end}}
+
+{{define "content"}}
+<!-- Outer Glass Container -->
+<div class="glass-outer p-5 lg:p-7 flex-1 flex flex-col min-h-0">
+    <div class="flex items-center justify-center flex-1 py-8">
+        <div class="max-w-md w-full">
+            <div class="glass-inner p-8">
+                <div class="text-center mb-8">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">
+                        Sign In
+                    </h2>
+                    <p class="text-gray-500 text-sm">Choose your preferred login method</p>
+                </div>
+
+                {{if .Error}}
+                <div class="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+                    {{if eq .Error "auth_failed"}}
+                    Authentication failed. Please try again.
+                    {{else if eq .Error "user_failed"}}
+                    Failed to process your account. Please try again.
+                    {{else if eq .Error "session_failed"}}
+                    Failed to create session. Please try again.
+                    {{else}}
+                    An error occurred. Please try again.
+                    {{end}}
+                </div>
+                {{end}}
+
+                {{if .EnabledProviders}}
+                <div class="space-y-3">
+                    {{range .EnabledProviders}}
+                    {{if eq . "github"}}
+                    <a href="/auth/github"
+                       class="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl bg-gray-900 hover:bg-gray-800 text-white transition group">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        <span class="font-medium">Continue with GitHub</span>
+                    </a>
+                    {{else if eq . "gitlab"}}
+                    <a href="/auth/gitlab"
+                       class="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white transition group">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="m23.6 9.59-.01-.04-3.28-8.45a.87.87 0 0 0-.34-.39.89.89 0 0 0-1.01.1.87.87 0 0 0-.29.38l-2.22 6.73H7.55L5.33 1.19a.87.87 0 0 0-.29-.38.89.89 0 0 0-1.01-.1c-.15.09-.27.22-.34.39L.4 9.55l-.01.04a6.22 6.22 0 0 0 2.07 7.18l.01.01.02.01 5.16 3.85 2.55 1.93 1.56 1.17a1.05 1.05 0 0 0 1.26 0l1.56-1.17 2.55-1.93 5.18-3.86.01-.01a6.22 6.22 0 0 0 2.07-7.18Z"/>
+                        </svg>
+                        <span class="font-medium">Continue with GitLab</span>
+                    </a>
+                    {{else if eq . "atlassian"}}
+                    <a href="/auth/atlassian"
+                       class="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white transition group">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6.77 13.48c-.2-.26-.5-.26-.7.04L.53 22.56c-.2.32-.08.64.28.64h7.7c.2 0 .4-.12.52-.36 1.18-2.64.64-6.88-2.26-9.36zm3.8-9.76c-2.18 3.56-2.06 7.84.38 11.08l4.04 5.52c.16.24.36.36.58.36h7.7c.36 0 .52-.32.3-.64L10.93 3.72c-.2-.24-.52-.24-.66 0z"/>
+                        </svg>
+                        <span class="font-medium">Continue with Atlassian</span>
+                    </a>
+                    {{end}}
+                    {{end}}
+                </div>
+                {{else}}
+                <div class="text-center text-gray-500 py-4">
+                    <p>No authentication providers configured.</p>
+                    <p class="text-sm mt-2">Please configure OAuth providers in the environment.</p>
+                </div>
+                {{end}}
+
+                <div class="mt-6 text-center">
+                    <p class="text-xs text-gray-400">
+                        By signing in, you agree to our Terms of Service
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    {{template "footer" .}}
+</div>
+{{end}}

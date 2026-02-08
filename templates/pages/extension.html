@@ -1,0 +1,89 @@
+{{define "extension.html"}}
+{{template "base.html" .}}
+{{end}}
+
+{{define "title"}}{{.Name}} - Veloria{{end}}
+
+{{define "content"}}
+<!-- Heading -->
+<div class="mb-6 lg:px-7 py-6 lg:py-0 lg:pt-5">
+    <nav class="text-sm text-gray-400 mb-3">
+        <a href="/repos" class="hover:text-brand-600 transition-colors">Repositories</a>
+        <span class="mx-2">/</span>
+        <a href="/repos/{{.RepoType}}" class="hover:text-brand-600 transition-colors capitalize">{{.RepoType}}</a>
+        <span class="mx-2">/</span>
+        <span class="text-gray-700 font-medium">{{.Name}}</span>
+    </nav>
+    <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-xl bg-white/60 border border-white/50 flex items-center justify-center">
+            {{if eq .RepoType "plugins"}}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            {{else if eq .RepoType "themes"}}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            {{else}}
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/>
+            </svg>
+            {{end}}
+        </div>
+        <div>
+            <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-gray-900">{{.Name}}</h1>
+            <p class="text-sm text-gray-600">v{{.Version}} &middot;
+                {{if .Indexed}}
+                <span class="text-green-600">Indexed</span>
+                {{else}}
+                <span class="text-gray-400">Pending</span>
+                {{end}}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Outer Glass Container -->
+<div class="glass-outer p-5 lg:p-7 flex-1 flex flex-col min-h-0">
+    {{if .ShortDescription}}
+    <div class="glass-inner p-6 mb-6">
+        <p class="text-gray-600">{{.ShortDescription}}</p>
+    </div>
+    {{end}}
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {{if or (eq .RepoType "plugins") (eq .RepoType "themes")}}
+        <div class="glass-inner p-4">
+            <p class="text-sm text-gray-500 mb-1">Active Installs</p>
+            <p class="text-2xl font-bold text-gray-900">{{formatCompact .ActiveInstalls}}</p>
+        </div>
+        {{end}}
+        <div class="glass-inner p-4">
+            <p class="text-sm text-gray-500 mb-1">Total Files</p>
+            <p class="text-2xl font-bold text-brand-600">{{.FileCount}}</p>
+        </div>
+        <div class="glass-inner p-4">
+            <p class="text-sm text-gray-500 mb-1">Total Size</p>
+            <p class="text-2xl font-bold text-brand-700">{{formatBytes .TotalSize}}</p>
+        </div>
+    </div>
+
+    {{if not .Indexed}}
+    <div class="glass-inner p-12 text-center">
+        <div class="w-16 h-16 rounded-full bg-white/30 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">Not Yet Indexed</h3>
+        <p class="text-gray-500">File statistics will be available once this {{.RepoType}} is indexed.</p>
+    </div>
+    {{end}}
+
+    <!-- Footer -->
+    {{template "footer" .}}
+</div>
+{{end}}
