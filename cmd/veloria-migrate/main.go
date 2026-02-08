@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	fmtDBString = "host=%s user=%s password=%s dbname=%s port=%d sslmode=disable"
+	fmtDBString = "host=%s user=%s password=%s dbname=%s port=%d sslmode=%s"
 )
 
 var flags = flag.NewFlagSet("migrate", flag.ExitOnError)
@@ -42,7 +42,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
-	dbString := fmt.Sprintf(fmtDBString, c.DBHost, c.DBUser, c.DBPass, c.DBName, c.DBPort)
+	dbString := fmt.Sprintf(fmtDBString, c.DBHost, c.DBUser, c.DBPass, c.DBName, c.DBPort, c.DBSSLMode)
 
 	db, err := goose.OpenDBWithDriver("pgx", dbString)
 	if err != nil {
