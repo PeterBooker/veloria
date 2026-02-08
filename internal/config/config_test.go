@@ -56,6 +56,7 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, "", cfg.OAuthBaseURL)
 	assert.Equal(t, "", cfg.SessionSecret)
 	assert.Equal(t, "", cfg.AspireCloudAPIKey)
+	assert.Equal(t, "", cfg.CloudflareAPIToken)
 }
 
 func TestConfigWithEnv(t *testing.T) {
@@ -94,6 +95,7 @@ func TestConfigWithEnv(t *testing.T) {
 	setEnv(t, "OAUTH_BASE_URL", "https://example.com")
 	setEnv(t, "SESSION_SECRET", "super-secret")
 	setEnv(t, "ASPIRE_CLOUD_API_KEY", "test-aspire-key")
+	setEnv(t, "CLOUDFLARE_API_TOKEN", "test-cf-token")
 	cfg, err := New()
 	require.NoError(t, err)
 
@@ -133,6 +135,7 @@ func TestConfigWithEnv(t *testing.T) {
 	assert.Equal(t, "https://example.com", cfg.OAuthBaseURL)
 	assert.Equal(t, "super-secret", cfg.SessionSecret)
 	assert.Equal(t, "test-aspire-key", cfg.AspireCloudAPIKey)
+	assert.Equal(t, "test-cf-token", cfg.CloudflareAPIToken)
 }
 
 func TestConfigValidation_InvalidPort(t *testing.T) {
@@ -165,6 +168,34 @@ func TestConfigValidation_InvalidConcurrency(t *testing.T) {
 	_, err := New()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "IndexerConcurrency")
+}
+
+func TestConfigValidation_CloudflareTokenRequiredInProduction(t *testing.T) {
+	os.Clearenv()
+	setEnv(t, "ENV", "production")
+	setEnv(t, "APP_URL", "https://example.com")
+	// CLOUDFLARE_API_TOKEN not set
+	_, err := New()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "CLOUDFLARE_API_TOKEN")
+}
+
+func TestConfigValidation_CloudflareTokenNotRequiredInDev(t *testing.T) {
+	os.Clearenv()
+	setEnv(t, "ENV", "development")
+	setEnv(t, "APP_URL", "https://example.com")
+	cfg, err := New()
+	require.NoError(t, err)
+	assert.Equal(t, "", cfg.CloudflareAPIToken)
+}
+
+func TestConfigValidation_CloudflareTokenNotRequiredWithoutAppURL(t *testing.T) {
+	os.Clearenv()
+	setEnv(t, "ENV", "production")
+	// APP_URL not set — TLS won't be enabled
+	cfg, err := New()
+	require.NoError(t, err)
+	assert.Equal(t, "", cfg.CloudflareAPIToken)
 }
 
 func TestConfigValidation_RequiredFields(t *testing.T) {

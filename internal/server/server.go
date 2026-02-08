@@ -13,6 +13,7 @@ import (
 	"veloria/internal/config"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/libdns/cloudflare"
 	"github.com/rs/zerolog"
 )
 
@@ -49,6 +50,14 @@ func New(handler http.Handler, c *config.Config, l *zerolog.Logger) (*Server, er
 		certmagic.Default.Storage = &certmagic.FileStorage{Path: filepath.Join(c.DataDir, "certs")}
 		certmagic.DefaultACME.Agreed = true
 		certmagic.DefaultACME.DisableHTTPChallenge = true
+		certmagic.DefaultACME.DisableTLSALPNChallenge = true
+		certmagic.DefaultACME.DNS01Solver = &certmagic.DNS01Solver{
+			DNSManager: certmagic.DNSManager{
+				DNSProvider: &cloudflare.Provider{
+					APIToken: c.CloudflareAPIToken,
+				},
+			},
+		}
 		if c.ACMEEmail != "" {
 			certmagic.DefaultACME.Email = c.ACMEEmail
 		}
