@@ -72,8 +72,9 @@ type Config struct {
 	AspireCloudAPIKey string `env:"ASPIRE_CLOUD_API_KEY" envDefault:""`
 
 	// Application URL (production TLS via certmagic)
-	AppURL    string `env:"APP_URL" envDefault:""`
-	ACMEEmail string `env:"ACME_EMAIL" envDefault:""`
+	AppURL             string `env:"APP_URL" envDefault:""`
+	ACMEEmail          string `env:"ACME_EMAIL" envDefault:""`
+	CloudflareAPIToken string `env:"CLOUDFLARE_API_TOKEN" envDefault:""`
 }
 
 // EnsureDirs creates all required data directories if they don't already exist.
@@ -146,6 +147,10 @@ func New() (*Config, error) {
 
 	if err := validator.New().Struct(c); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	if c.Env != "development" && c.AppURL != "" && c.CloudflareAPIToken == "" {
+		return nil, fmt.Errorf("invalid configuration: CLOUDFLARE_API_TOKEN is required when APP_URL is set in non-development mode")
 	}
 
 	return c, nil
