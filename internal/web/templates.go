@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"path/filepath"
+	"io/fs"
+	"path"
 	"strings"
 	"time"
 )
@@ -14,10 +15,10 @@ type Templates struct {
 	templates map[string]*template.Template
 }
 
-// NewTemplates parses all templates from the templates directory.
+// NewTemplates parses all templates from the embedded filesystem.
 // Each page gets its own template instance with layouts and partials included.
 // Partials are also registered for direct rendering (htmx responses).
-func NewTemplates(templatesDir string) (*Templates, error) {
+func NewTemplates(fsys fs.FS) (*Templates, error) {
 	funcs := template.FuncMap{
 		"add": func(a int, b int) int {
 			return a + b
@@ -104,21 +105,18 @@ func NewTemplates(templatesDir string) (*Templates, error) {
 			}
 		},
 	}
-	// Get shared templates (layouts and partials)
-	layouts, err := filepath.Glob(filepath.Join(templatesDir, "layouts", "*.html"))
-	if err != nil {
-		return nil, err
-	}
 
-	partials, err := filepath.Glob(filepath.Join(templatesDir, "partials", "*.html"))
-	if err != nil {
-		return nil, err
-	}
-
-	shared := append(layouts, partials...)
+	// Collect shared template patterns (layouts and partials)
+	sharedPatterns := []string{"layouts/*.html", "partials/*.html"}
 
 	// Get all page templates
-	pages, err := filepath.Glob(filepath.Join(templatesDir, "pages", "*.html"))
+	pages, err := fs.Glob(fsys, "pages/*.html")
+	if err != nil {
+		return nil, err
+	}
+
+	// Get partial names for direct rendering
+	partials, err := fs.Glob(fsys, "partials/*.html")
 	if err != nil {
 		return nil, err
 	}
@@ -127,13 +125,12 @@ func NewTemplates(templatesDir string) (*Templates, error) {
 		templates: make(map[string]*template.Template),
 	}
 
-	// Parse each page with its own copy of shared templates
+	// Parse each page with its own copy of shared templates + the page itself
 	for _, page := range pages {
-		name := filepath.Base(page)
+		name := path.Base(page)
+		patterns := append(sharedPatterns, page)
 
-		// Create a new template for this page, parsing shared templates first
-		files := append(shared, page)
-		tmpl, err := template.New(name).Funcs(funcs).ParseFiles(files...)
+		tmpl, err := template.New(name).Funcs(funcs).ParseFS(fsys, patterns...)
 		if err != nil {
 			return nil, fmt.Errorf("parsing %s: %w", name, err)
 		}
@@ -143,8 +140,8 @@ func NewTemplates(templatesDir string) (*Templates, error) {
 
 	// Also register partials for direct rendering (htmx responses)
 	for _, partial := range partials {
-		name := filepath.Base(partial)
-		tmpl, err := template.New(name).Funcs(funcs).ParseFiles(partial)
+		name := path.Base(partial)
+		tmpl, err := template.New(name).Funcs(funcs).ParseFS(fsys, partial)
 		if err != nil {
 			return nil, fmt.Errorf("parsing partial %s: %w", name, err)
 		}

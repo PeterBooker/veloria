@@ -19,7 +19,6 @@ type Config struct {
 	Version                string        `env:"VERSION" envDefault:"1.0.0"`
 	WorkingDir             string        `envDefault:"/"`
 	DataDir                string        `env:"DATA_DIR" envDefault:"/etc/veloria/data" validate:"required"`
-	TemplatesDir           string        `env:"TEMPLATES_DIR" envDefault:"templates"`
 	HTTPTimeout            int64         `env:"HTTP_TIMEOUT" envDefault:"2500"`
 	HTTPHandlerTimeout     time.Duration `env:"HTTP_HANDLER_TIMEOUT" envDefault:"30s"`
 	HTTPReadTimeout        time.Duration `env:"HTTP_READ_TIMEOUT" envDefault:"30s"`
@@ -140,12 +139,6 @@ func New() (*Config, error) {
 	}
 	if c.DBTimeZone == "" {
 		c.DBTimeZone = "UTC"
-	}
-	if c.TemplatesDir == "" {
-		c.TemplatesDir = "templates"
-	}
-	if !filepath.IsAbs(c.TemplatesDir) {
-		c.TemplatesDir = filepath.Join(c.WorkingDir, c.TemplatesDir)
 	}
 	if _, ok := os.LookupEnv("S3_ENSURE_BUCKET"); !ok && c.Env == "development" {
 		c.S3EnsureBucket = true

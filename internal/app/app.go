@@ -25,6 +25,7 @@ import (
 	"veloria/internal/storage"
 	"veloria/internal/tasks"
 	"veloria/internal/web"
+	"veloria/templates"
 )
 
 const fmtDBString = "host=%s user=%s password=%s dbname=%s port=%d sslmode=%s TimeZone=%s connect_timeout=%d"
@@ -124,7 +125,7 @@ func New(ctx context.Context) (*App, error) {
 	}
 
 	// Initialize templates and web handler
-	templates, err := web.NewTemplates(c.TemplatesDir)
+	tmpl, err := web.NewTemplates(templates.FS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load templates: %w", err)
 	}
@@ -142,7 +143,7 @@ func New(ctx context.Context) (*App, error) {
 		}
 		l.Warn().Msgf("Search disabled: %s", searchDisabledReason)
 	}
-	deps := web.NewDeps(templates, a.DB, a.Manager, a.S3, appCache, c, searchEnabled, searchDisabledReason)
+	deps := web.NewDeps(tmpl, a.DB, a.Manager, a.S3, appCache, c, searchEnabled, searchDisabledReason)
 
 	r := router.New(l, nil, a.DB, a.Manager, a.S3, deps, a.SessionStore, a.AuthHandler, router.Options{
 		HandlerTimeout:   c.HTTPHandlerTimeout,
