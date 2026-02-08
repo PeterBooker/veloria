@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -27,7 +26,6 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, "development", cfg.Env)
 	assert.Equal(t, "1.0.0", cfg.Version)
 	assert.Equal(t, "/etc/veloria/data", cfg.DataDir)
-	assert.Equal(t, filepath.Join(cfg.WorkingDir, "templates"), cfg.TemplatesDir)
 	assert.Equal(t, int64(2500), cfg.HTTPTimeout)
 	assert.Equal(t, 30*time.Second, cfg.HTTPHandlerTimeout)
 	assert.Equal(t, 30*time.Second, cfg.HTTPReadTimeout)
@@ -66,7 +64,6 @@ func TestConfigWithEnv(t *testing.T) {
 	setEnv(t, "ENV", "production")
 	setEnv(t, "VERSION", "1.1.0")
 	setEnv(t, "DATA_DIR", "/custom/data/dir")
-	setEnv(t, "TEMPLATES_DIR", "/custom/templates")
 	setEnv(t, "HTTP_TIMEOUT", "5000")
 	setEnv(t, "HTTP_HANDLER_TIMEOUT", "12s")
 	setEnv(t, "HTTP_READ_TIMEOUT", "11s")
@@ -106,7 +103,6 @@ func TestConfigWithEnv(t *testing.T) {
 	assert.Equal(t, "production", cfg.Env)
 	assert.Equal(t, "1.1.0", cfg.Version)
 	assert.Equal(t, "/custom/data/dir", cfg.DataDir)
-	assert.Equal(t, "/custom/templates", cfg.TemplatesDir)
 	assert.Equal(t, int64(5000), cfg.HTTPTimeout)
 	assert.Equal(t, 12*time.Second, cfg.HTTPHandlerTimeout)
 	assert.Equal(t, 11*time.Second, cfg.HTTPReadTimeout)
