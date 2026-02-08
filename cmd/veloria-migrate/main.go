@@ -11,6 +11,7 @@ import (
 	"veloria/migrations"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/joho/godotenv"
 	"github.com/pressly/goose/v3"
 )
 
@@ -33,6 +34,9 @@ func main() {
 	}
 
 	command := args[0]
+
+	// Always load .env from cwd so the migrate binary works standalone on prod
+	_ = godotenv.Load(".env")
 
 	c, err := config.New()
 	if err != nil {
