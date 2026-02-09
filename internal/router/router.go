@@ -85,6 +85,7 @@ func New(l *zerolog.Logger, v *validator.Validate, db *gorm.DB, m *manager.Manag
 	// Web UI routes
 	if deps != nil {
 		r.Get("/", web.HomePage(deps))
+		r.Get("/about", web.AboutPage(deps))
 		r.Get("/repos", web.ReposPage(deps))
 		r.Get("/repos/{type}", web.RepoPage(deps))
 		r.Get("/repos/plugins/{slug}", plugin.ViewPage(deps))
