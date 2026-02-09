@@ -72,12 +72,21 @@ type SearchResultsData struct {
 // SearchViewData contains data for the single search view.
 type SearchViewData struct {
 	PageData
-	Search             searchmodel.Search
-	Results            *manager.SearchResponse
-	ExtensionSummaries []ExtensionResultSummary
-	TotalMatches       int
-	DurationMs         int64
-	Error              string
+	Search          searchmodel.Search
+	TotalMatches    int
+	TotalExtensions int
+	DurationMs      int64
+	Error           string
+}
+
+// SearchExtensionsData contains data for the search extensions HTMX partial.
+type SearchExtensionsData struct {
+	SearchID   string
+	SearchRepo string
+	Extensions []ExtensionResultSummary
+	Page       int
+	TotalPages int
+	Search     string
 }
 
 // ExtensionResultSummary contains summary info for one extension in search results (no match details).
@@ -140,9 +149,6 @@ type LineSeries struct {
 type RepoData struct {
 	PageData
 	RepoSummary        RepoSummary
-	Items              []RepoItem
-	Page               int
-	TotalPages         int
 	ActiveInstallsLine LineSeries
 	FileCountLine      LineSeries
 	FileSizeLine       LineSeries
@@ -161,6 +167,15 @@ type LargestRepoFile struct {
 	Size int64
 	Slug string
 	Name string
+}
+
+// RepoItemsData contains data for the repo items HTMX partial.
+type RepoItemsData struct {
+	Repo       string
+	Items      []RepoItem
+	Page       int
+	TotalPages int
+	Search     string
 }
 
 // ExtensionData contains data for single extension views.

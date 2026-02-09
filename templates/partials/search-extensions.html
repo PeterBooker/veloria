@@ -1,0 +1,85 @@
+{{define "search-extensions.html"}}
+{{if .Extensions}}
+<div class="flex flex-col gap-2">
+    {{$searchID := .SearchID}}
+    {{$searchRepo := .SearchRepo}}
+    {{range $ext := .Extensions}}
+    <!-- Extension Row -->
+    <div class="rounded-xl overflow-hidden bg-white border border-gray-200">
+        <!-- Clickable Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 lg:px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+             onclick="toggleExtDetail(this, '/search/{{$searchID}}/extension/{{$ext.Slug}}', 'ext-detail-{{$ext.Slug}}')">
+            <div class="flex items-center gap-2 text-gray-600 min-w-0">
+                <svg data-chevron class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+                <div class="min-w-0">
+                    <span class="text-gray-900 text-xs lg:text-sm font-medium block truncate">{{$ext.Name}}</span>
+                    <span class="text-gray-400 text-xs font-mono">{{$ext.Slug}}/{{$ext.Version}}</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 sm:gap-4 pl-6 sm:pl-0">
+                {{if eq $searchRepo "plugins"}}
+                <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-brand-100 text-brand-700">Plugin</span>
+                {{else if eq $searchRepo "themes"}}
+                <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-blue-100 text-blue-700">Theme</span>
+                {{else}}
+                <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-amber-100 text-amber-700">Core</span>
+                {{end}}
+                {{if $ext.ActiveInstalls}}
+                <span class="text-gray-400 text-xs whitespace-nowrap">{{formatInstalls $ext.ActiveInstalls}} installs</span>
+                {{end}}
+                <span class="text-brand-600 text-xs font-semibold whitespace-nowrap">{{formatNumber $ext.TotalMatches}} matches</span>
+            </div>
+        </div>
+        <!-- Detail Container (hidden until header clicked) -->
+        <div data-detail class="hidden border-t border-gray-200">
+            <div id="ext-detail-{{$ext.Slug}}">
+                <div class="flex items-center justify-center gap-2 py-6 text-gray-400">
+                    <div class="w-4 h-4 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin"></div>
+                    <span class="text-xs">Loading matches...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{end}}
+</div>
+
+<!-- Pagination -->
+{{if gt .TotalPages 1}}
+<div class="mt-3 flex items-center justify-between">
+    <p class="text-sm text-gray-500">
+        Page {{.Page}} of {{.TotalPages}}
+    </p>
+    <div class="flex items-center gap-2">
+        {{if gt .Page 1}}
+        <button
+            hx-get="/search/{{.SearchID}}/extensions?page={{add .Page -1}}{{if .Search}}&search={{.Search}}{{end}}"
+            hx-target="#search-extensions"
+            hx-swap="innerHTML"
+            class="px-3 py-1.5 rounded-lg bg-white/40 border border-white/50 text-gray-600 text-sm hover:bg-white/60 transition-colors cursor-pointer">
+            Previous
+        </button>
+        {{end}}
+        {{if lt .Page .TotalPages}}
+        <button
+            hx-get="/search/{{.SearchID}}/extensions?page={{add .Page 1}}{{if .Search}}&search={{.Search}}{{end}}"
+            hx-target="#search-extensions"
+            hx-swap="innerHTML"
+            class="px-3 py-1.5 rounded-lg bg-white/40 border border-white/50 text-gray-600 text-sm hover:bg-white/60 transition-colors cursor-pointer">
+            Next
+        </button>
+        {{end}}
+    </div>
+</div>
+{{end}}
+{{else}}
+<div class="text-center py-12">
+    {{if .Search}}
+    <p class="text-gray-500 text-sm">No extensions matching "{{.Search}}".</p>
+    {{else}}
+    <p class="text-gray-500 text-sm">No matching extensions found.</p>
+    {{end}}
+</div>
+{{end}}
+{{end}}

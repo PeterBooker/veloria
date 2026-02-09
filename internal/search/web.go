@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"strconv"
 	"sync"
 	"time"
@@ -64,19 +65,8 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 				var protoResults typespb.SearchResponse
 				if err := d.S3.DownloadResult(ctx, s.ID.String(), &protoResults); err == nil {
 					results := searchmodel.SearchResponseFromProto(&protoResults)
-					data.Results = results
 					data.TotalMatches = web.CountTotalMatches(results)
-					summaries := make([]web.ExtensionResultSummary, len(results.Results))
-					for i, r := range results.Results {
-						summaries[i] = web.ExtensionResultSummary{
-							Slug:           r.Slug,
-							Name:           r.Name,
-							Version:        r.Version,
-							ActiveInstalls: r.ActiveInstalls,
-							TotalMatches:   r.TotalMatches,
-						}
-					}
-					data.ExtensionSummaries = summaries
+					data.TotalExtensions = results.Total
 				} else {
 					data.Error = "Results are currently unavailable."
 				}
@@ -86,6 +76,104 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		if err := d.Templates.Render(w, "search.html", data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+// SearchExtensionsPartial renders the paginated, searchable extension list as an HTMX partial.
+func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if d.DB == nil || d.S3 == nil {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+
+		idStr := chi.URLParam(r, "uuid")
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			http.Error(w, "invalid search id", http.StatusBadRequest)
+			return
+		}
+
+		var s searchmodel.Search
+		if err := d.DB.First(&s, "id = ?", id).Error; err != nil {
+			http.Error(w, "search not found", http.StatusNotFound)
+			return
+		}
+		if s.Status != searchmodel.StatusCompleted {
+			http.Error(w, "search not completed", http.StatusNotFound)
+			return
+		}
+
+		const pageSize = 25
+		page := 1
+		if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+			if parsed, err := strconv.Atoi(pageStr); err == nil && parsed > 0 {
+				page = parsed
+			}
+		}
+		search := strings.ToLower(r.URL.Query().Get("search"))
+
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+
+		var protoResults typespb.SearchResponse
+		if err := d.S3.DownloadResult(ctx, s.ID.String(), &protoResults); err != nil {
+			http.Error(w, "failed to load results", http.StatusInternalServerError)
+			return
+		}
+
+		results := searchmodel.SearchResponseFromProto(&protoResults)
+
+		// Build summaries, filtering by search term if provided.
+		var summaries []web.ExtensionResultSummary
+		for _, result := range results.Results {
+			if search != "" {
+				if !strings.Contains(strings.ToLower(result.Name), search) &&
+					!strings.Contains(strings.ToLower(result.Slug), search) {
+					continue
+				}
+			}
+			summaries = append(summaries, web.ExtensionResultSummary{
+				Slug:           result.Slug,
+				Name:           result.Name,
+				Version:        result.Version,
+				ActiveInstalls: result.ActiveInstalls,
+				TotalMatches:   result.TotalMatches,
+			})
+		}
+
+		total := len(summaries)
+		totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+		if totalPages == 0 {
+			totalPages = 1
+		}
+		if page > totalPages {
+			page = totalPages
+		}
+
+		// Paginate the slice.
+		start := (page - 1) * pageSize
+		end := start + pageSize
+		if start > len(summaries) {
+			start = len(summaries)
+		}
+		if end > len(summaries) {
+			end = len(summaries)
+		}
+
+		data := web.SearchExtensionsData{
+			SearchID:   s.ID.String(),
+			SearchRepo: s.Repo,
+			Extensions: summaries[start:end],
+			Page:       page,
+			TotalPages: totalPages,
+			Search:     r.URL.Query().Get("search"),
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := d.Templates.Render(w, "search-extensions.html", data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}

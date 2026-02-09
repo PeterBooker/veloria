@@ -94,59 +94,45 @@
     </div>
     {{end}}
 
-    {{if .Results}}
+    {{if gt .TotalExtensions 0}}
     <!-- Results Summary -->
-    <div class="glass-inner p-4 mb-4 flex items-center justify-between">
-        <p class="text-gray-500 text-sm">
+    <div class="glass-inner p-4 mb-4 flex items-center justify-between gap-4">
+        <p class="text-gray-500 text-sm flex-shrink-0">
             <span class="text-gray-900 font-semibold">{{formatNumber .TotalMatches}}</span> matches across
-            <span class="text-brand-600 font-semibold">{{formatNumber .Results.Total}}</span> extensions
+            <span class="text-brand-600 font-semibold">{{formatNumber .TotalExtensions}}</span> extensions
         </p>
+        <div class="relative w-full max-w-xs">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input
+                type="search"
+                name="search"
+                placeholder="Filter extensions..."
+                hx-get="/search/{{.Search.ID}}/extensions"
+                hx-trigger="input changed delay:300ms, search"
+                hx-target="#search-extensions"
+                hx-swap="innerHTML"
+                hx-include="this"
+                class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/50 border border-white/60 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition"
+            >
+        </div>
     </div>
 
-    {{if .ExtensionSummaries}}
-    <div class="glass-inner p-3 lg:p-4 flex flex-col gap-2">
-        {{$searchID := .Search.ID}}
-        {{$searchRepo := .Search.Repo}}
-        {{range $ext := .ExtensionSummaries}}
-        <!-- Extension Row -->
-        <div class="rounded-xl overflow-hidden bg-white border border-gray-200">
-            <!-- Clickable Header -->
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 lg:px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
-                 onclick="toggleExtDetail(this, '/search/{{$searchID}}/extension/{{$ext.Slug}}', 'ext-detail-{{$ext.Slug}}')">
-                <div class="flex items-center gap-2 text-gray-600 min-w-0">
-                    <svg data-chevron class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
-                    <div class="min-w-0">
-                        <span class="text-gray-900 text-xs lg:text-sm font-medium block truncate">{{$ext.Name}}</span>
-                        <span class="text-gray-400 text-xs font-mono">{{$ext.Slug}}/{{$ext.Version}}</span>
-                    </div>
-                </div>
-                <div class="flex items-center gap-3 sm:gap-4 pl-6 sm:pl-0">
-                    {{if eq $searchRepo "plugins"}}
-                    <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-brand-100 text-brand-700">Plugin</span>
-                    {{else if eq $searchRepo "themes"}}
-                    <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-blue-100 text-blue-700">Theme</span>
-                    {{else}}
-                    <span class="px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-amber-100 text-amber-700">Core</span>
-                    {{end}}
-                    {{if $ext.ActiveInstalls}}
-                    <span class="text-gray-400 text-xs whitespace-nowrap">{{formatInstalls $ext.ActiveInstalls}} installs</span>
-                    {{end}}
-                    <span class="text-brand-600 text-xs font-semibold whitespace-nowrap">{{formatNumber $ext.TotalMatches}} matches</span>
-                </div>
-            </div>
-            <!-- Detail Container (hidden until header clicked) -->
-            <div data-detail class="hidden border-t border-gray-200">
-                <div id="ext-detail-{{$ext.Slug}}">
-                    <div class="flex items-center justify-center gap-2 py-6 text-gray-400">
-                        <div class="w-4 h-4 border-2 border-gray-200 border-t-brand-500 rounded-full animate-spin"></div>
-                        <span class="text-xs">Loading matches...</span>
-                    </div>
-                </div>
+    <div class="glass-inner p-3 lg:p-4">
+        <div id="search-extensions"
+             hx-get="/search/{{.Search.ID}}/extensions"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="flex items-center justify-center gap-2 py-12 text-gray-400">
+                <svg class="animate-spin w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span class="text-sm text-gray-500">Loading extensions...</span>
             </div>
         </div>
-        {{end}}
     </div>
     <script>
     function toggleExtDetail(header, url, targetId) {
@@ -171,7 +157,7 @@
         htmx.ajax('GET', url, {target: '#' + targetId, swap: 'innerHTML'});
     }
     </script>
-    {{else}}
+    {{else if eq .Search.Status "completed"}}
     <!-- No Results -->
     <div class="glass-inner text-center py-12 lg:py-16">
         <div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/30 border border-white/50 mb-4 lg:mb-6">
@@ -184,7 +170,6 @@
         <h3 class="text-lg lg:text-xl text-gray-700 mb-2">No matches found</h3>
         <p class="text-gray-500 text-sm lg:text-base">Try a different regex pattern or repository.</p>
     </div>
-    {{end}}
     {{else}}
     <!-- Processing/Unavailable State -->
     <div class="glass-inner text-center py-12 lg:py-16">
