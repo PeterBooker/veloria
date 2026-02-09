@@ -96,12 +96,12 @@
 
     {{if gt .TotalExtensions 0}}
     <!-- Results Summary -->
-    <div class="glass-inner p-4 mb-4 flex items-center justify-between gap-4">
-        <p class="text-gray-500 text-sm flex-shrink-0">
+    <div class="glass-inner p-4 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <p class="text-gray-500 text-sm">
             <span class="text-gray-900 font-semibold">{{formatNumber .TotalMatches}}</span> matches across
             <span class="text-brand-600 font-semibold">{{formatNumber .TotalExtensions}}</span> extensions
         </p>
-        <div class="relative w-full max-w-xs">
+        <div class="relative w-full sm:max-w-xs">
             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
