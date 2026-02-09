@@ -146,85 +146,41 @@
 
     <!-- Items List -->
     <div class="glass-inner overflow-hidden">
-        <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
-            <h2 class="text-lg font-semibold text-gray-900">
+        <div class="px-6 py-4 flex items-center justify-between gap-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
+            <h2 class="text-lg font-semibold text-gray-900 flex-shrink-0">
                 {{if eq .RepoSummary.Repo "plugins"}}Plugins{{else if eq .RepoSummary.Repo "themes"}}Themes{{else}}Core Versions{{end}}
             </h2>
-        </div>
-
-        {{if .Items}}
-        <div>
-            {{$repo := .RepoSummary.Repo}}
-            {{range .Items}}
-            <a href="/repos/{{$repo}}/{{.Slug}}" class="px-6 py-4 flex items-center justify-between hover:bg-white/40 transition-colors block" style="border-bottom: 1px solid rgba(255,255,255,0.3);">
-                <div class="flex items-center gap-4">
-                    <div class="w-10 h-10 rounded-lg bg-white/60 border border-white/50 flex items-center justify-center">
-                        {{if .Indexed}}
-                        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                        {{else}}
-                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                        {{end}}
-                    </div>
-                    <div>
-                        <h3 class="text-gray-900 font-medium">{{.Name}}</h3>
-                        <p class="text-sm text-gray-400">{{.Slug}}</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-4">
-                    {{if .FileCount}}
-                    <span class="text-sm text-gray-400">{{formatCompact .FileCount}} files</span>
-                    {{end}}
-                    {{if .TotalSize}}
-                    <span class="text-sm text-gray-400">{{formatBytes .TotalSize}}</span>
-                    {{end}}
-                    <span class="text-sm text-gray-500">v{{.Version}}</span>
-                    {{if .Indexed}}
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 text-green-600 text-xs font-medium border border-green-200">
-                        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                        Indexed
-                    </span>
-                    {{else}}
-                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-medium border border-gray-200">
-                        <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                        Pending
-                    </span>
-                    {{end}}
-                </div>
-            </a>
-            {{end}}
-        </div>
-
-        <!-- Pagination -->
-        {{if gt .TotalPages 1}}
-        <div class="px-6 py-4 flex items-center justify-between" style="border-top: 1px solid rgba(255,255,255,0.5);">
-            <p class="text-sm text-gray-500">
-                Page {{.Page}} of {{.TotalPages}}
-            </p>
-            <div class="flex items-center gap-2">
-                {{if gt .Page 1}}
-                <a href="?page={{add .Page -1}}" class="px-3 py-1.5 rounded-lg bg-white/40 border border-white/50 text-gray-600 text-sm hover:bg-white/60 transition-colors">
-                    Previous
-                </a>
-                {{end}}
-                {{if lt .Page .TotalPages}}
-                <a href="?page={{add .Page 1}}" class="px-3 py-1.5 rounded-lg bg-white/40 border border-white/50 text-gray-600 text-sm hover:bg-white/60 transition-colors">
-                    Next
-                </a>
-                {{end}}
+            <div class="relative w-full max-w-xs">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                    type="search"
+                    name="search"
+                    placeholder="Search by name or slug..."
+                    hx-get="/repos/{{.RepoSummary.Repo}}/items"
+                    hx-trigger="input changed delay:300ms, search"
+                    hx-target="#repo-items"
+                    hx-swap="innerHTML"
+                    hx-include="this"
+                    class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/50 border border-white/60 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition"
+                >
             </div>
         </div>
-        {{end}}
-        {{else}}
-        <div class="px-6 py-12 text-center">
-            <p class="text-gray-500">No items found in this repository.</p>
+
+        <div id="repo-items"
+             hx-get="/repos/{{.RepoSummary.Repo}}/items"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="px-6 py-12 flex items-center justify-center">
+                <svg class="animate-spin w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span class="ml-2 text-sm text-gray-500">Loading...</span>
+            </div>
         </div>
-        {{end}}
     </div>
 
     <!-- Footer -->

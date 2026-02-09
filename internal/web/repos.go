@@ -50,16 +50,7 @@ func RepoPage(d *Deps) http.HandlerFunc {
 
 		var total, indexed int
 		var title string
-		var items []RepoItem
 		var activeInstallsLine, fileCountLine, fileSizeLine LineSeries
-
-		const pageSize = 50
-		page := 1
-		if pageStr := r.URL.Query().Get("page"); pageStr != "" {
-			if parsed, err := strconv.Atoi(pageStr); err == nil && parsed > 0 {
-				page = parsed
-			}
-		}
 
 		var largestFiles []LargestRepoFile
 
@@ -67,21 +58,18 @@ func RepoPage(d *Deps) http.HandlerFunc {
 		case "plugins":
 			total, indexed = d.Manager.GetPluginRepo().Stats()
 			title = "Plugins"
-			items = fetchPluginItems(d, page, pageSize)
 			activeInstallsLine = fetchActiveInstallsLine(d, "plugins")
 			fileCountLine, fileSizeLine = fetchFileStatsLines(d, "plugins")
 			largestFiles = fetchLargestRepoFiles(d, "plugins", 50)
 		case "themes":
 			total, indexed = d.Manager.GetThemeRepo().Stats()
 			title = "Themes"
-			items = fetchThemeItems(d, page, pageSize)
 			activeInstallsLine = fetchActiveInstallsLine(d, "themes")
 			fileCountLine, fileSizeLine = fetchFileStatsLines(d, "themes")
 			largestFiles = fetchLargestRepoFiles(d, "themes", 50)
 		case "cores":
 			total, indexed = d.Manager.GetCoreRepo().Stats()
 			title = "Core"
-			items = fetchCoreItems(d, page, pageSize)
 			fileCountLine, fileSizeLine = fetchFileStatsLines(d, "cores")
 			largestFiles = fetchLargestRepoFiles(d, "cores", 50)
 		default:
@@ -89,20 +77,9 @@ func RepoPage(d *Deps) http.HandlerFunc {
 			return
 		}
 
-		totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
-		if totalPages == 0 {
-			totalPages = 1
-		}
-		if page > totalPages {
-			page = totalPages
-		}
-
 		data := RepoData{
 			PageData:           d.PageData(r),
 			RepoSummary:        BuildRepoSummary(repoType, title, total, indexed),
-			Items:              items,
-			Page:               page,
-			TotalPages:         totalPages,
 			ActiveInstallsLine: activeInstallsLine,
 			FileCountLine:      fileCountLine,
 			FileSizeLine:       fileSizeLine,
@@ -116,7 +93,62 @@ func RepoPage(d *Deps) http.HandlerFunc {
 	}
 }
 
-func fetchPluginItems(d *Deps, page int, pageSize int) []RepoItem {
+// RepoItemsPartial renders the paginated, searchable items list as an HTMX partial.
+func RepoItemsPartial(d *Deps, repoType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if d.Manager == nil || d.DB == nil {
+			http.Error(w, "Repository data is unavailable.", http.StatusServiceUnavailable)
+			return
+		}
+
+		const pageSize = 25
+		page := 1
+		if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+			if parsed, err := strconv.Atoi(pageStr); err == nil && parsed > 0 {
+				page = parsed
+			}
+		}
+		search := r.URL.Query().Get("search")
+
+		var items []RepoItem
+		var total int
+
+		switch repoType {
+		case "plugins":
+			items, total = fetchPluginItems(d, page, pageSize, search)
+		case "themes":
+			items, total = fetchThemeItems(d, page, pageSize, search)
+		case "cores":
+			items, total = fetchCoreItems(d, page, pageSize, search)
+		default:
+			http.Error(w, "Repository not found", http.StatusNotFound)
+			return
+		}
+
+		totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+		if totalPages == 0 {
+			totalPages = 1
+		}
+		if page > totalPages {
+			page = totalPages
+		}
+
+		data := RepoItemsData{
+			Repo:       repoType,
+			Items:      items,
+			Page:       page,
+			TotalPages: totalPages,
+			Search:     search,
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := d.Templates.Render(w, "repo-items.html", data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+func fetchPluginItems(d *Deps, page int, pageSize int, search string) ([]RepoItem, int) {
 	offset := (page - 1) * pageSize
 
 	type pluginRow struct {
@@ -129,10 +161,18 @@ func fetchPluginItems(d *Deps, page int, pageSize int) []RepoItem {
 		TotalSize  int64
 	}
 
+	query := d.DB.Table("plugins").Where("deleted_at IS NULL")
+	if search != "" {
+		like := "%" + search + "%"
+		query = query.Where("name ILIKE ? OR slug ILIKE ?", like, like)
+	}
+
+	var total int64
+	query.Count(&total)
+
 	var rows []pluginRow
-	d.DB.Table("plugins").
+	query.
 		Select("id, name, slug, version, downloaded, file_count, total_size").
-		Where("deleted_at IS NULL").
 		Order("updated_at DESC").
 		Order("slug ASC").
 		Limit(pageSize).
@@ -153,10 +193,10 @@ func fetchPluginItems(d *Deps, page int, pageSize int) []RepoItem {
 			TotalSize:  row.TotalSize,
 		}
 	}
-	return items
+	return items, int(total)
 }
 
-func fetchThemeItems(d *Deps, page int, pageSize int) []RepoItem {
+func fetchThemeItems(d *Deps, page int, pageSize int, search string) ([]RepoItem, int) {
 	offset := (page - 1) * pageSize
 
 	type themeRow struct {
@@ -169,10 +209,18 @@ func fetchThemeItems(d *Deps, page int, pageSize int) []RepoItem {
 		TotalSize  int64
 	}
 
+	query := d.DB.Table("themes").Where("deleted_at IS NULL")
+	if search != "" {
+		like := "%" + search + "%"
+		query = query.Where("name ILIKE ? OR slug ILIKE ?", like, like)
+	}
+
+	var total int64
+	query.Count(&total)
+
 	var rows []themeRow
-	d.DB.Table("themes").
+	query.
 		Select("id, name, slug, version, downloaded, file_count, total_size").
-		Where("deleted_at IS NULL").
 		Order("updated_at DESC").
 		Order("slug ASC").
 		Limit(pageSize).
@@ -193,10 +241,10 @@ func fetchThemeItems(d *Deps, page int, pageSize int) []RepoItem {
 			TotalSize:  row.TotalSize,
 		}
 	}
-	return items
+	return items, int(total)
 }
 
-func fetchCoreItems(d *Deps, page int, pageSize int) []RepoItem {
+func fetchCoreItems(d *Deps, page int, pageSize int, search string) ([]RepoItem, int) {
 	offset := (page - 1) * pageSize
 
 	type coreRow struct {
@@ -206,10 +254,18 @@ func fetchCoreItems(d *Deps, page int, pageSize int) []RepoItem {
 		TotalSize int64
 	}
 
+	query := d.DB.Table("cores").Where("deleted_at IS NULL")
+	if search != "" {
+		like := "%" + search + "%"
+		query = query.Where("version ILIKE ?", like)
+	}
+
+	var total int64
+	query.Count(&total)
+
 	var rows []coreRow
-	d.DB.Table("cores").
+	query.
 		Select("id, version, file_count, total_size").
-		Where("deleted_at IS NULL").
 		Order("version DESC").
 		Limit(pageSize).
 		Offset(offset).
@@ -228,7 +284,7 @@ func fetchCoreItems(d *Deps, page int, pageSize int) []RepoItem {
 			TotalSize: row.TotalSize,
 		}
 	}
-	return items
+	return items, int(total)
 }
 
 func fetchActiveInstallsLine(d *Deps, table string) LineSeries {
