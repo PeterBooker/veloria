@@ -20,6 +20,9 @@ type Templates struct {
 // Partials are also registered for direct rendering (htmx responses).
 func NewTemplates(fsys fs.FS) (*Templates, error) {
 	funcs := template.FuncMap{
+		"safeJS": func(s string) template.JS {
+			return template.JS(s) // #nosec G203 -- server-generated JSON
+		},
 		"add": func(a int, b int) int {
 			return a + b
 		},

@@ -66,10 +66,13 @@ func BuildRepoSummary(repo string, title string, total int, indexed int) RepoSum
 	}
 }
 
-// BuildLineSeries creates an SVG polyline string from a slice of values.
-func BuildLineSeries(values []int64) LineSeries {
+const maxChartPoints = 500
+
+// BuildChartData serializes values to a JSON array for client-side charting.
+// If values exceed maxChartPoints, it downsamples by picking evenly spaced points.
+func BuildChartData(values []int64) ChartData {
 	if len(values) == 0 {
-		return LineSeries{}
+		return ChartData{}
 	}
 
 	var max int64
@@ -79,31 +82,25 @@ func BuildLineSeries(values []int64) LineSeries {
 		}
 	}
 
-	const width = 100.0
-	const height = 40.0
-
-	step := 0.0
-	if len(values) > 1 {
-		step = width / float64(len(values)-1)
+	if len(values) > maxChartPoints {
+		values = downsample(values, maxChartPoints)
 	}
 
-	var sb strings.Builder
-	for i, v := range values {
-		x := float64(i) * step
-		y := height
-		if max > 0 {
-			y = height - (float64(v)/float64(max))*height
-		}
-		if i > 0 {
-			sb.WriteByte(' ')
-		}
-		sb.WriteString(fmt.Sprintf("%.2f,%.2f", x, y))
+	b, _ := json.Marshal(values)
+	return ChartData{
+		JSON: string(b),
+		Max:  max,
 	}
+}
 
-	return LineSeries{
-		Points: sb.String(),
-		Max:    max,
+// downsample picks n evenly spaced points from values, always including the first and last.
+func downsample(values []int64, n int) []int64 {
+	result := make([]int64, n)
+	last := len(values) - 1
+	for i := 0; i < n; i++ {
+		result[i] = values[i*last/(n-1)]
 	}
+	return result
 }
 
 // ParseLargestFiles parses the JSONB largest_files column and returns at most limit entries.
