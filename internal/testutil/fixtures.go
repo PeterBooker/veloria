@@ -26,6 +26,7 @@ func SampleConfig() *config.Config {
 		DBTimeZone:         "UTC",
 		DBConnectTimeout:   5,
 		IndexerConcurrency: 1,
+		SearchConcurrency:  4,
 		S3Endpoint:         "localhost:9000",
 		S3Bucket:           "veloria-test",
 		S3AccessKey:        "minioadmin",

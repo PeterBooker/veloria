@@ -26,9 +26,7 @@ type SearchRequest struct {
 	Public           *bool  `json:"public,omitempty"`
 }
 
-const maxConcurrentSearches = 4
-
-var searchSem = make(chan struct{}, maxConcurrentSearches)
+var searchSem = make(chan struct{}, 1)
 
 func acquireSearchSlot(ctx context.Context) error {
 	select {
@@ -122,7 +120,7 @@ func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) h
 		}
 
 		s := searchmodel.Search{
-			Status:  searchmodel.StatusProcessing,
+			Status:  searchmodel.StatusQueued,
 			Private: private,
 			Term:    req.Term,
 			Repo:    req.Repo,
@@ -131,6 +129,9 @@ func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) h
 			api.WriteJSON(w, api.ErrInternal("failed to create search record"))
 			return
 		}
+
+		db.Model(&s).Update("status", searchmodel.StatusProcessing)
+		s.Status = searchmodel.StatusProcessing
 
 		results, err := m.Search(req.Repo, req.Term, &manager.SearchParams{
 			FileMatch:        req.FileMatch,

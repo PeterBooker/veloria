@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -371,7 +370,7 @@ func (r *Repository[T]) Search(term string, opt *index.SearchOptions) ([]*Search
 	}
 
 	// Parallel search with worker pool
-	workers := max(runtime.NumCPU(), 4)
+	workers := r.c.SearchConcurrency
 	if workers > len(extensions) {
 		workers = len(extensions)
 	}

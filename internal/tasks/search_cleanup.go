@@ -24,7 +24,7 @@ func CleanupStuckSearches(db *gorm.DB, l *zerolog.Logger) func(context.Context) 
 
 		result := db.WithContext(ctx).
 			Model(&searchmodel.Search{}).
-			Where("status = ? AND updated_at < ?", searchmodel.StatusProcessing, cutoff).
+			Where("status IN ? AND updated_at < ?", []string{searchmodel.StatusQueued, searchmodel.StatusProcessing}, cutoff).
 			Update("status", searchmodel.StatusFailed)
 
 		if result.Error != nil {
