@@ -17,6 +17,7 @@ import (
 	api "veloria/internal/api"
 	"veloria/internal/auth"
 	"veloria/internal/core"
+	"veloria/internal/logger"
 	"veloria/internal/manager"
 	"veloria/internal/plugin"
 	"veloria/internal/search"
@@ -29,6 +30,7 @@ type Options struct {
 	HandlerTimeout   time.Duration
 	SearchEnabled    bool
 	RateLimitEnabled bool
+	LoggingEnabled   bool
 }
 
 func New(l *zerolog.Logger, v *validator.Validate, db *gorm.DB, m *manager.Manager, s3 storage.ResultStorage, deps *web.Deps, sessionStore *auth.SessionStore, authHandler *auth.Handler, opts Options) *chi.Mux {
@@ -46,8 +48,10 @@ func New(l *zerolog.Logger, v *validator.Validate, db *gorm.DB, m *manager.Manag
 	// Security headers
 	r.Use(securityHeaders)
 
-	// Global middleware
-	r.Use(middleware.Logger)
+	// Access logging (stdout)
+	if opts.LoggingEnabled {
+		r.Use(logger.AccessLogger)
+	}
 	r.Use(middleware.Recoverer)
 	r.Use(sentryHandler.Handle)
 	r.Use(middleware.RequestID)
