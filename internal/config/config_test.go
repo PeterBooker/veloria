@@ -57,6 +57,7 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, "", cfg.SessionSecret)
 	assert.Equal(t, "", cfg.AspireCloudAPIKey)
 	assert.Equal(t, "", cfg.CloudflareAPIToken)
+	assert.Equal(t, 4, cfg.SearchConcurrency)
 }
 
 func TestConfigWithEnv(t *testing.T) {
@@ -96,6 +97,7 @@ func TestConfigWithEnv(t *testing.T) {
 	setEnv(t, "SESSION_SECRET", "super-secret")
 	setEnv(t, "ASPIRE_CLOUD_API_KEY", "test-aspire-key")
 	setEnv(t, "CLOUDFLARE_API_TOKEN", "test-cf-token")
+	setEnv(t, "SEARCH_CONCURRENCY", "8")
 	cfg, err := New()
 	require.NoError(t, err)
 
@@ -136,6 +138,7 @@ func TestConfigWithEnv(t *testing.T) {
 	assert.Equal(t, "super-secret", cfg.SessionSecret)
 	assert.Equal(t, "test-aspire-key", cfg.AspireCloudAPIKey)
 	assert.Equal(t, "test-cf-token", cfg.CloudflareAPIToken)
+	assert.Equal(t, 8, cfg.SearchConcurrency)
 }
 
 func TestConfigValidation_InvalidPort(t *testing.T) {
@@ -168,6 +171,14 @@ func TestConfigValidation_InvalidConcurrency(t *testing.T) {
 	_, err := New()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "IndexerConcurrency")
+}
+
+func TestConfigValidation_InvalidSearchConcurrency(t *testing.T) {
+	os.Clearenv()
+	setEnv(t, "SEARCH_CONCURRENCY", "0")
+	_, err := New()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "SearchConcurrency")
 }
 
 func TestConfigValidation_CloudflareTokenRequiredInProduction(t *testing.T) {
@@ -204,6 +215,7 @@ func TestConfigValidation_RequiredFields(t *testing.T) {
 		Port:               9071,
 		DBPort:             5432,
 		IndexerConcurrency: 1,
+		SearchConcurrency:  4,
 		// DBHost, DBName, DBUser, DataDir left empty — should fail required
 	}
 	err := v.Struct(cfg)
