@@ -142,17 +142,12 @@ func (cr *CoreRepo) PrepareUpdates() []IndexTask {
 	return cr.Repository.PrepareUpdates(fetchFn, saveFn)
 }
 
-// isVersionIndexed checks if a core version has already been indexed or attempted.
+// isVersionIndexed checks if a core version has already been indexed.
 func (cr *CoreRepo) isVersionIndexed(version string) bool {
-	// First check if it's in memory with an index loaded
 	if existing, ok := cr.Get(version); ok && existing.HasIndex() {
 		return true
 	}
-
-	// Also check database — any existing row means it was previously processed
-	var count int64
-	cr.db.Table("cores").Where("version = ?", version).Count(&count)
-	return count > 0
+	return false
 }
 
 // sortCoresByVersion sorts cores by version number in ascending order.

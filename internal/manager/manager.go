@@ -70,6 +70,7 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 		// Resume any extensions that were saved to DB but not indexed (e.g. interrupted runs).
 		resumeTasks := m.pr.ResumeUnindexed()
 		resumeTasks = append(resumeTasks, m.tr.ResumeUnindexed()...)
+		resumeTasks = append(resumeTasks, m.cr.ResumeUnindexed()...)
 		if len(resumeTasks) > 0 {
 			l.Info().Msgf("Resuming %d unindexed extensions", len(resumeTasks))
 			var wg sync.WaitGroup
