@@ -7,7 +7,7 @@ import (
 )
 
 func New(isDebug bool) *zerolog.Logger {
-	logLevel := zerolog.InfoLevel
+	logLevel := zerolog.WarnLevel
 	if isDebug {
 		logLevel = zerolog.TraceLevel
 	}

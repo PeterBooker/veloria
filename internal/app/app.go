@@ -57,7 +57,7 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("failed to ensure data directories: %w", err)
 	}
 
-	l := logger.New(c.Env == "development")
+	l := logger.New(c.AppDebug)
 	sentry.Setup(c)
 
 	a := &App{
@@ -215,7 +215,7 @@ func (a *App) initDB() error {
 	c := a.Config
 
 	var logLevel gormlogger.LogLevel
-	if c.Env == "development" {
+	if c.AppDebug {
 		logLevel = gormlogger.Info
 	} else {
 		logLevel = gormlogger.Error

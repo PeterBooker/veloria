@@ -74,6 +74,9 @@ type Config struct {
 	// AspireCloud API
 	AspireCloudAPIKey string `env:"ASPIRE_CLOUD_API_KEY" envDefault:""`
 
+	// Debug mode: controls informational (non-error/warning) log output
+	AppDebug bool `env:"APP_DEBUG" envDefault:"false"`
+
 	// Application URL (production TLS via certmagic)
 	AppURL             string `env:"APP_URL" envDefault:""`
 	ACMEEmail          string `env:"ACME_EMAIL" envDefault:""`
