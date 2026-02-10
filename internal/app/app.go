@@ -149,6 +149,7 @@ func New(ctx context.Context) (*App, error) {
 		HandlerTimeout:   c.HTTPHandlerTimeout,
 		SearchEnabled:    searchEnabled,
 		RateLimitEnabled: c.HTTPRateLimitEnabled,
+		LoggingEnabled:   c.HTTPLoggingEnabled,
 	})
 
 	srv, err := server.New(r, c, l)
