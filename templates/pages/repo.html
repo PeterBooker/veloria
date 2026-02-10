@@ -63,81 +63,127 @@
     </div>
 
     <!-- Charts Section -->
-    {{if or .ActiveInstallsLine.Points .FileCountLine.Points .FileSizeLine.Points}}
+    {{if or .ActiveInstalls.JSON .FileCount.JSON .FileSize.JSON}}
     <div class="grid grid-cols-1 gap-4 mb-6">
-        {{if .ActiveInstallsLine.Points}}
+        {{if .ActiveInstalls.JSON}}
         <div class="glass-inner p-6">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-lg font-semibold text-gray-900">Active Installs</h3>
-                <span class="text-xs text-gray-400">Max {{formatCompact (int .ActiveInstallsLine.Max)}}</span>
+                <span class="text-xs text-gray-400">Max {{formatCompact (int .ActiveInstalls.Max)}}</span>
             </div>
-            <div class="relative h-32">
-                <svg viewBox="0 0 100 40" class="w-full h-32" preserveAspectRatio="none">
-                    <path d="M0 40H100 M0 20H100 M0 0H100" stroke="rgba(0,0,0,0.06)" stroke-width="0.5" fill="none" />
-                    <polyline points="{{.ActiveInstallsLine.Points}}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-            </div>
+            <div id="chart-active-installs" style="width:100%;height:200px;"></div>
         </div>
         {{end}}
 
-        {{if or .FileCountLine.Points .FileSizeLine.Points}}
+        {{if or .FileCount.JSON .FileSize.JSON}}
         <div class="glass-inner p-6">
             <div class="flex items-center justify-between mb-2">
                 <h3 class="text-lg font-semibold text-gray-900">File Stats</h3>
             </div>
-            <div class="flex items-center gap-4 text-xs text-gray-500 mb-4">
-                <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-brand-500"></span>Total size</span>
-                <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-brand-300"></span>File count</span>
-            </div>
-            <div class="relative h-32">
-                <svg viewBox="0 0 100 40" class="w-full h-32" preserveAspectRatio="none">
-                    <path d="M0 40H100 M0 20H100 M0 0H100" stroke="rgba(0,0,0,0.06)" stroke-width="0.5" fill="none" />
-                    {{if .FileSizeLine.Points}}
-                    <polyline points="{{.FileSizeLine.Points}}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    {{end}}
-                    {{if .FileCountLine.Points}}
-                    <polyline points="{{.FileCountLine.Points}}" fill="none" stroke="#93c5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    {{end}}
-                </svg>
-            </div>
+            <div id="chart-file-stats" style="width:100%;height:200px;"></div>
         </div>
         {{end}}
     </div>
+
+    <script>
+    (function() {
+        var brand500 = '#3b82f6';
+        var brand300 = '#93c5fd';
+        var brandArea = 'rgba(59,130,246,0.08)';
+        var brand300Area = 'rgba(147,197,253,0.08)';
+
+        function fmtBytes(b) {
+            if (b >= 1073741824) return (b/1073741824).toFixed(1)+' GB';
+            if (b >= 1048576) return (b/1048576).toFixed(1)+' MB';
+            if (b >= 1024) return (b/1024).toFixed(1)+' KB';
+            return b+' B';
+        }
+        function fmtCompact(n) {
+            if (n >= 1e9) return (n/1e9).toFixed(0)+'B';
+            if (n >= 1e6) return (n/1e6).toFixed(0)+'M';
+            if (n >= 1e3) return (n/1e3).toFixed(0)+'K';
+            return n.toString();
+        }
+
+        {{if .ActiveInstalls.JSON}}
+        (function() {
+            var data = {{.ActiveInstalls.JSON | safeJS}};
+            var chart = echarts.init(document.getElementById('chart-active-installs'));
+            chart.setOption({
+                grid: { top: 10, right: 16, bottom: 24, left: 50 },
+                xAxis: { type: 'category', show: false, data: data.map(function(_,i){return i;}) },
+                yAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#9ca3af', formatter: function(v){return fmtCompact(v);} }, splitLine: { lineStyle: { color: 'rgba(0,0,0,0.04)' } } },
+                tooltip: { trigger: 'axis', formatter: function(p){ return 'Active installs: '+fmtCompact(p[0].value); } },
+                series: [{
+                    type: 'line', data: data, showSymbol: false, smooth: true,
+                    lineStyle: { color: brand500, width: 2 },
+                    areaStyle: { color: brandArea },
+                    itemStyle: { color: brand500 }
+                }]
+            });
+            window.addEventListener('resize', function(){ chart.resize(); });
+        })();
+        {{end}}
+
+        {{if or .FileCount.JSON .FileSize.JSON}}
+        (function() {
+            var sizeData = {{if .FileSize.JSON}}{{.FileSize.JSON | safeJS}}{{else}}[]{{end}};
+            var countData = {{if .FileCount.JSON}}{{.FileCount.JSON | safeJS}}{{else}}[]{{end}};
+            var chart = echarts.init(document.getElementById('chart-file-stats'));
+            chart.setOption({
+                grid: { top: 10, right: 60, bottom: 24, left: 50 },
+                xAxis: { type: 'category', show: false, data: (sizeData.length ? sizeData : countData).map(function(_,i){return i;}) },
+                yAxis: [
+                    { type: 'value', position: 'left', axisLabel: { fontSize: 10, color: '#9ca3af', formatter: function(v){return fmtBytes(v);} }, splitLine: { lineStyle: { color: 'rgba(0,0,0,0.04)' } } },
+                    { type: 'value', position: 'right', axisLabel: { fontSize: 10, color: '#9ca3af', formatter: function(v){return fmtCompact(v);} }, splitLine: { show: false } }
+                ],
+                tooltip: { trigger: 'axis', formatter: function(p){ var s=''; for(var i=0;i<p.length;i++){s+=p[i].marker+' '+p[i].seriesName+': '+(p[i].seriesName==='Total size'?fmtBytes(p[i].value):fmtCompact(p[i].value))+'<br>';} return s; } },
+                legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#6b7280' } },
+                series: [
+                    {{if .FileSize.JSON}}
+                    { name: 'Total size', type: 'line', data: sizeData, showSymbol: false, smooth: true, yAxisIndex: 0,
+                      lineStyle: { color: brand500, width: 2 }, itemStyle: { color: brand500 } },
+                    {{end}}
+                    {{if .FileCount.JSON}}
+                    { name: 'File count', type: 'line', data: countData, showSymbol: false, smooth: true, yAxisIndex: 1,
+                      lineStyle: { color: brand300, width: 2 }, itemStyle: { color: brand300 } }
+                    {{end}}
+                ]
+            });
+            window.addEventListener('resize', function(){ chart.resize(); });
+        })();
+        {{end}}
+    })();
+    </script>
     {{end}}
 
-    {{if .LargestFiles}}
-    <!-- Largest Files -->
+    {{if .LargestExtensions}}
+    <!-- Largest Extensions -->
     <div class="glass-inner overflow-hidden mb-6">
         <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
-            <h2 class="text-lg font-semibold text-gray-900">Largest Files</h2>
-            <p class="text-sm text-gray-500">Top {{len .LargestFiles}} largest files across all {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
+            <h2 class="text-lg font-semibold text-gray-900">Largest {{if eq .RepoSummary.Repo "plugins"}}Plugins{{else if eq .RepoSummary.Repo "themes"}}Themes{{else}}Core Versions{{end}}</h2>
+            <p class="text-sm text-gray-500">Top {{len .LargestExtensions}} by total size</p>
         </div>
 
         <div class="p-6">
             {{$maxSize := 0}}
-            {{range .LargestFiles}}
-                {{if gt .Size $maxSize}}{{$maxSize = .Size}}{{end}}
+            {{range .LargestExtensions}}
+                {{if gt .TotalSize $maxSize}}{{$maxSize = .TotalSize}}{{end}}
             {{end}}
 
             <div class="space-y-3">
                 {{$repo := .RepoSummary.Repo}}
-                {{range $i, $file := .LargestFiles}}
-                {{if lt $i 50}}
-                <a href="/repos/{{$repo}}/{{$file.Slug}}" class="group block">
+                {{range .LargestExtensions}}
+                <a href="/repos/{{$repo}}/{{.Slug}}" class="group block">
                     <div class="flex items-center justify-between text-sm mb-1">
-                        <div class="flex items-center gap-2 min-w-0 flex-1">
-                            <span class="text-brand-600 font-medium flex-shrink-0">{{$file.Slug}}</span>
-                            <span class="text-gray-400">/</span>
-                            <span class="text-gray-600 truncate" title="{{$file.Path}}">{{$file.Path}}</span>
-                        </div>
-                        <span class="text-gray-500 ml-2 flex-shrink-0">{{formatBytes $file.Size}}</span>
+                        <span class="text-brand-600 font-medium truncate">{{.Name}}</span>
+                        <span class="text-gray-500 ml-2 flex-shrink-0">{{formatBytes .TotalSize}}</span>
                     </div>
                     <div class="h-2 bg-gray-200/70 rounded-full overflow-hidden">
                         <div class="h-full rounded-full transition-all duration-300 group-hover:opacity-80"
-                             style="width: {{if gt $maxSize 0}}{{printf "%.1f" (divideFloat $file.Size $maxSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+                             style="width: {{if gt $maxSize 0}}{{printf "%.1f" (divideFloat .TotalSize $maxSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
                     </div>
                 </a>
-                {{end}}
                 {{end}}
             </div>
         </div>

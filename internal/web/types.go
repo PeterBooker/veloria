@@ -139,20 +139,27 @@ type RepoItem struct {
 	TotalSize  int64
 }
 
-// LineSeries represents a single series for a line chart.
-type LineSeries struct {
-	Points string
-	Max    int64
+// ChartData holds JSON-encoded chart values for client-side rendering.
+type ChartData struct {
+	JSON string // JSON array of numbers, e.g. "[10,20,30]"
+	Max  int64
+}
+
+// LargestExtension represents an extension ranked by total download size.
+type LargestExtension struct {
+	Slug      string
+	Name      string
+	TotalSize int64
 }
 
 // RepoData contains data for a single repository view.
 type RepoData struct {
 	PageData
-	RepoSummary        RepoSummary
-	ActiveInstallsLine LineSeries
-	FileCountLine      LineSeries
-	FileSizeLine       LineSeries
-	LargestFiles       []LargestRepoFile
+	RepoSummary       RepoSummary
+	ActiveInstalls    ChartData
+	FileCount         ChartData
+	FileSize          ChartData
+	LargestExtensions []LargestExtension
 }
 
 // FileStat represents a file with its size for display.

@@ -50,40 +50,40 @@ func RepoPage(d *Deps) http.HandlerFunc {
 
 		var total, indexed int
 		var title string
-		var activeInstallsLine, fileCountLine, fileSizeLine LineSeries
+		var activeInstalls, fileCount, fileSize ChartData
 
-		var largestFiles []LargestRepoFile
+		var largestExtensions []LargestExtension
 
 		switch repoType {
 		case "plugins":
 			total, indexed = d.Manager.GetPluginRepo().Stats()
 			title = "Plugins"
-			activeInstallsLine = fetchActiveInstallsLine(d, "plugins")
-			fileCountLine, fileSizeLine = fetchFileStatsLines(d, "plugins")
-			largestFiles = fetchLargestRepoFiles(d, "plugins", 50)
+			activeInstalls = fetchActiveInstallsChart(d, "plugins")
+			fileCount, fileSize = fetchFileStatsCharts(d, "plugins")
+			largestExtensions = fetchLargestExtensions(d, "plugins", 25)
 		case "themes":
 			total, indexed = d.Manager.GetThemeRepo().Stats()
 			title = "Themes"
-			activeInstallsLine = fetchActiveInstallsLine(d, "themes")
-			fileCountLine, fileSizeLine = fetchFileStatsLines(d, "themes")
-			largestFiles = fetchLargestRepoFiles(d, "themes", 50)
+			activeInstalls = fetchActiveInstallsChart(d, "themes")
+			fileCount, fileSize = fetchFileStatsCharts(d, "themes")
+			largestExtensions = fetchLargestExtensions(d, "themes", 25)
 		case "cores":
 			total, indexed = d.Manager.GetCoreRepo().Stats()
 			title = "Core"
-			fileCountLine, fileSizeLine = fetchFileStatsLines(d, "cores")
-			largestFiles = fetchLargestRepoFiles(d, "cores", 50)
+			fileCount, fileSize = fetchFileStatsCharts(d, "cores")
+			largestExtensions = fetchLargestExtensions(d, "cores", 25)
 		default:
 			http.Error(w, "Repository not found", http.StatusNotFound)
 			return
 		}
 
 		data := RepoData{
-			PageData:           d.PageData(r),
-			RepoSummary:        BuildRepoSummary(repoType, title, total, indexed),
-			ActiveInstallsLine: activeInstallsLine,
-			FileCountLine:      fileCountLine,
-			FileSizeLine:       fileSizeLine,
-			LargestFiles:       largestFiles,
+			PageData:          d.PageData(r),
+			RepoSummary:       BuildRepoSummary(repoType, title, total, indexed),
+			ActiveInstalls:    activeInstalls,
+			FileCount:         fileCount,
+			FileSize:          fileSize,
+			LargestExtensions: largestExtensions,
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -287,11 +287,11 @@ func fetchCoreItems(d *Deps, page int, pageSize int, search string) ([]RepoItem,
 	return items, int(total)
 }
 
-func fetchActiveInstallsLine(d *Deps, table string) LineSeries {
-	cacheKey := "active_installs_line:" + table
+func fetchActiveInstallsChart(d *Deps, table string) ChartData {
+	cacheKey := "active_installs_chart:" + table
 	if d.Cache != nil {
 		if v, ok := d.Cache.Get(cacheKey); ok {
-			return v.(LineSeries)
+			return v.(ChartData)
 		}
 	}
 
@@ -303,7 +303,7 @@ func fetchActiveInstallsLine(d *Deps, table string) LineSeries {
 	d.DB.Table(table).
 		Select("active_installs").
 		Where("deleted_at IS NULL").
-		Order("name ASC").
+		Order("active_installs ASC").
 		Scan(&rows)
 
 	values := make([]int64, len(rows))
@@ -311,60 +311,69 @@ func fetchActiveInstallsLine(d *Deps, table string) LineSeries {
 		values[i] = r.ActiveInstalls
 	}
 
-	result := BuildLineSeries(values)
+	result := BuildChartData(values)
 	if d.Cache != nil {
 		d.Cache.Set(cacheKey, result, 5*time.Minute)
 	}
 	return result
 }
 
-func fetchFileStatsLines(d *Deps, table string) (LineSeries, LineSeries) {
-	cacheKey := "file_stats_lines:" + table
+func fetchFileStatsCharts(d *Deps, table string) (ChartData, ChartData) {
+	cacheKey := "file_stats_charts:" + table
 	if d.Cache != nil {
 		if v, ok := d.Cache.Get(cacheKey); ok {
-			pair := v.([2]LineSeries)
+			pair := v.([2]ChartData)
 			return pair[0], pair[1]
 		}
 	}
 
-	nameCol := "name"
-	if table == "cores" {
-		nameCol = "version"
-	}
-
-	type row struct {
-		FileCount int64
-		TotalSize int64
-	}
-
-	var rows []row
+	type sizeRow struct{ TotalSize int64 }
+	var sizeRows []sizeRow
 	d.DB.Table(table).
-		Select("file_count, total_size").
+		Select("total_size").
 		Where("deleted_at IS NULL").
-		Order(nameCol + " ASC").
-		Scan(&rows)
+		Order("total_size ASC").
+		Scan(&sizeRows)
 
-	counts := make([]int64, len(rows))
-	sizes := make([]int64, len(rows))
-	for i, r := range rows {
-		counts[i] = r.FileCount
+	sizes := make([]int64, len(sizeRows))
+	for i, r := range sizeRows {
 		sizes[i] = r.TotalSize
 	}
 
-	countLine, sizeLine := BuildLineSeries(counts), BuildLineSeries(sizes)
-	if d.Cache != nil {
-		d.Cache.Set(cacheKey, [2]LineSeries{countLine, sizeLine}, 5*time.Minute)
+	type countRow struct{ FileCount int64 }
+	var countRows []countRow
+	d.DB.Table(table).
+		Select("file_count").
+		Where("deleted_at IS NULL").
+		Order("file_count ASC").
+		Scan(&countRows)
+
+	counts := make([]int64, len(countRows))
+	for i, r := range countRows {
+		counts[i] = r.FileCount
 	}
-	return countLine, sizeLine
+
+	countChart, sizeChart := BuildChartData(counts), BuildChartData(sizes)
+	if d.Cache != nil {
+		d.Cache.Set(cacheKey, [2]ChartData{countChart, sizeChart}, 5*time.Minute)
+	}
+	return countChart, sizeChart
 }
 
-func fetchLargestRepoFiles(d *Deps, repoType string, limit int) []LargestRepoFile {
-	var files []LargestRepoFile
-	d.DB.Table("largest_repo_files").
-		Select("path, size, slug, name").
-		Where("repo_type = ?", repoType).
-		Order("size DESC").
+func fetchLargestExtensions(d *Deps, table string, limit int) []LargestExtension {
+	nameCol := "name"
+	slugCol := "slug"
+	if table == "cores" {
+		nameCol = "'WordPress ' || version"
+		slugCol = "version"
+	}
+
+	var extensions []LargestExtension
+	d.DB.Table(table).
+		Select(slugCol+" AS slug, "+nameCol+" AS name, total_size").
+		Where("deleted_at IS NULL AND total_size > 0").
+		Order("total_size DESC").
 		Limit(limit).
-		Scan(&files)
-	return files
+		Scan(&extensions)
+	return extensions
 }
