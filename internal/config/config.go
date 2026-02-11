@@ -63,7 +63,7 @@ type Config struct {
 	GitLabClientSecret    string `env:"GITLAB_CLIENT_SECRET" envDefault:""`
 	AtlassianClientID     string `env:"ATLASSIAN_CLIENT_ID" envDefault:""`
 	AtlassianClientSecret string `env:"ATLASSIAN_CLIENT_SECRET" envDefault:""`
-	SessionSecret         string `env:"SESSION_SECRET" envDefault:""`
+	SessionSecret         string `env:"SESSION_SECRET" envDefault:""` // #nosec G117 -- config field from env var, never serialized
 
 	// Indexer concurrency: number of parallel goroutines for indexing
 	IndexerConcurrency int `env:"INDEXER_CONCURRENCY" envDefault:"1" validate:"min=1"`

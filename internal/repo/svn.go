@@ -99,7 +99,7 @@ func fetchSVNSlugs(ctx context.Context, svnURL string) ([]string, error) {
 	}
 	setBrowserHeaders(req)
 
-	resp, err := svnClient.Do(req)
+	resp, err := svnClient.Do(req) // #nosec G704 -- URL from internal constant svnCoreTagsURL
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch SVN listing from %s: %w", svnURL, err)
 	}

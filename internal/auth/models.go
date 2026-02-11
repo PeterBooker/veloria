@@ -12,8 +12,8 @@ type OAuthIdentity struct {
 	UserID       uuid.UUID  `gorm:"type:uuid;not null"`
 	Provider     string     `gorm:"size:50;not null"`
 	ProviderID   string     `gorm:"size:255;not null"`
-	AccessToken  string     `gorm:"size:500"`
-	RefreshToken string     `gorm:"size:500"`
+	AccessToken  string     `gorm:"size:500"` // #nosec G117 -- GORM model field, not exposed via JSON
+	RefreshToken string     `gorm:"size:500"` // #nosec G117 -- GORM model field, not exposed via JSON
 	ExpiresAt    *time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

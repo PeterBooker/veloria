@@ -19,8 +19,8 @@ const (
 
 // AtlassianProvider implements goth.Provider for Atlassian OAuth 2.0.
 type AtlassianProvider struct {
-	ClientKey    string
-	Secret       string
+	ClientKey    string // #nosec G117 -- not serialized, OAuth config field
+	Secret       string // #nosec G117 -- not serialized, OAuth config field
 	CallbackURL  string
 	HTTPClient   *http.Client
 	config       *oauth2.Config
@@ -99,7 +99,7 @@ func (p *AtlassianProvider) FetchUser(session goth.Session) (user goth.User, err
 	req.Header.Set("Authorization", "Bearer "+s.AccessToken)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := p.Client().Do(req)
+	resp, err := p.Client().Do(req) // #nosec G704 -- URL is the constant atlassianUserURL
 	if err != nil {
 		return user, err
 	}
@@ -155,8 +155,8 @@ func (p *AtlassianProvider) RefreshTokenAvailable() bool {
 // AtlassianSession stores session data.
 type AtlassianSession struct {
 	AuthURL      string
-	AccessToken  string
-	RefreshToken string
+	AccessToken  string // #nosec G117 -- required by goth.Session interface
+	RefreshToken string // #nosec G117 -- required by goth.Session interface
 	ExpiresAt    time.Time
 }
 

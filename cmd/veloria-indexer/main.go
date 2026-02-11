@@ -27,7 +27,7 @@ func main() {
 	flag.StringVar(&zipURL, "zipurl", "", "URL to a zip file to download and extract before indexing (required)")
 	flag.StringVar(&slug, "slug", "", "Destination folder name under source/ (required)")
 	flag.Usage = func() {
-		log.Printf("Usage: %s -repo=<plugins|themes|cores> -zipurl=<url> -slug=<name>\n", filepath.Base(os.Args[0]))
+		log.Printf("Usage: %s -repo=<plugins|themes|cores> -zipurl=<url> -slug=<name>\n", filepath.Base(os.Args[0])) // #nosec G706 -- os.Args[0] is the binary name, sanitized by filepath.Base
 		flag.PrintDefaults()
 	}
 	flag.Parse()
