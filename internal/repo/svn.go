@@ -18,8 +18,6 @@ import (
 var svnHrefRe = regexp.MustCompile(`<a[^>]+href="([^"]+)">`)
 
 const (
-	svnPluginsURL  = "https://plugins.svn.wordpress.org/"
-	svnThemesURL   = "https://themes.svn.wordpress.org/"
 	svnCoreTagsURL = "https://core.svn.wordpress.org/tags/"
 
 	// svnResponseMaxBytes is the maximum allowed response size for SVN listings.

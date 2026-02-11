@@ -9,12 +9,10 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	"golang.org/x/sync/errgroup"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -178,125 +176,70 @@ func (pr *PluginRepo) PrepareUpdates() []IndexTask {
 	return pr.Repository.PrepareUpdates(fetchFn, saveFn)
 }
 
-const discoveryAPIConcurrency = 10
-
-// discoverNewPlugins fetches the complete plugin catalog from the WordPress SVN
-// repository and uses the WordPress API to fetch metadata for any new slugs not
-// already known to the system.
+// discoverNewPlugins paginates the full AspireCloud plugin catalog and returns
+// plugins not yet known to the system.
 func (pr *PluginRepo) discoverNewPlugins() ([]*Plugin, error) {
-	// Step 1: Fetch all plugin slugs from SVN
-	pr.l.Info().Msg("Fetching plugin slugs from SVN...")
-	svnSlugs, err := fetchSVNSlugs(pr.ctx, svnPluginsURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch SVN plugin listing: %w", err)
-	}
-	pr.l.Info().Int("total", len(svnSlugs)).Msg("Fetched plugin slugs from SVN")
-
-	// Step 2: Load all known slugs (active, closed, unindexed) from DB + memory
 	known, err := pr.getAllKnownSlugs()
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 3: Filter to truly new slugs
-	var newSlugs []string
-	for _, slug := range svnSlugs {
-		if _, ok := known[slug]; !ok {
-			newSlugs = append(newSlugs, slug)
+	pr.l.Info().Int("known", len(known)).Msg("Starting full plugin discovery via API")
+
+	var result []*Plugin
+	var skipped int
+
+	for page := 1; ; page++ {
+		if pr.ctx.Err() != nil {
+			return nil, pr.ctx.Err()
+		}
+
+		pageURL := fmt.Sprintf("%s?action=query_plugins&browse=updated&posts_per_page=100&page=%d", basePluginsURL, page)
+		plugins, info, err := fetchPluginPage(pr.ctx, pageURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch plugin page %d: %w", page, err)
+		}
+
+		if len(plugins) == 0 {
+			break
+		}
+
+		for i := range plugins {
+			p := plugins[i]
+			if p.Source == "" {
+				p.Source = SourceWordPress
+			}
+			if _, ok := known[p.Slug]; ok {
+				skipped++
+				continue
+			}
+			if p.DownloadLink == "" {
+				skipped++
+				continue
+			}
+			p.IndexedExtension = NewIndexedExtension()
+			result = append(result, &p)
+		}
+
+		if page%10 == 0 {
+			pr.l.Info().
+				Int("page", page).
+				Int("totalPages", info.Pages).
+				Int("new", len(result)).
+				Int("skipped", skipped).
+				Msg("Plugin discovery progress")
+		}
+
+		if page >= info.Pages {
+			break
 		}
 	}
 
 	pr.l.Info().
-		Int("svnTotal", len(svnSlugs)).
 		Int("known", len(known)).
-		Int("new", len(newSlugs)).
-		Msg("Filtered new plugin slugs for discovery")
-
-	if len(newSlugs) == 0 {
-		pr.l.Info().Msg("No new plugin slugs to discover")
-		return nil, nil
-	}
-
-	// Step 4: Fetch info for each new slug concurrently
-	var (
-		mu          sync.Mutex
-		result      []*Plugin
-		closedCount int
-		errCount    int
-		fetched     int
-	)
-
-	g, gCtx := errgroup.WithContext(pr.ctx)
-	g.SetLimit(discoveryAPIConcurrency)
-
-	for _, slug := range newSlugs {
-		s := slug
-		g.Go(func() error {
-			time.Sleep(50 * time.Millisecond)
-
-			if gCtx.Err() != nil {
-				return gCtx.Err()
-			}
-
-			p, fetchErr := tryFetchPluginInfo(gCtx, s)
-
-			if gCtx.Err() != nil {
-				return gCtx.Err()
-			}
-
-			isClosed := fetchErr == nil && (p == nil || p.DownloadLink == "")
-			isActive := fetchErr == nil && p != nil && p.DownloadLink != ""
-
-			if isActive {
-				p.IndexedExtension = NewIndexedExtension()
-			}
-
-			mu.Lock()
-			fetched++
-
-			if fetchErr != nil {
-				errCount++
-			} else if isClosed {
-				closedCount++
-			}
-			if isActive {
-				result = append(result, p)
-			}
-
-			if fetched%1000 == 0 {
-				pr.l.Info().
-					Int("fetched", fetched).
-					Int("total", len(newSlugs)).
-					Int("active", len(result)).
-					Int("closed", closedCount).
-					Int("errors", errCount).
-					Msg("Plugin discovery progress")
-			}
-			mu.Unlock()
-
-			if fetchErr != nil {
-				pr.l.Warn().Err(fetchErr).Str("slug", s).Msg("Failed to fetch plugin info, will retry next scan")
-			} else if isClosed {
-				pr.saveClosedPlugin(s, p)
-			}
-
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
-		return nil, fmt.Errorf("plugin discovery failed: %w", err)
-	}
-
-	pr.l.Info().
-		Int("svnTotal", len(svnSlugs)).
-		Int("known", len(known)).
-		Int("new", len(newSlugs)).
-		Int("fetched", fetched).
-		Int("active", len(result)).
-		Int("closed", closedCount).
-		Int("errors", errCount).
-		Msg("Full plugin SVN scan complete")
+		Int("new", len(result)).
+		Int("skipped", skipped).
+		Msg("Full plugin discovery scan complete")
 
 	return result, nil
 }
@@ -304,8 +247,6 @@ func (pr *PluginRepo) discoverNewPlugins() ([]*Plugin, error) {
 // getAllKnownSlugs returns a set of all plugin slugs known to the system,
 // including active, closed, and unindexed plugins from both the in-memory
 // repository and the database.
-// This is scoped to SVN discovery which only produces wordpress.org packages,
-// so source is not included in the key.
 func (pr *PluginRepo) getAllKnownSlugs() (map[string]struct{}, error) {
 	known := make(map[string]struct{})
 
@@ -325,63 +266,6 @@ func (pr *PluginRepo) getAllKnownSlugs() (map[string]struct{}, error) {
 
 	return known, nil
 }
-
-// saveClosedPlugin creates or updates a plugin record as closed.
-// If p is nil (API returned null/false), a minimal record is created.
-// Only used during SVN discovery, so source is always SourceWordPress.
-func (pr *PluginRepo) saveClosedPlugin(slug string, p *Plugin) {
-	now := time.Now()
-
-	var existing Plugin
-	err := pr.db.Where("slug = ? AND source = ?", slug, SourceWordPress).First(&existing).Error
-	if err == nil {
-		if existing.ClosedAt == nil {
-			pr.db.Table("plugins").Where("slug = ? AND source = ?", slug, SourceWordPress).Update("closed_at", now)
-		}
-		return
-	}
-
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		pr.l.Error().Err(err).Str("slug", slug).Msg("Failed to check existing plugin")
-		return
-	}
-
-	record := &Plugin{
-		Slug:            slug,
-		Source:          SourceWordPress,
-		Name:            slug,
-		ClosedAt:        &now,
-		Tags:            make(map[string]string),
-		RequiresPlugins: []string{},
-	}
-
-	if p != nil {
-		record.Name = p.Name
-		record.Version = p.Version
-		record.Requires = p.Requires
-		record.Tested = p.Tested
-		record.RequiresPHP = p.RequiresPHP
-		record.Rating = p.Rating
-		record.ActiveInstalls = p.ActiveInstalls
-		record.Downloaded = p.Downloaded
-		record.ShortDescription = p.ShortDescription
-		record.DownloadLink = p.DownloadLink
-		if p.Tags != nil {
-			record.Tags = p.Tags
-		}
-		if p.RequiresPlugins != nil {
-			record.RequiresPlugins = p.RequiresPlugins
-		}
-		if p.Name != "" {
-			record.Name = p.Name
-		}
-	}
-
-	if err := pr.db.Create(record).Error; err != nil {
-		pr.l.Error().Err(err).Str("slug", slug).Msg("Failed to create closed plugin record")
-	}
-}
-
 
 // Search searches all plugins and returns results in the legacy format.
 func (pr *PluginRepo) Search(term string, opt *index.SearchOptions) ([]*PluginSearchResult, error) {
@@ -556,40 +440,6 @@ func FetchPluginInfo(ctx context.Context, slug string) (plugin *Plugin, err erro
 	if p.Source == "" {
 		p.Source = SourceWordPress
 	}
-	return &p, nil
-}
-
-// tryFetchPluginInfo fetches a single plugin's info from the WordPress API.
-// Returns (nil, nil) when the API indicates the plugin does not exist (null/false response).
-// Returns (nil, err) on network/API errors.
-// Returns (plugin, nil) on success.
-func tryFetchPluginInfo(ctx context.Context, slug string) (*Plugin, error) {
-	reqURL := fmt.Sprintf("%s?action=plugin_information&request[slug]=%s", basePluginsURL, url.QueryEscape(slug))
-
-	// Bypass circuit breaker: bulk discovery expects many "not found" responses
-	// which should not trip the breaker that protects the regular API path.
-	body, err := doWPAPIRequest(ctx, reqURL)
-	if err != nil {
-		// 404 means the plugin doesn't exist on the API — treat as closed, not an error.
-		var apiErr *wpAPIError
-		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	trimmed := strings.TrimSpace(string(body))
-	if trimmed == "null" || trimmed == "false" || trimmed == "" {
-		return nil, nil
-	}
-
-	var p Plugin
-	if err := json.Unmarshal(body, &p); err != nil {
-		return nil, fmt.Errorf("failed to decode plugin info for %s: %w", slug, err)
-	}
-
-	// SVN discovery only finds wordpress.org plugins
-	p.Source = SourceWordPress
 	return &p, nil
 }
 
