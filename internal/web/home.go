@@ -1,13 +1,10 @@
 package web
 
 import (
-	"context"
 	"net/http"
-	"sync"
-	"time"
 
-	searchmodel "veloria/internal/search/model"
 	"veloria/internal/auth"
+	searchmodel "veloria/internal/search/model"
 )
 
 // HomePage renders the home page with search form.
@@ -22,19 +19,8 @@ func HomePage(d *Deps) http.HandlerFunc {
 		}
 
 		summaries := make([]SearchSummary, len(recentSearches))
-		if len(recentSearches) > 0 {
-			ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-			defer cancel()
-
-			var wg sync.WaitGroup
-			for i, s := range recentSearches {
-				wg.Add(1)
-				go func(idx int, srch searchmodel.Search) {
-					defer wg.Done()
-					summaries[idx] = BuildSearchSummary(ctx, d.S3, srch)
-				}(i, s)
-			}
-			wg.Wait()
+		for i, s := range recentSearches {
+			summaries[i] = BuildSearchSummary(s)
 		}
 
 		data := HomeData{

@@ -25,10 +25,8 @@ type S3Client struct {
 	bucket       string
 	l            *zerolog.Logger
 	ensureBucket bool
-	zstdEnc      *zstd.Encoder
-	zstdDec      *zstd.Decoder
-	zstdMu       sync.Mutex
-	zstdDecMu    sync.Mutex
+	zstdEncPool  sync.Pool
+	zstdDecPool  sync.Pool
 }
 
 // NewS3Client creates a new S3 client from configuration.
@@ -42,27 +40,38 @@ func NewS3Client(c *config.Config, l *zerolog.Logger) (*S3Client, error) {
 		return nil, fmt.Errorf("failed to create S3 client: %w", err)
 	}
 
+	// Verify that zstd encoder/decoder creation works before returning.
 	enc, err := zstd.NewWriter(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create zstd encoder: %w", err)
 	}
+	enc.Close()
 
 	dec, err := zstd.NewReader(nil)
 	if err != nil {
-		if cerr := enc.Close(); cerr != nil {
-			return nil, fmt.Errorf("failed to create zstd decoder: %w (failed to close encoder: %v)", err, cerr)
-		}
 		return nil, fmt.Errorf("failed to create zstd decoder: %w", err)
 	}
+	dec.Close()
 
-	return &S3Client{
+	s3c := &S3Client{
 		client:       client,
 		bucket:       c.S3Bucket,
 		l:            l,
 		ensureBucket: c.S3EnsureBucket,
-		zstdEnc:      enc,
-		zstdDec:      dec,
-	}, nil
+	}
+	s3c.zstdEncPool = sync.Pool{
+		New: func() any {
+			w, _ := zstd.NewWriter(nil)
+			return w
+		},
+	}
+	s3c.zstdDecPool = sync.Pool{
+		New: func() any {
+			r, _ := zstd.NewReader(nil)
+			return r
+		},
+	}
+	return s3c, nil
 }
 
 // EnsureBucket verifies the bucket exists and is accessible.
@@ -112,9 +121,9 @@ func (s *S3Client) UploadResult(ctx context.Context, searchID string, result pro
 	}
 
 	// Compress with zstd
-	s.zstdMu.Lock()
-	compressedData := s.zstdEnc.EncodeAll(protoData, nil)
-	s.zstdMu.Unlock()
+	enc := s.zstdEncPool.Get().(*zstd.Encoder)
+	compressedData := enc.EncodeAll(protoData, nil)
+	s.zstdEncPool.Put(enc)
 	compressedSize := int64(len(compressedData))
 
 	// Upload to S3
@@ -199,9 +208,9 @@ func (s *S3Client) readZstdObject(ctx context.Context, key string) (data []byte,
 		return nil, err
 	}
 
-	s.zstdDecMu.Lock()
-	data, err = s.zstdDec.DecodeAll(compressedData, nil)
-	s.zstdDecMu.Unlock()
+	dec := s.zstdDecPool.Get().(*zstd.Decoder)
+	data, err = dec.DecodeAll(compressedData, nil)
+	s.zstdDecPool.Put(dec)
 	if err != nil {
 		return nil, err
 	}

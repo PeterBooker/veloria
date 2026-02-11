@@ -7,9 +7,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"strconv"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -55,21 +54,12 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			data.DurationMs = s.CompletedAt.Sub(s.CreatedAt).Milliseconds()
 		}
 
-		if s.Status == searchmodel.StatusCompleted {
-			if d.S3 == nil {
-				data.Error = "Results are currently unavailable."
-			} else {
-				ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-				defer cancel()
-
-				var protoResults typespb.SearchResponse
-				if err := d.S3.DownloadResult(ctx, s.ID.String(), &protoResults); err == nil {
-					results := searchmodel.SearchResponseFromProto(&protoResults)
-					data.TotalMatches = web.CountTotalMatches(results)
-					data.TotalExtensions = results.Total
-				} else {
-					data.Error = "Results are currently unavailable."
-				}
+			if s.Status == searchmodel.StatusCompleted {
+			if s.TotalMatches != nil {
+				data.TotalMatches = *s.TotalMatches
+			}
+			if s.TotalExtensions != nil {
+				data.TotalExtensions = *s.TotalExtensions
 			}
 		}
 
@@ -272,10 +262,14 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 		return
 	}
 
+	totalMatches := web.CountTotalMatches(results)
+
 	d.DB.Model(&searchmodel.Search{}).Where("id = ?", searchID).Updates(map[string]any{
-		"status":       searchmodel.StatusCompleted,
-		"results_size": size,
-		"completed_at": now,
+		"status":           searchmodel.StatusCompleted,
+		"results_size":     size,
+		"completed_at":     now,
+		"total_matches":    totalMatches,
+		"total_extensions": results.Total,
 	})
 }
 
@@ -317,19 +311,8 @@ func ListPage(d *web.Deps) http.HandlerFunc {
 		d.DB.Where("private = false").Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&searches)
 
 		summaries := make([]web.SearchSummary, len(searches))
-		if len(searches) > 0 {
-			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-			defer cancel()
-
-			var wg sync.WaitGroup
-			for i, s := range searches {
-				wg.Add(1)
-				go func(idx int, srch searchmodel.Search) {
-					defer wg.Done()
-					summaries[idx] = web.BuildSearchSummary(ctx, d.S3, srch)
-				}(i, s)
-			}
-			wg.Wait()
+		for i, s := range searches {
+			summaries[i] = web.BuildSearchSummary(s)
 		}
 
 		data := web.SearchesData{
@@ -382,19 +365,8 @@ func MyListPage(d *web.Deps) http.HandlerFunc {
 		d.DB.Where("user_id = ?", currentUser.ID).Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&searches)
 
 		summaries := make([]web.SearchSummary, len(searches))
-		if len(searches) > 0 {
-			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-			defer cancel()
-
-			var wg sync.WaitGroup
-			for i, s := range searches {
-				wg.Add(1)
-				go func(idx int, srch searchmodel.Search) {
-					defer wg.Done()
-					summaries[idx] = web.BuildSearchSummary(ctx, d.S3, srch)
-				}(i, s)
-			}
-			wg.Wait()
+		for i, s := range searches {
+			summaries[i] = web.BuildSearchSummary(s)
 		}
 
 		data := web.MySearchesData{

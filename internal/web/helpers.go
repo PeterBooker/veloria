@@ -2,7 +2,6 @@ package web
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -12,28 +11,16 @@ import (
 
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
-	"veloria/internal/storage"
-	typespb "veloria/internal/types"
 )
 
-// BuildSearchSummary fetches match count from S3 for a search.
-func BuildSearchSummary(ctx context.Context, s3 storage.ResultStorage, s searchmodel.Search) SearchSummary {
+// BuildSearchSummary builds a SearchSummary from a Search record.
+// Match counts are read directly from the DB columns populated at search completion.
+func BuildSearchSummary(s searchmodel.Search) SearchSummary {
 	summary := SearchSummary{Search: s}
-	if s.Status != searchmodel.StatusCompleted {
-		return summary
+	if s.Status == searchmodel.StatusCompleted && s.TotalMatches != nil {
+		summary.MatchCount = *s.TotalMatches
+		summary.MatchesKnown = true
 	}
-	if s3 == nil {
-		return summary
-	}
-
-	var protoResults typespb.SearchResponse
-	if err := s3.DownloadResult(ctx, s.ID.String(), &protoResults); err != nil {
-		return summary
-	}
-
-	results := searchmodel.SearchResponseFromProto(&protoResults)
-	summary.MatchCount = CountTotalMatches(results)
-	summary.MatchesKnown = true
 	return summary
 }
 
