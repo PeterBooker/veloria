@@ -15,6 +15,7 @@ import (
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/storage"
 	typespb "veloria/internal/types"
+	"veloria/internal/web"
 )
 
 type SearchRequest struct {
@@ -157,15 +158,21 @@ func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) h
 			return
 		}
 
+		totalMatches := web.CountTotalMatches(results)
+
 		s.Status = searchmodel.StatusCompleted
 		s.ResultsSize = &size
 		s.CompletedAt = &now
+		s.TotalMatches = &totalMatches
+		s.TotalExtensions = &results.Total
 		s.Results = results
 
 		db.Model(&s).Updates(map[string]any{
-			"status":       searchmodel.StatusCompleted,
-			"results_size": size,
-			"completed_at": now,
+			"status":           searchmodel.StatusCompleted,
+			"results_size":     size,
+			"completed_at":     now,
+			"total_matches":    totalMatches,
+			"total_extensions": results.Total,
 		})
 
 		api.WriteSuccessJSON(w, http.StatusCreated, s)
