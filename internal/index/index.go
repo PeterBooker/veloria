@@ -1,7 +1,7 @@
 package index
 
 import (
-	"bufio"
+	"bytes"
 	"math"
 	"os"
 	"path/filepath"
@@ -53,9 +53,13 @@ type SearchOptions struct {
 // CompiledSearch holds pre-compiled patterns for searching indexes.
 // Create one via CompileSearch and reuse it across multiple Index.SearchCompiled calls
 // to avoid redundant regex compilation.
+//
+// The pattern field stores the regex string for content matching. Each goroutine
+// compiles its own cregexp.Regexp from this pattern because the codesearch DFA
+// engine is not safe for concurrent use.
 type CompiledSearch struct {
 	querySyntax    *syntax.Regexp
-	re             *regexp.Regexp
+	pattern        string
 	fre            *regexp.Regexp
 	excludeFre     *regexp.Regexp
 	maxResults     int
@@ -82,14 +86,9 @@ func CompileSearch(pat string, opt *SearchOptions) (*CompiledSearch, error) {
 		return nil, err
 	}
 
-	re, err := regexp.Compile(fullPat)
-	if err != nil {
-		return nil, err
-	}
-
 	cs := &CompiledSearch{
 		querySyntax:    cre.Syntax,
-		re:             re,
+		pattern:        fullPat,
 		maxResults:     opt.MaxResults,
 		linesOfContext: int(min(opt.LinesOfContext, uint(math.MaxInt))), // #nosec G115 -- clamped to MaxInt
 		offset:         opt.Offset,
@@ -152,6 +151,13 @@ func (i *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 	startedAt := time.Now()
 
+	// Compile a local codesearch DFA regexp for this goroutine.
+	// cregexp.Regexp is not safe for concurrent use, so each caller gets its own.
+	re, err := cregexp.Compile(cs.pattern)
+	if err != nil {
+		return nil, err
+	}
+
 	i.RLock()
 	defer i.RUnlock()
 
@@ -181,7 +187,7 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 
 		filesOpened++
 
-		matches, err := grepFile(name, cs.re, cs.linesOfContext, cs.maxResults-matchesCollected)
+		matches, err := grepFile(name, re, cs.linesOfContext, cs.maxResults-matchesCollected)
 		if err != nil {
 			continue
 		}
@@ -221,97 +227,127 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 	}, nil
 }
 
+var nlByte = []byte{'\n'}
+
+// countNL counts the number of newline bytes in b.
+func countNL(b []byte) int {
+	n := 0
+	for {
+		i := bytes.IndexByte(b, '\n')
+		if i < 0 {
+			break
+		}
+		n++
+		b = b[i+1:]
+	}
+	return n
+}
+
+// extractBeforeContext extracts up to n lines immediately before lineStart from buf.
+func extractBeforeContext(buf []byte, lineStart int, n int) []string {
+	if lineStart == 0 || n == 0 {
+		return nil
+	}
+
+	// Collect lines backwards
+	lines := make([]string, 0, n)
+	end := lineStart
+	if end > 0 && buf[end-1] == '\n' {
+		end--
+	}
+
+	for i := 0; i < n && end > 0; i++ {
+		start := 0
+		if j := bytes.LastIndexByte(buf[:end], '\n'); j >= 0 {
+			start = j + 1
+		}
+		lines = append(lines, string(buf[start:end]))
+		end = start
+		if end > 0 {
+			end-- // skip \n before this line
+		}
+	}
+
+	// Reverse to chronological order
+	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+		lines[i], lines[j] = lines[j], lines[i]
+	}
+	return lines
+}
+
+// extractAfterContext extracts up to n lines immediately after lineEnd from buf.
+func extractAfterContext(buf []byte, lineEnd int, n int) []string {
+	if lineEnd >= len(buf) || n == 0 {
+		return nil
+	}
+
+	lines := make([]string, 0, n)
+	pos := lineEnd
+	for i := 0; i < n && pos < len(buf); i++ {
+		nlIdx := bytes.IndexByte(buf[pos:], '\n')
+		if nlIdx < 0 {
+			if pos < len(buf) {
+				lines = append(lines, string(buf[pos:]))
+			}
+			break
+		}
+		lines = append(lines, string(buf[pos:pos+nlIdx]))
+		pos = pos + nlIdx + 1
+	}
+	return lines
+}
+
 // grepFile searches a file for lines matching the regex and returns matches with context.
-// Uses streaming I/O with a ring buffer for context lines to avoid loading entire files into memory.
-func grepFile(filename string, re *regexp.Regexp, contextLines int, maxMatches int) (matches []*Match, err error) {
-	f, err := os.Open(filename) // #nosec G304 -- filename from internal index walk
+// Uses the codesearch DFA regexp engine on a whole-file buffer, jumping directly between
+// matches without scanning non-matching lines.
+func grepFile(filename string, re *cregexp.Regexp, contextLines int, maxMatches int) ([]*Match, error) {
+	buf, err := os.ReadFile(filename) // #nosec G304 -- filename from internal index walk
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if cerr := f.Close(); err == nil && cerr != nil {
-			err = cerr
+
+	var (
+		matches    []*Match
+		chunkStart int
+		end        = len(buf)
+		beginText  = true
+		lineno     = 1
+	)
+
+	for chunkStart < end && len(matches) < maxMatches {
+		m := re.Match(buf[chunkStart:end], beginText, true) + chunkStart
+		beginText = false
+		if m < chunkStart {
+			break
 		}
-	}()
 
-	scanner := bufio.NewScanner(f)
-	lineNum := 0
-
-	if contextLines <= 0 {
-		// Fast path: no context lines needed, pure streaming
-		for scanner.Scan() {
-			lineNum++
-			line := scanner.Text()
-			if re.MatchString(line) {
-				matches = append(matches, &Match{
-					Line:       line,
-					LineNumber: lineNum,
-				})
-				if len(matches) >= maxMatches {
-					break
-				}
-			}
+		// Find line boundaries around the match
+		lineStart := bytes.LastIndex(buf[chunkStart:m], nlByte) + 1 + chunkStart
+		lineEnd := m + 1
+		if lineEnd > end {
+			lineEnd = end
 		}
-	} else {
-		// Context path: ring buffer for "before" lines
-		ring := make([]string, contextLines)
-		var pending []*Match
 
-		for scanner.Scan() {
-			line := scanner.Text()
-			lineNum++
+		// Track line numbers
+		lineno += countNL(buf[chunkStart:lineStart])
 
-			// Fill "after" context for pending matches
-			for i := len(pending) - 1; i >= 0; i-- {
-				pending[i].After = append(pending[i].After, line)
-				if len(pending[i].After) >= contextLines {
-					pending[i] = pending[len(pending)-1]
-					pending = pending[:len(pending)-1]
-				}
-			}
+		// Extract matched line without trailing newline/CR
+		line := string(bytes.TrimRight(buf[lineStart:lineEnd], "\r\n"))
 
-			if re.MatchString(line) {
-				// Collect "before" context from ring buffer
-				var before []string
-				start := lineNum - contextLines
-				if start < 1 {
-					start = 1
-				}
-				for i := start; i < lineNum; i++ {
-					before = append(before, ring[(i-1)%contextLines])
-				}
-
-				m := &Match{
-					Line:       line,
-					LineNumber: lineNum,
-					Before:     before,
-				}
-				matches = append(matches, m)
-				pending = append(pending, m)
-
-				if len(matches) >= maxMatches {
-					// Read remaining lines to fill "after" context
-					for len(pending) > 0 && scanner.Scan() {
-						afterLine := scanner.Text()
-						for i := len(pending) - 1; i >= 0; i-- {
-							pending[i].After = append(pending[i].After, afterLine)
-							if len(pending[i].After) >= contextLines {
-								pending[i] = pending[len(pending)-1]
-								pending = pending[:len(pending)-1]
-							}
-						}
-					}
-					break
-				}
-			}
-
-			// Store current line in ring buffer for future "before" context
-			ring[(lineNum-1)%contextLines] = line
+		match := &Match{
+			Line:       line,
+			LineNumber: lineno,
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
+		if contextLines > 0 {
+			match.Before = extractBeforeContext(buf, lineStart, contextLines)
+			match.After = extractAfterContext(buf, lineEnd, contextLines)
+		}
+
+		matches = append(matches, match)
+
+		lineno++
+		chunkStart = lineEnd
 	}
 
 	return matches, nil
