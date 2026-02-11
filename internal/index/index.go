@@ -2,6 +2,8 @@ package index
 
 import (
 	"bytes"
+	"compress/gzip"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -305,11 +307,72 @@ func extractAfterContext(buf []byte, lineEnd int, n int) []string {
 	return lines
 }
 
+// gzipMagic is the two-byte header that identifies gzip-compressed data.
+var gzipMagic = []byte{0x1f, 0x8b}
+
+// readSourceFile reads a source file, transparently decompressing gzip content.
+// Files without the gzip magic header are returned as-is for backward compatibility
+// with indexes built before source compression was introduced.
+func readSourceFile(filename string) ([]byte, error) {
+	f, err := openSourceReader(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	buf, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	return buf, nil
+}
+
+// openSourceReader opens a source file and returns an io.ReadCloser that
+// transparently decompresses gzip content. Callers must close the returned reader.
+func openSourceReader(filename string) (io.ReadCloser, error) {
+	f, err := os.Open(filename) // #nosec G304 -- filename from internal index walk
+	if err != nil {
+		return nil, err
+	}
+
+	// Peek at the first two bytes to detect gzip.
+	var header [2]byte
+	n, _ := io.ReadFull(f, header[:])
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		f.Close()
+		return nil, err
+	}
+
+	if n == 2 && header[0] == gzipMagic[0] && header[1] == gzipMagic[1] {
+		gz, err := gzip.NewReader(f)
+		if err != nil {
+			f.Close()
+			return nil, err
+		}
+		return &gzipReadCloser{gz: gz, f: f}, nil
+	}
+
+	return f, nil
+}
+
+// gzipReadCloser wraps a gzip.Reader and the underlying file so both are
+// closed when the reader is closed.
+type gzipReadCloser struct {
+	gz *gzip.Reader
+	f  *os.File
+}
+
+func (r *gzipReadCloser) Read(p []byte) (int, error) { return r.gz.Read(p) }
+func (r *gzipReadCloser) Close() error {
+	_ = r.gz.Close()
+	return r.f.Close()
+}
+
 // grepFile searches a file for lines matching the regex and returns matches with context.
 // Uses the codesearch DFA regexp engine on a whole-file buffer, jumping directly between
 // matches without scanning non-matching lines.
 func grepFile(filename string, re *cregexp.Regexp, contextLines int, maxMatches int) ([]*Match, error) {
-	buf, err := os.ReadFile(filename) // #nosec G304 -- filename from internal index walk
+	buf, err := readSourceFile(filename)
 	if err != nil {
 		return nil, err
 	}

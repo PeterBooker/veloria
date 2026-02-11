@@ -113,7 +113,6 @@ func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) h
 			api.WriteJSON(w, api.ErrTimeout("request cancelled"))
 			return
 		}
-		defer releaseSearchSlot()
 
 		private := false
 		if req.Public != nil {
@@ -127,6 +126,7 @@ func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) h
 			Repo:    req.Repo,
 		}
 		if err := db.Create(&s).Error; err != nil {
+			releaseSearchSlot()
 			api.WriteJSON(w, api.ErrInternal("failed to create search record"))
 			return
 		}
@@ -139,6 +139,10 @@ func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) h
 			ExcludeFileMatch: req.ExcludeFileMatch,
 			CaseInsensitive:  !req.CaseSensitive,
 		})
+
+		// Search done — free the slot immediately so the next search can start.
+		releaseSearchSlot()
+
 		if err != nil {
 			db.Model(&s).Update("status", searchmodel.StatusFailed)
 			api.WriteJSON(w, api.ErrInternal("search failed"))
@@ -146,36 +150,41 @@ func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) h
 		}
 
 		now := time.Now()
-
-		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-		defer cancel()
-
-		protoResults := searchmodel.SearchResponseToProto(results)
-		size, err := s3.UploadResult(ctx, s.ID.String(), protoResults)
-		if err != nil {
-			db.Model(&s).Update("status", searchmodel.StatusFailed)
-			api.WriteJSON(w, api.ErrInternal("failed to store results"))
-			return
-		}
-
 		totalMatches := web.CountTotalMatches(results)
 
 		s.Status = searchmodel.StatusCompleted
-		s.ResultsSize = &size
 		s.CompletedAt = &now
 		s.TotalMatches = &totalMatches
 		s.TotalExtensions = &results.Total
 		s.Results = results
 
-		db.Model(&s).Updates(map[string]any{
-			"status":           searchmodel.StatusCompleted,
-			"results_size":     size,
-			"completed_at":     now,
-			"total_matches":    totalMatches,
-			"total_extensions": results.Total,
-		})
+		// Persist results to S3 and update DB in the background so the
+		// client gets its response without waiting for the network upload.
+		go persistSearchResults(db, s3, s.ID, results, now, totalMatches, results.Total)
 
 		api.WriteSuccessJSON(w, http.StatusCreated, s)
+	})
+}
+
+// persistSearchResults uploads search results to S3 and updates the DB record.
+// It runs in a background goroutine so the API response is not blocked by S3 I/O.
+func persistSearchResults(db *gorm.DB, s3 storage.ResultStorage, searchID uuid.UUID, results *manager.SearchResponse, completedAt time.Time, totalMatches int, totalExtensions int) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	protoResults := searchmodel.SearchResponseToProto(results)
+	size, err := s3.UploadResult(ctx, searchID.String(), protoResults)
+	if err != nil {
+		db.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
+		return
+	}
+
+	db.Model(&searchmodel.Search{}).Where("id = ?", searchID).Updates(map[string]any{
+		"status":           searchmodel.StatusCompleted,
+		"results_size":     size,
+		"completed_at":     completedAt,
+		"total_matches":    totalMatches,
+		"total_extensions": totalExtensions,
 	})
 }
 

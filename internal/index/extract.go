@@ -2,6 +2,7 @@ package index
 
 import (
 	"archive/zip"
+	"compress/gzip"
 	"container/heap"
 	"fmt"
 	"io"
@@ -331,4 +332,49 @@ func extractFile(f *zip.File, fpath string) (err error) {
 		return fmt.Errorf("file exceeds maximum decompressed size of %d bytes", maxDecompressSize)
 	}
 	return nil
+}
+
+// CompressSourceDir gzip-compresses every regular file in dir in place.
+// Each file is written to a temp file first, then atomically renamed to avoid
+// data loss on failure. This is intended to be called after the trigram index
+// has been built from the uncompressed source files.
+func CompressSourceDir(dir string) error {
+	return filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		return compressFileInPlace(path)
+	})
+}
+
+func compressFileInPlace(path string) (err error) {
+	data, err := os.ReadFile(path) // #nosec G304 -- path from internal directory walk
+	if err != nil {
+		return err
+	}
+
+	tmp := path + ".gz.tmp"
+	f, err := os.Create(tmp) // #nosec G304 -- path from internal directory walk
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = f.Close()
+			_ = os.Remove(tmp)
+		}
+	}()
+
+	gz := gzip.NewWriter(f)
+	if _, err = gz.Write(data); err != nil {
+		return err
+	}
+	if err = gz.Close(); err != nil {
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(tmp, path)
 }
