@@ -45,7 +45,7 @@ func NewS3Client(c *config.Config, l *zerolog.Logger) (*S3Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create zstd encoder: %w", err)
 	}
-	enc.Close()
+	_ = enc.Close()
 
 	dec, err := zstd.NewReader(nil)
 	if err != nil {
