@@ -54,12 +54,15 @@ type SearchOptions struct {
 // Create one via CompileSearch and reuse it across multiple Index.SearchCompiled calls
 // to avoid redundant regex compilation.
 //
-// The pattern field stores the regex string for content matching. Each goroutine
-// compiles its own cregexp.Regexp from this pattern because the codesearch DFA
-// engine is not safe for concurrent use.
+// The rePool holds a sync.Pool of *cregexp.Regexp instances. Each goroutine borrows
+// one from the pool for its search and returns it when done. This avoids recompiling
+// the DFA regexp for every extension and — critically — lets the DFA state cache stay
+// warm across extensions within the same worker, which makes subsequent matches
+// nearly free (one table lookup per byte instead of recomputing DFA transitions).
 type CompiledSearch struct {
 	querySyntax    *syntax.Regexp
 	pattern        string
+	rePool         sync.Pool // pool of *cregexp.Regexp; not safe to copy CompiledSearch
 	fre            *regexp.Regexp
 	excludeFre     *regexp.Regexp
 	maxResults     int
@@ -87,8 +90,15 @@ func CompileSearch(pat string, opt *SearchOptions) (*CompiledSearch, error) {
 	}
 
 	cs := &CompiledSearch{
-		querySyntax:    cre.Syntax,
-		pattern:        fullPat,
+		querySyntax: cre.Syntax,
+		pattern:     fullPat,
+		rePool: sync.Pool{
+			New: func() any {
+				// Pattern was validated above; compilation cannot fail here.
+				re, _ := cregexp.Compile(fullPat) //nolint:errcheck
+				return re
+			},
+		},
 		maxResults:     opt.MaxResults,
 		linesOfContext: int(min(opt.LinesOfContext, uint(math.MaxInt))), // #nosec G115 -- clamped to MaxInt
 		offset:         opt.Offset,
@@ -151,12 +161,10 @@ func (i *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 	startedAt := time.Now()
 
-	// Compile a local codesearch DFA regexp for this goroutine.
-	// cregexp.Regexp is not safe for concurrent use, so each caller gets its own.
-	re, err := cregexp.Compile(cs.pattern)
-	if err != nil {
-		return nil, err
-	}
+	// Borrow a DFA regexp from the pool. Each worker keeps its DFA state cache
+	// warm across extensions, avoiding cold-start overhead on every call.
+	re := cs.rePool.Get().(*cregexp.Regexp)
+	defer cs.rePool.Put(re)
 
 	i.RLock()
 	defer i.RUnlock()
