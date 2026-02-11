@@ -2,8 +2,10 @@ package web
 
 import (
 	"bufio"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -121,6 +123,7 @@ func SafeJoin(base string, rel string) (string, error) {
 }
 
 // ReadContextLines reads lines around a target line number from a file.
+// It transparently handles gzip-compressed source files.
 func ReadContextLines(path string, lineNumber int, radius int) (lines []SearchContextLine, err error) {
 	file, err := os.Open(path) // #nosec G304 -- path is validated by SafePath caller
 	if err != nil {
@@ -132,13 +135,36 @@ func ReadContextLines(path string, lineNumber int, radius int) (lines []SearchCo
 		}
 	}()
 
+	// Detect gzip by peeking at the first two bytes.
+	var r io.Reader = file
+	var header [2]byte
+	if n, _ := io.ReadFull(file, header[:]); n == 2 && header[0] == 0x1f && header[1] == 0x8b {
+		if _, serr := file.Seek(0, io.SeekStart); serr != nil {
+			return nil, serr
+		}
+		gz, gerr := gzip.NewReader(file)
+		if gerr != nil {
+			return nil, gerr
+		}
+		defer func() {
+			if cerr := gz.Close(); err == nil && cerr != nil {
+				err = cerr
+			}
+		}()
+		r = gz
+	} else {
+		if _, serr := file.Seek(0, io.SeekStart); serr != nil {
+			return nil, serr
+		}
+	}
+
 	start := lineNumber - radius
 	if start < 1 {
 		start = 1
 	}
 	end := lineNumber + radius
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(r)
 	current := 0
 	for scanner.Scan() {
 		current++

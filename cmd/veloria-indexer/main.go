@@ -97,6 +97,13 @@ func main() {
 		log.Fatalf("failed to rename %q to %q: %v", tmpPath, finalPath, err)
 	}
 
+	// Gzip-compress source files now that the trigram index has been built
+	// from the uncompressed content. Compressed files reduce disk footprint
+	// and page cache pressure during search.
+	if err := index.CompressSourceDir(dest); err != nil {
+		log.Fatalf("failed to compress source files in %q: %v", dest, err)
+	}
+
 	// Output the index directory path so the server can load it.
 	// Format: INDEX_READY:<path>
 	fmt.Printf("INDEX_READY:%s\n", slugDir)
