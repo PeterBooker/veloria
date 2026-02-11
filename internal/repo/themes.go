@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
-	"golang.org/x/sync/errgroup"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -173,123 +171,71 @@ func (tr *ThemeRepo) PrepareUpdates() []IndexTask {
 	return tr.Repository.PrepareUpdates(fetchFn, saveFn)
 }
 
-// discoverNewThemes fetches the complete theme catalog from the WordPress SVN
-// repository and uses the WordPress API to fetch metadata for any new slugs not
-// already known to the system.
+// discoverNewThemes paginates the full AspireCloud theme catalog and returns
+// themes not yet known to the system.
 func (tr *ThemeRepo) discoverNewThemes() ([]*Theme, error) {
-	// Step 1: Fetch all theme slugs from SVN
-	tr.l.Info().Msg("Fetching theme slugs from SVN...")
-	svnSlugs, err := fetchSVNSlugs(tr.ctx, svnThemesURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch SVN theme listing: %w", err)
-	}
-	tr.l.Info().Int("total", len(svnSlugs)).Msg("Fetched theme slugs from SVN")
-
-	// Step 2: Load all known slugs (active, closed, unindexed) from DB + memory
 	known, err := tr.getAllKnownSlugs()
 	if err != nil {
 		return nil, err
 	}
 
-	// Step 3: Filter to truly new slugs
-	var newSlugs []string
-	for _, slug := range svnSlugs {
-		if _, ok := known[slug]; !ok {
-			newSlugs = append(newSlugs, slug)
+	tr.l.Info().Int("known", len(known)).Msg("Starting full theme discovery via API")
+
+	var result []*Theme
+	var skipped int
+
+	for page := 1; ; page++ {
+		if tr.ctx.Err() != nil {
+			return nil, tr.ctx.Err()
+		}
+
+		pageURL := fmt.Sprintf("%s?action=query_themes&browse=updated&posts_per_page=100&page=%d", baseThemesURL, page)
+		themes, info, err := fetchThemePage(tr.ctx, pageURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch theme page %d: %w", page, err)
+		}
+
+		if len(themes) == 0 {
+			break
+		}
+
+		for i := range themes {
+			t := themes[i]
+			if t.Source == "" {
+				t.Source = SourceWordPress
+			}
+			fillWordPressDownloadLink(&t)
+			if _, ok := known[t.Slug]; ok {
+				skipped++
+				continue
+			}
+			if t.DownloadLink == "" {
+				skipped++
+				continue
+			}
+			t.IndexedExtension = NewIndexedExtension()
+			result = append(result, &t)
+		}
+
+		if page%10 == 0 {
+			tr.l.Info().
+				Int("page", page).
+				Int("totalPages", info.Pages).
+				Int("new", len(result)).
+				Int("skipped", skipped).
+				Msg("Theme discovery progress")
+		}
+
+		if page >= info.Pages {
+			break
 		}
 	}
 
 	tr.l.Info().
-		Int("svnTotal", len(svnSlugs)).
 		Int("known", len(known)).
-		Int("new", len(newSlugs)).
-		Msg("Filtered new theme slugs for discovery")
-
-	if len(newSlugs) == 0 {
-		tr.l.Info().Msg("No new theme slugs to discover")
-		return nil, nil
-	}
-
-	// Step 4: Fetch info for each new slug concurrently
-	var (
-		mu          sync.Mutex
-		result      []*Theme
-		closedCount int
-		errCount    int
-		fetched     int
-	)
-
-	g, gCtx := errgroup.WithContext(tr.ctx)
-	g.SetLimit(discoveryAPIConcurrency)
-
-	for _, slug := range newSlugs {
-		s := slug
-		g.Go(func() error {
-			time.Sleep(50 * time.Millisecond)
-
-			if gCtx.Err() != nil {
-				return gCtx.Err()
-			}
-
-			t, fetchErr := tryFetchThemeInfo(gCtx, s)
-
-			if gCtx.Err() != nil {
-				return gCtx.Err()
-			}
-
-			isClosed := fetchErr == nil && (t == nil || t.DownloadLink == "")
-			isActive := fetchErr == nil && t != nil && t.DownloadLink != ""
-
-			if isActive {
-				t.IndexedExtension = NewIndexedExtension()
-			}
-
-			mu.Lock()
-			fetched++
-
-			if fetchErr != nil {
-				errCount++
-			} else if isClosed {
-				closedCount++
-			}
-			if isActive {
-				result = append(result, t)
-			}
-
-			if fetched%1000 == 0 {
-				tr.l.Info().
-					Int("fetched", fetched).
-					Int("total", len(newSlugs)).
-					Int("active", len(result)).
-					Int("closed", closedCount).
-					Int("errors", errCount).
-					Msg("Theme discovery progress")
-			}
-			mu.Unlock()
-
-			if fetchErr != nil {
-				tr.l.Warn().Err(fetchErr).Str("slug", s).Msg("Failed to fetch theme info, will retry next scan")
-			} else if isClosed {
-				tr.saveClosedTheme(s, t)
-			}
-
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
-		return nil, fmt.Errorf("theme discovery failed: %w", err)
-	}
-
-	tr.l.Info().
-		Int("svnTotal", len(svnSlugs)).
-		Int("known", len(known)).
-		Int("new", len(newSlugs)).
-		Int("fetched", fetched).
-		Int("active", len(result)).
-		Int("closed", closedCount).
-		Int("errors", errCount).
-		Msg("Full theme SVN scan complete")
+		Int("new", len(result)).
+		Int("skipped", skipped).
+		Msg("Full theme discovery scan complete")
 
 	return result, nil
 }
@@ -297,8 +243,6 @@ func (tr *ThemeRepo) discoverNewThemes() ([]*Theme, error) {
 // getAllKnownSlugs returns a set of all theme slugs known to the system,
 // including active, closed, and unindexed themes from both the in-memory
 // repository and the database.
-// This is scoped to SVN discovery which only produces wordpress.org packages,
-// so source is not included in the key.
 func (tr *ThemeRepo) getAllKnownSlugs() (map[string]struct{}, error) {
 	known := make(map[string]struct{})
 
@@ -318,63 +262,6 @@ func (tr *ThemeRepo) getAllKnownSlugs() (map[string]struct{}, error) {
 
 	return known, nil
 }
-
-// saveClosedTheme creates or updates a theme record as closed.
-// If t is nil (API returned null/false), a minimal record is created.
-// Only used during SVN discovery, so source is always SourceWordPress.
-func (tr *ThemeRepo) saveClosedTheme(slug string, t *Theme) {
-	now := time.Now()
-
-	var existing Theme
-	err := tr.db.Where("slug = ? AND source = ?", slug, SourceWordPress).First(&existing).Error
-	if err == nil {
-		if existing.ClosedAt == nil {
-			tr.db.Table("themes").Where("slug = ? AND source = ?", slug, SourceWordPress).Update("closed_at", now)
-		}
-		return
-	}
-
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		tr.l.Error().Err(err).Str("slug", slug).Msg("Failed to check existing theme")
-		return
-	}
-
-	record := &Theme{
-		Slug:            slug,
-		Source:          SourceWordPress,
-		Name:            slug,
-		ClosedAt:        &now,
-		Tags:            make(map[string]string),
-		RequiresPlugins: []string{},
-	}
-
-	if t != nil {
-		record.Name = t.Name
-		record.Version = t.Version
-		record.Requires = t.Requires
-		record.Tested = t.Tested
-		record.RequiresPHP = t.RequiresPHP
-		record.Rating = t.Rating
-		record.ActiveInstalls = t.ActiveInstalls
-		record.Downloaded = t.Downloaded
-		record.ShortDescription = t.ShortDescription
-		record.DownloadLink = t.DownloadLink
-		if t.Tags != nil {
-			record.Tags = t.Tags
-		}
-		if t.RequiresPlugins != nil {
-			record.RequiresPlugins = t.RequiresPlugins
-		}
-		if t.Name != "" {
-			record.Name = t.Name
-		}
-	}
-
-	if err := tr.db.Create(record).Error; err != nil {
-		tr.l.Error().Err(err).Str("slug", slug).Msg("Failed to create closed theme record")
-	}
-}
-
 
 // Search searches all themes and returns results.
 func (tr *ThemeRepo) Search(term string, opt *index.SearchOptions) ([]*ThemeSearchResult, error) {
@@ -577,37 +464,3 @@ func FetchThemeInfo(ctx context.Context, slug string) (theme *Theme, err error) 
 	return &t, nil
 }
 
-// tryFetchThemeInfo fetches a single theme's info from the WordPress API.
-// Returns (nil, nil) when the API indicates the theme does not exist (null/false response).
-// Returns (nil, err) on network/API errors.
-// Returns (theme, nil) on success.
-func tryFetchThemeInfo(ctx context.Context, slug string) (*Theme, error) {
-	reqURL := fmt.Sprintf("%s?action=theme_information&request[slug]=%s", baseThemesURL, url.QueryEscape(slug))
-
-	// Bypass circuit breaker: bulk discovery expects many "not found" responses
-	// which should not trip the breaker that protects the regular API path.
-	body, err := doWPAPIRequest(ctx, reqURL)
-	if err != nil {
-		// 404 means the theme doesn't exist on the API — treat as closed, not an error.
-		var apiErr *wpAPIError
-		if errors.As(err, &apiErr) && apiErr.StatusCode == 404 {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	trimmed := strings.TrimSpace(string(body))
-	if trimmed == "null" || trimmed == "false" || trimmed == "" {
-		return nil, nil
-	}
-
-	var t Theme
-	if err := json.Unmarshal(body, &t); err != nil {
-		return nil, fmt.Errorf("failed to decode theme info for %s: %w", slug, err)
-	}
-
-	// SVN discovery only finds wordpress.org themes
-	t.Source = SourceWordPress
-	fillWordPressDownloadLink(&t)
-	return &t, nil
-}

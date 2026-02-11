@@ -313,12 +313,16 @@ var gzipMagic = []byte{0x1f, 0x8b}
 // readSourceFile reads a source file, transparently decompressing gzip content.
 // Files without the gzip magic header are returned as-is for backward compatibility
 // with indexes built before source compression was introduced.
-func readSourceFile(filename string) ([]byte, error) {
+func readSourceFile(filename string) (data []byte, retErr error) {
 	f, err := openSourceReader(filename)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if cErr := f.Close(); cErr != nil && retErr == nil {
+			retErr = cErr
+		}
+	}()
 
 	buf, err := io.ReadAll(f)
 	if err != nil {
@@ -339,14 +343,14 @@ func openSourceReader(filename string) (io.ReadCloser, error) {
 	var header [2]byte
 	n, _ := io.ReadFull(f, header[:])
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		f.Close()
+		_ = f.Close()
 		return nil, err
 	}
 
 	if n == 2 && header[0] == gzipMagic[0] && header[1] == gzipMagic[1] {
 		gz, err := gzip.NewReader(f)
 		if err != nil {
-			f.Close()
+			_ = f.Close()
 			return nil, err
 		}
 		return &gzipReadCloser{gz: gz, f: f}, nil

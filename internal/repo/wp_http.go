@@ -85,7 +85,7 @@ func doWPAPIRequest(ctx context.Context, url string) ([]byte, error) {
 	}
 
 	httpClient := client.GetAPI()
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) // #nosec G704 -- URL from internal constants, not user input
 	if err != nil {
 		return nil, err
 	}
