@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
-	cindex "github.com/google/codesearch/index"
+	cindex "veloria/internal/codesearch/index"
 )
 
 // Open opens an existing trigram index at the given directory path.

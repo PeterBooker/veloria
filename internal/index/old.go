@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/codesearch/index"
+	"veloria/internal/codesearch/index"
 )
 
 // flushQuiet calls ix.Flush() with the standard logger silenced,
