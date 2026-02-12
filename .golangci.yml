@@ -1,0 +1,11 @@
+version: "2"
+
+linters:
+  exclusions:
+    paths:
+      - internal/codesearch
+
+formatters:
+  exclusions:
+    paths:
+      - internal/codesearch
