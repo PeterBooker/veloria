@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	cindex "github.com/google/codesearch/index"
-	cregexp "github.com/google/codesearch/regexp"
+	cindex "veloria/internal/codesearch/index"
+	cregexp "veloria/internal/codesearch/regexp"
 )
 
 const (
