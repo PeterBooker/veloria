@@ -157,7 +157,7 @@ type SearchParams struct {
 // Search searches the specified repository for the given term.
 func (m *Manager) Search(repoType string, term string, params *SearchParams) (*SearchResponse, error) {
 	if params == nil {
-		params = &SearchParams{CaseInsensitive: true}
+		params = &SearchParams{}
 	}
 
 	opt := &index.SearchOptions{
