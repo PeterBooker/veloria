@@ -348,7 +348,9 @@ func (r *Repository[T]) UpdateIndex(idx *index.Index, slug string) error {
 // Search searches all extensions for the given term.
 // It compiles regex once, snapshots the extension list to minimize lock scope,
 // and searches extensions concurrently with a worker pool.
-func (r *Repository[T]) Search(term string, opt *index.SearchOptions) ([]*SearchResult, error) {
+// If progressFn is non-nil, it is called after each extension is searched
+// with the number of extensions searched so far and the total count.
+func (r *Repository[T]) Search(term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error) {
 	// Compile search patterns once for reuse across all extensions
 	cs, err := index.CompileSearch(term, opt)
 	if err != nil {
@@ -376,10 +378,13 @@ func (r *Repository[T]) Search(term string, opt *index.SearchOptions) ([]*Search
 	}
 
 	var (
-		mu           sync.Mutex
-		results      []*SearchResult
-		totalMatches atomic.Int64
+		mu               sync.Mutex
+		results          []*SearchResult
+		totalMatches     atomic.Int64
+		searched         atomic.Int64
 	)
+
+	total := len(extensions)
 
 	sem := make(chan struct{}, workers)
 	var wg sync.WaitGroup
@@ -399,7 +404,13 @@ func (r *Repository[T]) Search(term string, opt *index.SearchOptions) ([]*Search
 		wg.Add(1)
 		go func(e T) {
 			defer wg.Done()
-			defer func() { <-sem }()
+			defer func() {
+				<-sem
+				n := int(searched.Add(1))
+				if progressFn != nil {
+					progressFn(n, total)
+				}
+			}()
 
 			if totalMatches.Load() >= globalMatchCap {
 				return

@@ -195,8 +195,12 @@ func compareVersions(a, b string) int {
 }
 
 // Search searches all cores and returns results.
-func (cr *CoreRepo) Search(term string, opt *index.SearchOptions) ([]*CoreSearchResult, error) {
-	results, err := cr.Repository.Search(term, opt)
+func (cr *CoreRepo) Search(term string, opt *index.SearchOptions, progressFn ...func(searched, total int)) ([]*CoreSearchResult, error) {
+	var fn func(searched, total int)
+	if len(progressFn) > 0 {
+		fn = progressFn[0]
+	}
+	results, err := cr.Repository.Search(term, opt, fn)
 	if err != nil {
 		return nil, err
 	}

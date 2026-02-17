@@ -264,8 +264,12 @@ func (tr *ThemeRepo) getAllKnownSlugs() (map[string]struct{}, error) {
 }
 
 // Search searches all themes and returns results.
-func (tr *ThemeRepo) Search(term string, opt *index.SearchOptions) ([]*ThemeSearchResult, error) {
-	results, err := tr.Repository.Search(term, opt)
+func (tr *ThemeRepo) Search(term string, opt *index.SearchOptions, progressFn ...func(searched, total int)) ([]*ThemeSearchResult, error) {
+	var fn func(searched, total int)
+	if len(progressFn) > 0 {
+		fn = progressFn[0]
+	}
+	results, err := tr.Repository.Search(term, opt, fn)
 	if err != nil {
 		return nil, err
 	}

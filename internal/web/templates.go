@@ -107,6 +107,12 @@ func NewTemplates(fsys fs.FS) (*Templates, error) {
 				return formatNumberWithCommas(n)
 			}
 		},
+		"percentage": func(a, b int) int {
+			if b == 0 {
+				return 0
+			}
+			return a * 100 / b
+		},
 	}
 
 	// Collect shared template patterns (layouts and partials)
