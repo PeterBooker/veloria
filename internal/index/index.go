@@ -168,6 +168,11 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 	re := cs.rePool.Get().(*cregexp.Regexp)
 	defer cs.rePool.Put(re)
 
+	// Borrow a read buffer from the pool. Reused across all files in this
+	// search to avoid allocating a new []byte for every source file opened.
+	readBuf := grepBufPool.Get().(*bytes.Buffer)
+	defer grepBufPool.Put(readBuf)
+
 	i.RLock()
 	defer i.RUnlock()
 
@@ -197,10 +202,12 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 
 		filesOpened++
 
-		matches, err := grepFile(name, re, cs.linesOfContext, cs.maxResults-matchesCollected)
+		data, err := readSourceFileBuf(name, readBuf)
 		if err != nil {
 			continue
 		}
+
+		matches := grepData(data, re, cs.linesOfContext, cs.maxResults-matchesCollected)
 
 		if len(matches) > 0 {
 			filesFound++
@@ -372,6 +379,35 @@ func (r *gzipReadCloser) Close() error {
 	return r.f.Close()
 }
 
+// grepBufPool reuses read buffers across file grep operations to avoid
+// allocating a new []byte for every source file opened during search.
+var grepBufPool = sync.Pool{
+	New: func() any {
+		return bytes.NewBuffer(make([]byte, 0, 256<<10)) // 256 KB initial
+	},
+}
+
+// readSourceFileBuf reads a source file into the provided buffer, reusing its
+// underlying storage. Returns the file data as a slice of the buffer's memory.
+func readSourceFileBuf(filename string, buf *bytes.Buffer) ([]byte, error) {
+	f, err := openSourceReader(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	buf.Reset()
+	_, err = buf.ReadFrom(f)
+	closeErr := f.Close()
+	if err != nil {
+		return nil, err
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+
+	return buf.Bytes(), nil
+}
+
 // grepFile searches a file for lines matching the regex and returns matches with context.
 // Uses the codesearch DFA regexp engine on a whole-file buffer, jumping directly between
 // matches without scanning non-matching lines.
@@ -380,7 +416,11 @@ func grepFile(filename string, re *cregexp.Regexp, contextLines int, maxMatches 
 	if err != nil {
 		return nil, err
 	}
+	return grepData(buf, re, contextLines, maxMatches), nil
+}
 
+// grepData searches a byte buffer for lines matching the regex and returns matches with context.
+func grepData(buf []byte, re *cregexp.Regexp, contextLines int, maxMatches int) []*Match {
 	var (
 		matches    []*Match
 		chunkStart int
@@ -425,7 +465,7 @@ func grepFile(filename string, re *cregexp.Regexp, contextLines int, maxMatches 
 		chunkStart = lineEnd
 	}
 
-	return matches, nil
+	return matches
 }
 
 // SourceDir returns the source directory path for this index.

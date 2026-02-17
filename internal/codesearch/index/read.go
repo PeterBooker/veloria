@@ -154,6 +154,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"sync"
 )
 
 const (
@@ -183,6 +184,9 @@ type Index struct {
 	postIndex    int
 	numPost      int
 	numPostBlock int
+
+	nameCacheOnce sync.Once
+	nameCache     []string
 }
 
 func (ix *Index) PrintStats() {
@@ -280,8 +284,24 @@ func (ix *Index) Roots() *PathReader {
 }
 
 // Name returns the name corresponding to the given fileid.
+// Results are cached on first access so that subsequent lookups are O(1).
 func (ix *Index) Name(fileid int) Path {
-	return ix.NamesAt(fileid, fileid+1).Path()
+	ix.nameCacheOnce.Do(ix.buildNameCache)
+	if fileid >= 0 && fileid < len(ix.nameCache) {
+		return Path{ix.nameCache[fileid]}
+	}
+	return Path{}
+}
+
+// buildNameCache decodes all names from the index into a flat slice.
+// Called once via sync.Once; after that, Name() is a direct array lookup.
+func (ix *Index) buildNameCache() {
+	ix.nameCache = make([]string, ix.numName)
+	r := ix.NamesAt(0, ix.numName)
+	for i := 0; i < ix.numName && r.Valid(); i++ {
+		ix.nameCache[i] = r.Path().String()
+		r.Next()
+	}
 }
 
 // NameAt returns a PathReader returning the names for
