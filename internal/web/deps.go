@@ -47,6 +47,7 @@ func (d *Deps) PageData(r *http.Request) PageData {
 		SearchEnabled:        d.SearchEnabled,
 		SearchDisabledReason: d.SearchDisabledReason,
 		CurrentPath:          r.URL.Path,
+		Version:              config.Version,
 	}
 }
 

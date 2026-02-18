@@ -15,6 +15,7 @@ type PageData struct {
 	SearchEnabled        bool
 	SearchDisabledReason string
 	CurrentPath          string
+	Version              string
 }
 
 // LoginData contains data for the login page.

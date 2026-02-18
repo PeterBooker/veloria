@@ -12,11 +12,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Version is set at build time via -ldflags (e.g. -X veloria/internal/config.Version=v1.0.0).
+var Version = "dev"
+
 type Config struct {
 	Name                   string        `env:"NAME" envDefault:"Veloria Core"`
 	Port                   int           `env:"PORT" envDefault:"9071" validate:"min=1,max=65535"`
 	Env                    string        `env:"ENV" envDefault:"development"`
-	Version                string        `env:"VERSION" envDefault:"1.0.0"`
 	WorkingDir             string        `envDefault:"/"`
 	DataDir                string        `env:"DATA_DIR" envDefault:"/etc/veloria/data" validate:"required"`
 	HTTPTimeout            int64         `env:"HTTP_TIMEOUT" envDefault:"2500"`

@@ -22,7 +22,7 @@ func Setup(c *config.Config) {
 		Transport:        sentrySyncTransport,
 		Dsn:              c.SentryDSN,
 		Environment:      c.Env,
-		Release:          c.Version,
+		Release:          config.Version,
 		SampleRate:       c.SentrySampleRate,
 		EnableTracing:    true,
 		TracesSampleRate: c.SentryTracesSampleRate,
