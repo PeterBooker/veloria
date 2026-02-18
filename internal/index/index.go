@@ -1,6 +1,7 @@
 package index
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"io"
@@ -8,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"regexp/syntax"
 	"strings"
 	"sync"
 	"time"
@@ -62,7 +62,7 @@ type SearchOptions struct {
 // warm across extensions within the same worker, which makes subsequent matches
 // nearly free (one table lookup per byte instead of recomputing DFA transitions).
 type CompiledSearch struct {
-	querySyntax    *syntax.Regexp
+	query          *cindex.Query // pre-computed trigram query, safe for concurrent reads
 	pattern        string
 	rePool         sync.Pool // pool of *cregexp.Regexp; not safe to copy CompiledSearch
 	fre            *regexp.Regexp
@@ -92,8 +92,8 @@ func CompileSearch(pat string, opt *SearchOptions) (*CompiledSearch, error) {
 	}
 
 	cs := &CompiledSearch{
-		querySyntax: cre.Syntax,
-		pattern:     fullPat,
+		query:   cindex.RegexpQuery(cre.Syntax),
+		pattern: fullPat,
 		rePool: sync.Pool{
 			New: func() any {
 				// Pattern was validated above; compilation cannot fail here.
@@ -186,7 +186,7 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 		return nil, nil
 	}
 
-	files := idx.PostingQuery(cindex.RegexpQuery(cs.querySyntax))
+	files := idx.PostingQuery(cs.query)
 
 	var (
 		results          []*FileMatch
@@ -397,15 +397,30 @@ var grepBufPool = sync.Pool{
 	},
 }
 
-// gzipReaderPool reuses gzip.Reader instances across file reads.
-// Each gzip.NewReader allocates ~32 KB of internal flate buffers;
-// with hundreds of thousands of files grepped per search, pooling
-// avoids massive GC pressure.
-var gzipReaderPool = sync.Pool{}
+// gzipReadState bundles a gzip.Reader with a bufio.Reader for pooling.
+// The bufio.Reader is critical: gzip.Reset(r) checks if r implements
+// flate.Reader (io.Reader + io.ByteReader). os.File does NOT, so without
+// our own bufio.Reader, every Reset allocates a new 4 KB bufio internally.
+// The bufio.Reader also reduces read syscalls by batching small reads.
+type gzipReadState struct {
+	gz *gzip.Reader
+	br *bufio.Reader
+}
+
+// gzipStatePool reuses gzip+bufio reader pairs across file reads.
+// Eliminates per-file allocation of: gzip internal flate buffers (~32 KB),
+// gzip's internal bufio.Reader (4 KB), and our bufio.Reader (16 KB).
+var gzipStatePool = sync.Pool{
+	New: func() any {
+		return &gzipReadState{
+			br: bufio.NewReaderSize(nil, 16<<10), // 16 KB read buffer
+		}
+	},
+}
 
 // readSourceFileBuf reads a source file into the provided buffer, reusing its
-// underlying storage and a pooled gzip.Reader when the file is gzip-compressed.
-// Returns the file data as a slice of the buffer's memory.
+// underlying storage and a pooled gzip+bufio reader pair when the file is
+// gzip-compressed. Returns the file data as a slice of the buffer's memory.
 func readSourceFileBuf(filename string, buf *bytes.Buffer) ([]byte, error) {
 	f, err := os.Open(filename) // #nosec G304 -- filename from internal index walk
 	if err != nil {
@@ -414,52 +429,36 @@ func readSourceFileBuf(filename string, buf *bytes.Buffer) ([]byte, error) {
 
 	buf.Reset()
 
-	// Try gzip first — almost all source files are compressed.
-	// Use a pooled gzip.Reader to avoid re-allocating internal flate buffers.
-	if pooled := gzipReaderPool.Get(); pooled != nil {
-		gz := pooled.(*gzip.Reader)
-		if err := gz.Reset(f); err == nil {
-			_, readErr := buf.ReadFrom(gz)
-			_ = gz.Close()
-			gzipReaderPool.Put(gz)
-			_ = f.Close()
-			if readErr != nil {
-				return nil, readErr
-			}
-			return buf.Bytes(), nil
-		}
-		gzipReaderPool.Put(gz)
-		// Reset failed — not gzip, fall through to raw read.
-		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			_ = f.Close()
-			return nil, err
-		}
+	// Get pooled gzip+bufio state. The bufio.Reader satisfies flate.Reader
+	// (io.Reader + io.ByteReader), so gzip.Reset won't allocate its own.
+	st := gzipStatePool.Get().(*gzipReadState)
+	st.br.Reset(f)
+
+	var gzipOK bool
+	if st.gz != nil {
+		gzipOK = st.gz.Reset(st.br) == nil
 	} else {
-		// No pooled reader — peek for gzip magic to decide.
-		var header [2]byte
-		n, _ := io.ReadFull(f, header[:])
-		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			_ = f.Close()
-			return nil, err
-		}
-		if n == 2 && header[0] == gzipMagic[0] && header[1] == gzipMagic[1] {
-			gz, err := gzip.NewReader(f)
-			if err != nil {
-				_ = f.Close()
-				return nil, err
-			}
-			_, readErr := buf.ReadFrom(gz)
-			_ = gz.Close()
-			gzipReaderPool.Put(gz)
-			_ = f.Close()
-			if readErr != nil {
-				return nil, readErr
-			}
-			return buf.Bytes(), nil
-		}
+		st.gz, err = gzip.NewReader(st.br)
+		gzipOK = err == nil
 	}
 
-	// Not gzip — read raw.
+	if gzipOK {
+		_, readErr := buf.ReadFrom(st.gz)
+		_ = st.gz.Close()
+		gzipStatePool.Put(st)
+		_ = f.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
+		return buf.Bytes(), nil
+	}
+
+	// Not gzip — return state to pool, seek to start, read raw.
+	gzipStatePool.Put(st)
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
 	_, err = buf.ReadFrom(f)
 	_ = f.Close()
 	if err != nil {
