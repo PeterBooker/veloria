@@ -173,10 +173,20 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 	readBuf := grepBufPool.Get().(*bytes.Buffer)
 	defer grepBufPool.Put(readBuf)
 
+	// Read the index pointer under lock, then release immediately.
+	// The cindex.Index is safe to use after unlock: Close() only nils this
+	// pointer (under write lock) and the old cindex.Index stays alive via our
+	// local reference until GC. The 5-second delay in closeOldIndex ensures
+	// we finish before the mmap is released.
 	i.RLock()
-	defer i.RUnlock()
+	idx := i.idx
+	i.RUnlock()
 
-	files := i.idx.PostingQuery(cindex.RegexpQuery(cs.querySyntax))
+	if idx == nil {
+		return nil, nil
+	}
+
+	files := idx.PostingQuery(cindex.RegexpQuery(cs.querySyntax))
 
 	var (
 		results          []*FileMatch
@@ -191,7 +201,7 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 			break
 		}
 
-		name := i.idx.Name(fileID).String()
+		name := idx.Name(fileID).String()
 
 		if cs.fre != nil && !cs.fre.MatchString(name) {
 			continue
@@ -387,24 +397,74 @@ var grepBufPool = sync.Pool{
 	},
 }
 
+// gzipReaderPool reuses gzip.Reader instances across file reads.
+// Each gzip.NewReader allocates ~32 KB of internal flate buffers;
+// with hundreds of thousands of files grepped per search, pooling
+// avoids massive GC pressure.
+var gzipReaderPool = sync.Pool{}
+
 // readSourceFileBuf reads a source file into the provided buffer, reusing its
-// underlying storage. Returns the file data as a slice of the buffer's memory.
+// underlying storage and a pooled gzip.Reader when the file is gzip-compressed.
+// Returns the file data as a slice of the buffer's memory.
 func readSourceFileBuf(filename string, buf *bytes.Buffer) ([]byte, error) {
-	f, err := openSourceReader(filename)
+	f, err := os.Open(filename) // #nosec G304 -- filename from internal index walk
 	if err != nil {
 		return nil, err
 	}
 
 	buf.Reset()
+
+	// Try gzip first — almost all source files are compressed.
+	// Use a pooled gzip.Reader to avoid re-allocating internal flate buffers.
+	if pooled := gzipReaderPool.Get(); pooled != nil {
+		gz := pooled.(*gzip.Reader)
+		if err := gz.Reset(f); err == nil {
+			_, readErr := buf.ReadFrom(gz)
+			_ = gz.Close()
+			gzipReaderPool.Put(gz)
+			f.Close()
+			if readErr != nil {
+				return nil, readErr
+			}
+			return buf.Bytes(), nil
+		}
+		gzipReaderPool.Put(gz)
+		// Reset failed — not gzip, fall through to raw read.
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			f.Close()
+			return nil, err
+		}
+	} else {
+		// No pooled reader — peek for gzip magic to decide.
+		var header [2]byte
+		n, _ := io.ReadFull(f, header[:])
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			f.Close()
+			return nil, err
+		}
+		if n == 2 && header[0] == gzipMagic[0] && header[1] == gzipMagic[1] {
+			gz, err := gzip.NewReader(f)
+			if err != nil {
+				f.Close()
+				return nil, err
+			}
+			_, readErr := buf.ReadFrom(gz)
+			_ = gz.Close()
+			gzipReaderPool.Put(gz)
+			f.Close()
+			if readErr != nil {
+				return nil, readErr
+			}
+			return buf.Bytes(), nil
+		}
+	}
+
+	// Not gzip — read raw.
 	_, err = buf.ReadFrom(f)
-	closeErr := f.Close()
+	f.Close()
 	if err != nil {
 		return nil, err
 	}
-	if closeErr != nil {
-		return nil, closeErr
-	}
-
 	return buf.Bytes(), nil
 }
 
