@@ -71,7 +71,7 @@ type Config struct {
 	IndexerConcurrency int `env:"INDEXER_CONCURRENCY" envDefault:"1" validate:"min=1"`
 
 	// Search concurrency: max concurrent search requests
-	SearchConcurrency int `env:"SEARCH_CONCURRENCY" envDefault:"6" validate:"min=1"`
+	SearchConcurrency int `env:"SEARCH_CONCURRENCY" envDefault:"24" validate:"min=1"`
 
 	// AspireCloud API
 	AspireCloudAPIKey string `env:"ASPIRE_CLOUD_API_KEY" envDefault:""`

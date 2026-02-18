@@ -56,7 +56,7 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, "", cfg.SessionSecret)
 	assert.Equal(t, "", cfg.AspireCloudAPIKey)
 	assert.Equal(t, "", cfg.CloudflareAPIToken)
-	assert.Equal(t, 6, cfg.SearchConcurrency)
+	assert.Equal(t, 24, cfg.SearchConcurrency)
 }
 
 func TestConfigWithEnv(t *testing.T) {
