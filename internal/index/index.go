@@ -422,7 +422,7 @@ func readSourceFileBuf(filename string, buf *bytes.Buffer) ([]byte, error) {
 			_, readErr := buf.ReadFrom(gz)
 			_ = gz.Close()
 			gzipReaderPool.Put(gz)
-			f.Close()
+			_ = f.Close()
 			if readErr != nil {
 				return nil, readErr
 			}
@@ -431,7 +431,7 @@ func readSourceFileBuf(filename string, buf *bytes.Buffer) ([]byte, error) {
 		gzipReaderPool.Put(gz)
 		// Reset failed — not gzip, fall through to raw read.
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			f.Close()
+			_ = f.Close()
 			return nil, err
 		}
 	} else {
@@ -439,19 +439,19 @@ func readSourceFileBuf(filename string, buf *bytes.Buffer) ([]byte, error) {
 		var header [2]byte
 		n, _ := io.ReadFull(f, header[:])
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			f.Close()
+			_ = f.Close()
 			return nil, err
 		}
 		if n == 2 && header[0] == gzipMagic[0] && header[1] == gzipMagic[1] {
 			gz, err := gzip.NewReader(f)
 			if err != nil {
-				f.Close()
+				_ = f.Close()
 				return nil, err
 			}
 			_, readErr := buf.ReadFrom(gz)
 			_ = gz.Close()
 			gzipReaderPool.Put(gz)
-			f.Close()
+			_ = f.Close()
 			if readErr != nil {
 				return nil, readErr
 			}
@@ -461,7 +461,7 @@ func readSourceFileBuf(filename string, buf *bytes.Buffer) ([]byte, error) {
 
 	// Not gzip — read raw.
 	_, err = buf.ReadFrom(f)
-	f.Close()
+	_ = f.Close()
 	if err != nil {
 		return nil, err
 	}

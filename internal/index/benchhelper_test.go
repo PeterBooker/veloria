@@ -39,7 +39,7 @@ func ensurePluginZip(b *testing.B) string {
 	if err != nil {
 		b.Skipf("failed to download plugin zip (no network?): %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		b.Skipf("failed to download plugin zip: HTTP %d", resp.StatusCode)
@@ -52,14 +52,14 @@ func ensurePluginZip(b *testing.B) string {
 	}
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		f.Close()
-		os.Remove(tmp)
+		_ = f.Close()
+		_ = os.Remove(tmp)
 		b.Skipf("failed to download plugin zip: %v", err)
 	}
-	f.Close()
+	_ = f.Close()
 
 	if err := os.Rename(tmp, zipPath); err != nil {
-		os.Remove(tmp)
+		_ = os.Remove(tmp)
 		b.Fatal(err)
 	}
 
