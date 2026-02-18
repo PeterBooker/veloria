@@ -3,7 +3,7 @@ package index
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
+	"github.com/klauspost/compress/gzip"
 	"io"
 	"math"
 	"os"

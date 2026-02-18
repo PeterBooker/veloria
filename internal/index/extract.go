@@ -2,7 +2,7 @@ package index
 
 import (
 	"archive/zip"
-	"compress/gzip"
+	"github.com/klauspost/compress/gzip"
 	"container/heap"
 	"fmt"
 	"io"
