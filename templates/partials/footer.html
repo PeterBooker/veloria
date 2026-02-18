@@ -6,7 +6,7 @@
             GitHub
         </a>
         <span class="text-gray-300 text-[12px]">&middot;</span>
-        <a href="https://peterbooker.com/" target="_blank" rel="noopener noreferrer" class="text-[12px] text-gray-400 hover:text-gray-600 transition">Made by Peter Booker</a>
+        {{if eq .Version "dev"}}<span class="text-[12px] text-gray-400">Version: dev</span>{{else}}<a href="https://github.com/PeterBooker/veloria/releases/tag/{{.Version}}" target="_blank" rel="noopener noreferrer" class="text-[12px] text-gray-400 hover:text-gray-600 transition">Version: {{.Version}}</a>{{end}}
         <span class="text-gray-300 text-[12px]">&middot;</span>
         <span class="text-[12px] text-gray-400">&copy; 2026 Veloria</span>
     </nav>

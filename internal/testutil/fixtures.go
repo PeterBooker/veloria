@@ -13,7 +13,6 @@ func SampleConfig() *config.Config {
 		Name:               "Veloria Test",
 		Port:               9071,
 		Env:                "development",
-		Version:            "1.0.0-test",
 		WorkingDir:         "/tmp",
 		DataDir:            "/tmp/veloria-test-data",
 		HTTPHandlerTimeout: 0,

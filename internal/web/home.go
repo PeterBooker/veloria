@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"veloria/internal/auth"
+	"veloria/internal/config"
 	searchmodel "veloria/internal/search/model"
 )
 
@@ -50,6 +51,7 @@ func LoginPage(d *Deps) http.HandlerFunc {
 				SearchEnabled:        d.SearchEnabled,
 				SearchDisabledReason: d.SearchDisabledReason,
 				CurrentPath:          r.URL.Path,
+				Version:              config.Version,
 			},
 			Error: r.URL.Query().Get("error"),
 		}
