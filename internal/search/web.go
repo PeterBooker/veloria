@@ -54,7 +54,14 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			data.DurationMs = s.CompletedAt.Sub(s.CreatedAt).Milliseconds()
 		}
 
-			if s.Status == searchmodel.StatusCompleted {
+		if s.Status == searchmodel.StatusProcessing {
+			if p, ok := d.Progress.Get(s.ID); ok {
+				data.ProgressSearched = p.Searched
+				data.ProgressTotal = p.Total
+			}
+		}
+
+		if s.Status == searchmodel.StatusCompleted {
 			if s.TotalMatches != nil {
 				data.TotalMatches = *s.TotalMatches
 			}
@@ -239,11 +246,15 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 
 func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excludeMatch string, caseInsensitive bool) {
 	d.DB.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusProcessing)
+	defer d.Progress.Delete(searchID)
 
 	results, err := d.Manager.Search(repo, term, &manager.SearchParams{
 		FileMatch:        fileMatch,
 		ExcludeFileMatch: excludeMatch,
 		CaseInsensitive:  caseInsensitive,
+		OnProgress: func(searched, total int) {
+			d.Progress.Set(searchID, searched, total)
+		},
 	})
 	if err != nil {
 		d.DB.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)

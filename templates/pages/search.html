@@ -174,23 +174,22 @@
     <!-- Processing/Unavailable State -->
     <div class="glass-inner text-center py-12 lg:py-16">
         <div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/30 border border-white/50 mb-4 lg:mb-6">
-            {{if eq .Search.Status "completed"}}
-            <svg class="w-8 h-8 lg:w-10 lg:h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 8v4"></path>
-                <path d="M12 16h.01"></path>
-            </svg>
-            {{else}}
             <svg class="w-8 h-8 lg:w-10 lg:h-10 text-brand-500 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
             </svg>
-            {{end}}
         </div>
-        {{if eq .Search.Status "completed"}}
-        <h3 class="text-lg lg:text-xl text-gray-700 mb-2">Results are unavailable</h3>
-        <p class="text-gray-500 text-sm lg:text-base">Try refreshing in a moment or rerun the search.</p>
-        {{else}}
         <h3 class="text-lg lg:text-xl text-gray-700 mb-2">Search in progress</h3>
+        {{if gt .ProgressTotal 0}}
+        <p class="text-gray-500 text-sm lg:text-base mb-4">
+            Searched <span class="text-gray-900 font-semibold">{{formatNumber .ProgressSearched}}</span> of
+            <span class="text-brand-600 font-semibold">{{formatNumber .ProgressTotal}}</span> extensions
+        </p>
+        <div class="max-w-xs mx-auto">
+            <div class="w-full h-2 rounded-full bg-white/40 border border-white/50 overflow-hidden">
+                <div class="h-full rounded-full bg-brand-500 transition-all duration-500 ease-out" style="width: {{percentage .ProgressSearched .ProgressTotal}}%"></div>
+            </div>
+        </div>
+        {{else}}
         <p class="text-gray-500 text-sm lg:text-base">Results will appear automatically when the search completes.</p>
         {{end}}
     </div>

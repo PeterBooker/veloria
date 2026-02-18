@@ -147,11 +147,16 @@ type SearchResponse struct {
 	Total   int             `json:"total"`
 }
 
+// ProgressFunc is called during search to report progress.
+// searched is the number of extensions searched so far, total is the total count.
+type ProgressFunc func(searched, total int)
+
 // SearchParams contains parameters for a search query.
 type SearchParams struct {
 	FileMatch        string
 	ExcludeFileMatch string
 	CaseInsensitive  bool
+	OnProgress       ProgressFunc
 }
 
 // Search searches the specified repository for the given term.
@@ -172,7 +177,7 @@ func (m *Manager) Search(repoType string, term string, params *SearchParams) (*S
 
 	switch repoType {
 	case "plugins":
-		results, err := m.pr.Search(term, opt)
+		results, err := m.pr.Search(term, opt, params.OnProgress)
 		if err != nil {
 			return nil, err
 		}
@@ -191,7 +196,7 @@ func (m *Manager) Search(repoType string, term string, params *SearchParams) (*S
 		}
 
 	case "themes":
-		results, err := m.tr.Search(term, opt)
+		results, err := m.tr.Search(term, opt, params.OnProgress)
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +215,7 @@ func (m *Manager) Search(repoType string, term string, params *SearchParams) (*S
 		}
 
 	case "cores":
-		results, err := m.cr.Search(term, opt)
+		results, err := m.cr.Search(term, opt, params.OnProgress)
 		if err != nil {
 			return nil, err
 		}

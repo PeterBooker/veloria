@@ -67,7 +67,7 @@ func BenchmarkSearchCompiled(b *testing.B) {
 			}
 
 			// Warm the DFA pool
-			idx.SearchCompiled(cs)
+			_, _ = idx.SearchCompiled(cs)
 
 			b.ReportAllocs()
 			b.ResetTimer()

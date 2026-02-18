@@ -72,11 +72,13 @@ type SearchResultsData struct {
 // SearchViewData contains data for the single search view.
 type SearchViewData struct {
 	PageData
-	Search          searchmodel.Search
-	TotalMatches    int
-	TotalExtensions int
-	DurationMs      int64
-	Error           string
+	Search           searchmodel.Search
+	TotalMatches     int
+	TotalExtensions  int
+	DurationMs       int64
+	ProgressSearched int
+	ProgressTotal    int
+	Error            string
 }
 
 // SearchExtensionsData contains data for the search extensions HTMX partial.

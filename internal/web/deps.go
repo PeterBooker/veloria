@@ -20,6 +20,7 @@ type Deps struct {
 	S3                   storage.ResultStorage
 	Cache                cache.Cache
 	Config               *config.Config
+	Progress             *ProgressStore
 	SearchEnabled        bool
 	SearchDisabledReason string
 }
@@ -33,6 +34,7 @@ func NewDeps(templates *Templates, db *gorm.DB, m *manager.Manager, s3 storage.R
 		S3:                   s3,
 		Cache:                ch,
 		Config:               cfg,
+		Progress:             &ProgressStore{},
 		SearchEnabled:        searchEnabled,
 		SearchDisabledReason: searchDisabledReason,
 	}

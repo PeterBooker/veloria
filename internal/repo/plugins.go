@@ -268,8 +268,12 @@ func (pr *PluginRepo) getAllKnownSlugs() (map[string]struct{}, error) {
 }
 
 // Search searches all plugins and returns results in the legacy format.
-func (pr *PluginRepo) Search(term string, opt *index.SearchOptions) ([]*PluginSearchResult, error) {
-	results, err := pr.Repository.Search(term, opt)
+func (pr *PluginRepo) Search(term string, opt *index.SearchOptions, progressFn ...func(searched, total int)) ([]*PluginSearchResult, error) {
+	var fn func(searched, total int)
+	if len(progressFn) > 0 {
+		fn = progressFn[0]
+	}
+	results, err := pr.Repository.Search(term, opt, fn)
 	if err != nil {
 		return nil, err
 	}
