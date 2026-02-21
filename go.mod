@@ -29,6 +29,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/minio v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
+	go.etcd.io/bbolt v1.4.3
 	golang.org/x/oauth2 v0.34.0
 	google.golang.org/protobuf v1.36.11
 	gorm.io/datatypes v1.2.6
