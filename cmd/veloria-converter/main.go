@@ -59,7 +59,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to open wpdir db %q: %v", wpDirDB, err)
 	}
-	defer boltDB.Close()
+	defer func() {
+		if err := boltDB.Close(); err != nil {
+			log.Printf("warning: failed to close wpdir db: %v", err)
+		}
+	}()
 
 	// Collect all search IDs from the all_dates index.
 	searchIDs, err := collectSearchIDs(boltDB)
@@ -93,7 +97,11 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to get underlying sql.DB: %v", err)
 		}
-		defer sqlDB.Close()
+		defer func() {
+			if err := sqlDB.Close(); err != nil {
+				log.Printf("warning: failed to close database connection: %v", err)
+			}
+		}()
 
 		// Initialize S3.
 		zl := zerolog.New(os.Stderr).With().Timestamp().Logger()
