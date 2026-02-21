@@ -52,7 +52,7 @@ func RepoPage(d *Deps) http.HandlerFunc {
 		var title string
 		var activeInstalls, fileCount, fileSize ChartData
 
-		var largestExtensions []LargestExtension
+		var largestBySize, largestByFileCount []LargestExtension
 
 		switch repoType {
 		case "plugins":
@@ -60,30 +60,34 @@ func RepoPage(d *Deps) http.HandlerFunc {
 			title = "Plugins"
 			activeInstalls = fetchActiveInstallsChart(d, "plugins")
 			fileCount, fileSize = fetchFileStatsCharts(d, "plugins")
-			largestExtensions = fetchLargestExtensions(d, "plugins", 25)
+			largestBySize = fetchLargestExtensions(d, "plugins", 25, "total_size")
+			largestByFileCount = fetchLargestExtensions(d, "plugins", 25, "file_count")
 		case "themes":
 			total, indexed = d.Manager.GetThemeRepo().Stats()
 			title = "Themes"
 			activeInstalls = fetchActiveInstallsChart(d, "themes")
 			fileCount, fileSize = fetchFileStatsCharts(d, "themes")
-			largestExtensions = fetchLargestExtensions(d, "themes", 25)
+			largestBySize = fetchLargestExtensions(d, "themes", 25, "total_size")
+			largestByFileCount = fetchLargestExtensions(d, "themes", 25, "file_count")
 		case "cores":
 			total, indexed = d.Manager.GetCoreRepo().Stats()
 			title = "Core"
 			fileCount, fileSize = fetchFileStatsCharts(d, "cores")
-			largestExtensions = fetchLargestExtensions(d, "cores", 25)
+			largestBySize = fetchLargestExtensions(d, "cores", 25, "total_size")
+			largestByFileCount = fetchLargestExtensions(d, "cores", 25, "file_count")
 		default:
 			http.Error(w, "Repository not found", http.StatusNotFound)
 			return
 		}
 
 		data := RepoData{
-			PageData:          d.PageData(r),
-			RepoSummary:       BuildRepoSummary(repoType, title, total, indexed),
-			ActiveInstalls:    activeInstalls,
-			FileCount:         fileCount,
-			FileSize:          fileSize,
-			LargestExtensions: largestExtensions,
+			PageData:           d.PageData(r),
+			RepoSummary:        BuildRepoSummary(repoType, title, total, indexed),
+			ActiveInstalls:     activeInstalls,
+			FileCount:          fileCount,
+			FileSize:           fileSize,
+			LargestBySize:      largestBySize,
+			LargestByFileCount: largestByFileCount,
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -360,7 +364,7 @@ func fetchFileStatsCharts(d *Deps, table string) (ChartData, ChartData) {
 	return countChart, sizeChart
 }
 
-func fetchLargestExtensions(d *Deps, table string, limit int) []LargestExtension {
+func fetchLargestExtensions(d *Deps, table string, limit int, orderCol string) []LargestExtension {
 	nameCol := "name"
 	slugCol := "slug"
 	if table == "cores" {
@@ -370,9 +374,9 @@ func fetchLargestExtensions(d *Deps, table string, limit int) []LargestExtension
 
 	var extensions []LargestExtension
 	d.DB.Table(table).
-		Select(slugCol+" AS slug, "+nameCol+" AS name, total_size").
-		Where("deleted_at IS NULL AND total_size > 0").
-		Order("total_size DESC").
+		Select(slugCol+" AS slug, "+nameCol+" AS name, total_size, file_count").
+		Where("deleted_at IS NULL AND "+orderCol+" > 0").
+		Order(orderCol + " DESC").
 		Limit(limit).
 		Scan(&extensions)
 	return extensions

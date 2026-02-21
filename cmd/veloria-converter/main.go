@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -421,12 +422,12 @@ func buildSearchResponse(boltDB *bolt.DB, wpID string, summary *wpdirpb.Summary,
 			Version:        result.GetVersion(),
 			ActiveInstalls: int64(result.GetActiveInstalls()),
 			Matches:        fileMatches,
-			TotalMatches:   int32(slugTotal),
+			TotalMatches:   int32(min(slugTotal, math.MaxInt32)), // #nosec G115 -- clamped to MaxInt32
 		}
 		resp.Results = append(resp.Results, sr)
 	}
 
-	resp.Total = int32(len(resp.Results))
+	resp.Total = int32(min(len(resp.Results), math.MaxInt32)) // #nosec G115 -- clamped to MaxInt32
 	return resp, totalMatches, nil
 }
 
@@ -448,7 +449,7 @@ func groupMatchesByFile(wpMatches []*wpdirpb.Match) []*typespb.FileMatch {
 		}
 		byFile[file] = append(byFile[file], &typespb.Match{
 			Line:       m.GetLineText(),
-			LineNumber: int32(m.GetLineNum()),
+			LineNumber: int32(min(m.GetLineNum(), math.MaxInt32)), // #nosec G115 -- clamped to MaxInt32
 		})
 	}
 

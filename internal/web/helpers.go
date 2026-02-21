@@ -108,6 +108,18 @@ func ParseLargestFiles(data []byte, limit int) []FileStat {
 	return files
 }
 
+// ParseTags parses a JSONB tags column into a map.
+func ParseTags(data []byte) map[string]string {
+	if len(data) == 0 {
+		return nil
+	}
+	var tags map[string]string
+	if err := json.Unmarshal(data, &tags); err != nil {
+		return nil
+	}
+	return tags
+}
+
 // SafeJoin safely joins a base directory with a relative path, preventing directory traversal.
 func SafeJoin(base string, rel string) (string, error) {
 	clean := filepath.Clean(rel)

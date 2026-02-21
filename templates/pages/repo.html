@@ -37,20 +37,25 @@
 
 <!-- Outer Glass Container -->
 <div class="glass-outer p-5 lg:p-7 flex-1 flex flex-col min-h-0">
-    <!-- Stats Card -->
+    <!-- Index Status -->
     <div class="glass-inner p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-gray-900">Index Status</h2>
             <span class="text-sm text-gray-500">{{.RepoSummary.IndexedPercent}}% complete</span>
         </div>
-        <div class="grid grid-cols-2 gap-6 mb-4">
+        <div class="grid grid-cols-3 gap-6 mb-4">
             <div>
                 <p class="text-sm text-gray-500 mb-1">Total Items</p>
-                <p class="text-2xl font-bold text-gray-900">{{formatCompact .RepoSummary.Total}}</p>
+                <p class="text-2xl font-bold text-gray-900">{{formatNumber .RepoSummary.Total}}</p>
             </div>
             <div>
                 <p class="text-sm text-gray-500 mb-1">Indexed</p>
-                <p class="text-2xl font-bold text-brand-600">{{formatCompact .RepoSummary.Indexed}}</p>
+                <p class="text-2xl font-bold text-brand-600">{{formatNumber .RepoSummary.Indexed}} <span class="text-sm font-normal text-gray-400">({{.RepoSummary.IndexedPercent}}%)</span></p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500 mb-1">Not Indexed</p>
+                {{$notIndexed := sub .RepoSummary.Total .RepoSummary.Indexed}}
+                <p class="text-2xl font-bold text-gray-400">{{formatNumber $notIndexed}}</p>
             </div>
         </div>
         <div class="h-2 bg-gray-200/70 rounded-full overflow-hidden">
@@ -64,7 +69,7 @@
 
     <!-- Charts Section -->
     {{if or .ActiveInstalls.JSON .FileCount.JSON .FileSize.JSON}}
-    <div class="grid grid-cols-1 gap-4 mb-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {{if .ActiveInstalls.JSON}}
         <div class="glass-inner p-6">
             <div class="flex items-center justify-between mb-2">
@@ -157,36 +162,68 @@
     </script>
     {{end}}
 
-    {{if .LargestExtensions}}
+    {{if or .LargestBySize .LargestByFileCount}}
     <!-- Largest Extensions -->
-    <div class="glass-inner overflow-hidden mb-6">
-        <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
-            <h2 class="text-lg font-semibold text-gray-900">Largest {{if eq .RepoSummary.Repo "plugins"}}Plugins{{else if eq .RepoSummary.Repo "themes"}}Themes{{else}}Core Versions{{end}}</h2>
-            <p class="text-sm text-gray-500">Top {{len .LargestExtensions}} by total size</p>
-        </div>
-
-        <div class="p-6">
-            {{$maxSize := 0}}
-            {{range .LargestExtensions}}
-                {{if gt .TotalSize $maxSize}}{{$maxSize = .TotalSize}}{{end}}
-            {{end}}
-
-            <div class="space-y-3">
-                {{$repo := .RepoSummary.Repo}}
-                {{range .LargestExtensions}}
-                <a href="/repos/{{$repo}}/{{.Slug}}" class="group block">
-                    <div class="flex items-center justify-between text-sm mb-1">
-                        <span class="text-brand-600 font-medium truncate">{{.Name}}</span>
-                        <span class="text-gray-500 ml-2 flex-shrink-0">{{formatBytes .TotalSize}}</span>
-                    </div>
-                    <div class="h-2 bg-gray-200/70 rounded-full overflow-hidden">
-                        <div class="h-full rounded-full transition-all duration-300 group-hover:opacity-80"
-                             style="width: {{if gt $maxSize 0}}{{printf "%.1f" (divideFloat .TotalSize $maxSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
-                    </div>
-                </a>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {{if .LargestBySize}}
+        <div class="glass-inner overflow-hidden">
+            <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
+                <h2 class="text-base font-semibold text-gray-900">Largest by Size</h2>
+                <p class="text-sm text-gray-500">Top {{len .LargestBySize}} {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
+            </div>
+            <div class="p-6">
+                {{$maxSize := 0}}
+                {{range .LargestBySize}}
+                    {{if gt .TotalSize $maxSize}}{{$maxSize = .TotalSize}}{{end}}
                 {{end}}
+                <div class="space-y-3">
+                    {{$repo := .RepoSummary.Repo}}
+                    {{range .LargestBySize}}
+                    <a href="/repos/{{$repo}}/{{.Slug}}" class="group block">
+                        <div class="flex items-center justify-between text-sm mb-1">
+                            <span class="text-brand-600 font-medium truncate">{{.Name}}</span>
+                            <span class="text-gray-500 ml-2 flex-shrink-0">{{formatBytes .TotalSize}}</span>
+                        </div>
+                        <div class="h-1.5 bg-gray-200/70 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-300 group-hover:opacity-80"
+                                 style="width: {{if gt $maxSize 0}}{{printf "%.1f" (divideFloat .TotalSize $maxSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+                        </div>
+                    </a>
+                    {{end}}
+                </div>
             </div>
         </div>
+        {{end}}
+
+        {{if .LargestByFileCount}}
+        <div class="glass-inner overflow-hidden">
+            <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
+                <h2 class="text-base font-semibold text-gray-900">Most Files</h2>
+                <p class="text-sm text-gray-500">Top {{len .LargestByFileCount}} {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
+            </div>
+            <div class="p-6">
+                {{$maxCount := 0}}
+                {{range .LargestByFileCount}}
+                    {{if gt .FileCount $maxCount}}{{$maxCount = .FileCount}}{{end}}
+                {{end}}
+                <div class="space-y-3">
+                    {{$repo := .RepoSummary.Repo}}
+                    {{range .LargestByFileCount}}
+                    <a href="/repos/{{$repo}}/{{.Slug}}" class="group block">
+                        <div class="flex items-center justify-between text-sm mb-1">
+                            <span class="text-brand-600 font-medium truncate">{{.Name}}</span>
+                            <span class="text-gray-500 ml-2 flex-shrink-0">{{formatNumber .FileCount}} files</span>
+                        </div>
+                        <div class="h-1.5 bg-gray-200/70 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-300 group-hover:opacity-80"
+                                 style="width: {{if gt $maxCount 0}}{{printf "%.1f" (divideFloat (int64 .FileCount) (int64 $maxCount) | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #93c5fd, #3b82f6);"></div>
+                        </div>
+                    </a>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+        {{end}}
     </div>
     {{end}}
 

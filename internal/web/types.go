@@ -153,16 +153,18 @@ type LargestExtension struct {
 	Slug      string
 	Name      string
 	TotalSize int64
+	FileCount int
 }
 
 // RepoData contains data for a single repository view.
 type RepoData struct {
 	PageData
-	RepoSummary       RepoSummary
-	ActiveInstalls    ChartData
-	FileCount         ChartData
-	FileSize          ChartData
-	LargestExtensions []LargestExtension
+	RepoSummary            RepoSummary
+	ActiveInstalls         ChartData
+	FileCount              ChartData
+	FileSize               ChartData
+	LargestBySize          []LargestExtension
+	LargestByFileCount     []LargestExtension
 }
 
 // FileStat represents a file with its size for display.
@@ -194,10 +196,18 @@ type ExtensionData struct {
 	RepoType         string
 	Name             string
 	Slug             string
+	Source           string
 	Version          string
 	ShortDescription string
+	Author           string
+	Requires         string
+	Tested           string
+	RequiresPHP      string
+	Rating           int
 	ActiveInstalls   int
 	Downloaded       int
+	DownloadLink     string
+	Tags             map[string]string
 	Indexed          bool
 	FileCount        int
 	TotalSize        int64
