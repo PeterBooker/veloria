@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package wpdirpb;
+
+option go_package = "veloria/cmd/veloria-converter/wpdirpb";
+
+// Wire-compatible with wpdir's internal/search/search.proto (gogo/protobuf).
+// Field numbers and types match exactly so standard proto.Unmarshal can decode
+// data serialized by wpdir's gogo-generated code.
+
+message Search {
+    string id = 1;
+    string input = 2;
+    string repo = 3;
+    string started = 4;
+    string completed = 5;
+    uint32 progress = 6;
+    bool private = 7;
+    enum Status {
+        Queued = 0;
+        Started = 1;
+        Completed = 2;
+    }
+    Status status = 8;
+    Options options = 9;
+    uint32 matches = 10;
+    uint32 revision = 11;
+}
+
+message Options {
+    bool ignore_case = 1;
+    uint32 lines_of_context = 2;
+    string file_regexp = 3;
+    bool ignore_comments = 4;
+    uint32 offset = 5;
+    uint32 limit = 6;
+}
+
+message Summary {
+    uint64 total = 1;
+    map<string, Result> list = 2;
+}
+
+message Result {
+    string slug = 1;
+    string name = 2;
+    string version = 3;
+    string homepage = 4;
+    uint32 active_installs = 5;
+    uint32 matches = 6;
+}
+
+message Matches {
+    repeated Match list = 1;
+}
+
+message Match {
+    string slug = 1;
+    string file = 2;
+    uint32 line_num = 3;
+    string line_text = 4;
+}
