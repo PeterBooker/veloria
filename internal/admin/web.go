@@ -32,10 +32,10 @@ func ReindexExtension(d *web.Deps) http.HandlerFunc {
 		ok := d.Manager.SubmitReindex(repoType, slug)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if !ok {
-			fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg">Not found or queue full</span>`)
+			_, _ = fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg">Not found or queue full</span>`)
 			return
 		}
 
-		fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg">Queued for re-index</span>`)
+		_, _ = fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg">Queued for re-index</span>`)
 	}
 }

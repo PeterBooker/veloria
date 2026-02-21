@@ -62,7 +62,7 @@ func SubmitReport(d *web.Deps) http.HandlerFunc {
 			if strings.Contains(result.Error.Error(), "duplicate key") ||
 				strings.Contains(result.Error.Error(), "UNIQUE constraint") {
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-600">Already reported</span>`)
+				_, _ = fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-600">Already reported</span>`)
 				return
 			}
 			http.Error(w, "failed to create report", http.StatusInternalServerError)
@@ -70,7 +70,7 @@ func SubmitReport(d *web.Deps) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-600">Reported</span>`)
+		_, _ = fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-600">Reported</span>`)
 	}
 }
 
@@ -181,6 +181,6 @@ func ResolveReport(d *web.Deps) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintf(w, `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-green-50 text-green-600 border border-green-200">Resolved by %s</span>`, currentUser.Name)
+		_, _ = fmt.Fprintf(w, `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-green-50 text-green-600 border border-green-200">Resolved by %s</span>`, currentUser.Name)
 	}
 }
