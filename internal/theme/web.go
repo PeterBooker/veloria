@@ -22,10 +22,17 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			ID               uuid.UUID
 			Name             string
 			Slug             string
+			Source           string
 			Version          string
 			ShortDescription string
+			Requires         string
+			Tested           string
+			RequiresPHP      string
+			Rating           int
 			ActiveInstalls   int
 			Downloaded       int
+			DownloadLink     string
+			Tags             []byte
 			FileCount        int
 			TotalSize        int64
 			LargestFiles     []byte
@@ -33,7 +40,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 
 		var row themeRow
 		err := d.DB.Table("themes").
-			Select("id, name, slug, version, short_description, active_installs, downloaded, file_count, total_size, largest_files").
+			Select("id, name, slug, source, version, short_description, requires, tested, requires_php, rating, active_installs, downloaded, download_link, tags, file_count, total_size, largest_files").
 			Where("slug = ? AND deleted_at IS NULL", slug).
 			Scan(&row).Error
 
@@ -52,10 +59,17 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			RepoType:         "themes",
 			Name:             row.Name,
 			Slug:             row.Slug,
+			Source:           row.Source,
 			Version:          row.Version,
 			ShortDescription: row.ShortDescription,
+			Requires:         row.Requires,
+			Tested:           row.Tested,
+			RequiresPHP:      row.RequiresPHP,
+			Rating:           row.Rating,
 			ActiveInstalls:   row.ActiveInstalls,
 			Downloaded:       row.Downloaded,
+			DownloadLink:     row.DownloadLink,
+			Tags:             web.ParseTags(row.Tags),
 			Indexed:          indexStatus[row.Slug],
 			FileCount:        row.FileCount,
 			TotalSize:        row.TotalSize,

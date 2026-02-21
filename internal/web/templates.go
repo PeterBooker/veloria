@@ -68,6 +68,12 @@ func NewTemplates(fsys fs.FS) (*Templates, error) {
 		"int": func(v int64) int {
 			return int(v)
 		},
+		"sub": func(a, b int) int {
+			return a - b
+		},
+		"int64": func(v int) int64 {
+			return int64(v)
+		},
 		"formatNumber": func(n int) string {
 			return formatNumberWithCommas(n)
 		},
