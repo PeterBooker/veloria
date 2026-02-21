@@ -1,0 +1,124 @@
+{{define "reports.html"}}
+{{template "base.html" .}}
+{{end}}
+
+{{define "title"}}Reported Searches - Veloria Admin{{end}}
+
+{{define "content"}}
+<!-- Heading -->
+<div class="mb-6 lg:px-7 py-6 lg:py-0 lg:pt-5">
+    <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-gray-900 mb-2">Reported Searches</h1>
+    <p class="text-sm text-gray-600">Review and moderate user-reported searches.</p>
+</div>
+
+<!-- Outer Glass Container -->
+<div class="glass-outer p-5 lg:p-7 flex-1 flex flex-col min-h-0">
+    {{if .Reports}}
+    <div class="glass-inner overflow-hidden">
+        <table class="w-full">
+            <thead style="background: rgba(255,255,255,0.4); border-bottom: 1px solid rgba(255,255,255,0.5);">
+                <tr>
+                    <th class="px-5 py-4 text-left text-sm font-medium text-gray-600">Pattern</th>
+                    <th class="px-5 py-4 text-left text-sm font-medium text-gray-600">Repository</th>
+                    <th class="px-5 py-4 text-left text-sm font-medium text-gray-600">Reporter</th>
+                    <th class="px-5 py-4 text-left text-sm font-medium text-gray-600">Reason</th>
+                    <th class="px-5 py-4 text-left text-sm font-medium text-gray-600">Reported</th>
+                    <th class="px-5 py-4 text-left text-sm font-medium text-gray-600">Visibility</th>
+                    <th class="px-5 py-4 text-left text-sm font-medium text-gray-600">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Reports}}
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.3);">
+                    <td class="px-5 py-4">
+                        <a href="/search/{{.SearchID}}" class="font-mono text-sm text-brand-600 bg-brand-50 px-2 py-1 rounded hover:underline">{{.SearchTerm}}</a>
+                    </td>
+                    <td class="px-5 py-4">
+                        <span class="text-sm text-gray-600 capitalize">{{.SearchRepo}}</span>
+                    </td>
+                    <td class="px-5 py-4">
+                        <span class="text-sm text-gray-700">{{.ReporterName}}</span>
+                    </td>
+                    <td class="px-5 py-4">
+                        {{if .Reason}}
+                        <span class="text-sm text-gray-600">{{.Reason}}</span>
+                        {{else}}
+                        <span class="text-sm text-gray-400">&mdash;</span>
+                        {{end}}
+                    </td>
+                    <td class="px-5 py-4">
+                        <span class="text-sm text-gray-500">{{.ReportedAt}}</span>
+                    </td>
+                    <td class="px-5 py-4">
+                        <div id="visibility-{{.ReportID}}">
+                            {{if .SearchPrivate}}
+                            <div class="flex items-center gap-2">
+                                <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 border border-gray-200">Private</span>
+                                <button hx-post="/admin/search/{{.SearchID}}/visibility" hx-target="#visibility-{{.ReportID}}" hx-swap="innerHTML"
+                                    class="text-xs text-brand-600 hover:text-brand-700 font-medium">Make Public</button>
+                            </div>
+                            {{else}}
+                            <div class="flex items-center gap-2">
+                                <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-50 text-green-600 border border-green-200">Public</span>
+                                <button hx-post="/admin/search/{{.SearchID}}/visibility" hx-target="#visibility-{{.ReportID}}" hx-swap="innerHTML"
+                                    class="text-xs text-red-600 hover:text-red-700 font-medium">Make Private</button>
+                            </div>
+                            {{end}}
+                        </div>
+                    </td>
+                    <td class="px-5 py-4">
+                        <div id="actions-{{.ReportID}}" class="flex items-center gap-2">
+                            <button hx-post="/admin/reports/{{.ReportID}}/resolve" hx-target="#actions-{{.ReportID}}" hx-swap="innerHTML"
+                                class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white/40 border border-white/50 rounded-lg hover:bg-white/60 transition">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Resolve
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="glass-inner mt-4 p-3 flex items-center justify-between">
+        <div class="text-xs text-gray-400">Page {{.Page}} of {{.TotalPages}}</div>
+        <div class="flex items-center gap-2">
+            {{if gt .Page 1}}
+            <a href="/admin/reports?page={{add .Page -1}}" class="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-white/40 border border-white/50 rounded-lg hover:bg-white/60 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Prev
+            </a>
+            {{end}}
+            {{if lt .Page .TotalPages}}
+            <a href="/admin/reports?page={{add .Page 1}}" class="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 bg-white/40 border border-white/50 rounded-lg hover:bg-white/60 transition">
+                Next
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </a>
+            {{end}}
+        </div>
+    </div>
+    {{else}}
+    <!-- Empty State -->
+    <div class="glass-inner text-center py-16">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/30 border border-white/50 mb-6">
+            <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <h3 class="text-xl text-gray-700 mb-2">No pending reports</h3>
+        <p class="text-gray-500">All reported searches have been resolved.</p>
+    </div>
+    {{end}}
+
+    <!-- Footer -->
+    {{template "footer" .}}
+</div>
+{{end}}

@@ -40,6 +40,21 @@
                 {{end}}
             </p>
         </div>
+        {{if and .User .User.IsAdmin}}
+        <div id="reindex-btn" class="ml-auto">
+            <button hx-post="/admin/reindex"
+                    hx-vals='{"repo_type": "{{.RepoType}}", "slug": "{{.Slug}}"}'
+                    hx-target="#reindex-btn"
+                    hx-swap="innerHTML"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-white/40 border border-white/50 rounded-lg hover:bg-white/60 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                Re-index
+            </button>
+        </div>
+        {{end}}
     </div>
 </div>
 

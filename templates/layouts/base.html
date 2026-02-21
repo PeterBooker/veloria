@@ -225,6 +225,14 @@
                     My Searches
                 </a>
                 {{end}}
+                {{if and .User .User.IsAdmin}}
+                <a href="/admin/reports" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if hasPrefix $currentPath "/admin/reports"}}font-semibold text-brand-600 nav-active{{else}}text-gray-500 hover:bg-white/60{{end}}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    Reports
+                </a>
+                {{end}}
             </div>
 
             <!-- Mobile User Section -->
@@ -310,6 +318,14 @@
                         </svg>
                         My Searches
                     </span>
+                </a>
+                {{end}}
+                {{if and .User .User.IsAdmin}}
+                <a href="/admin/reports" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] transition {{if hasPrefix $currentPath "/admin/reports"}}font-semibold text-brand-700 nav-active{{else}}text-gray-600 hover:bg-white/35 hover:text-gray-800{{end}}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    Reports
                 </a>
                 {{end}}
 

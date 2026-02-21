@@ -190,6 +190,32 @@ type RepoItemsData struct {
 	Search     string
 }
 
+// ReportedSearchItem contains data for one reported search in the admin view.
+type ReportedSearchItem struct {
+	ReportID      string
+	SearchID      string
+	SearchTerm    string
+	SearchRepo    string
+	SearchPrivate bool
+	ReporterName  string
+	Reason        string
+	ReportedAt    string
+}
+
+// ReportsPageData contains data for the admin reports page.
+type ReportsPageData struct {
+	PageData
+	Reports    []ReportedSearchItem
+	Page       int
+	TotalPages int
+}
+
+// VisibilityToggleData contains data for the admin visibility toggle partial.
+type VisibilityToggleData struct {
+	SearchID string
+	Private  bool
+}
+
 // ExtensionData contains data for single extension views.
 type ExtensionData struct {
 	PageData

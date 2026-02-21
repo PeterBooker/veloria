@@ -14,12 +14,14 @@ import (
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 
+	"veloria/internal/admin"
 	api "veloria/internal/api"
 	"veloria/internal/auth"
 	"veloria/internal/core"
 	"veloria/internal/logger"
 	"veloria/internal/manager"
 	"veloria/internal/plugin"
+	"veloria/internal/report"
 	"veloria/internal/search"
 	"veloria/internal/storage"
 	"veloria/internal/theme"
@@ -105,6 +107,24 @@ func New(l *zerolog.Logger, v *validator.Validate, db *gorm.DB, m *manager.Manag
 		r.Get("/search/{uuid}/extension/{slug}", search.ExtensionResultsPage(deps))
 		r.Post("/search", search.SubmitSearch(deps))
 		r.Get("/my-searches", search.MyListPage(deps))
+
+		// Report a search (requires login)
+		if sessionStore != nil {
+			r.With(sessionStore.RequireAuth).Post("/search/{uuid}/report", report.SubmitReport(deps))
+		}
+
+		// Admin routes
+		if sessionStore != nil {
+			r.Route("/admin", func(r chi.Router) {
+				r.Use(sessionStore.RequireAuth)
+				r.Use(sessionStore.RequireAdmin)
+
+				r.Get("/reports", report.ReportsPage(deps))
+				r.Post("/reports/{id}/resolve", report.ResolveReport(deps))
+				r.Post("/search/{uuid}/visibility", search.ToggleVisibility(deps))
+				r.Post("/reindex", admin.ReindexExtension(deps))
+			})
+		}
 	}
 
 	// JSON API routes
