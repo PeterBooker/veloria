@@ -510,6 +510,12 @@ func (r *Repository[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn func(
 	return tasks
 }
 
+// MakeReindexTask creates an IndexTask for re-indexing an already-loaded extension.
+// This is used for admin-triggered ad-hoc re-indexing.
+func (r *Repository[T]) MakeReindexTask(ext T) IndexTask {
+	return r.makeIndexTask(ext, ext.GetSlug(), ext.GetSource())
+}
+
 // makeIndexTask creates an IndexTask that runs the indexer for the given extension.
 func (r *Repository[T]) makeIndexTask(taskExt T, taskSlug, taskSource string) IndexTask {
 	return IndexTask{

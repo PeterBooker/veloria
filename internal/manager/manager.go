@@ -14,9 +14,10 @@ import (
 )
 
 type Manager struct {
-	pr *repo.PluginRepo
-	tr *repo.ThemeRepo
-	cr *repo.CoreRepo
+	pr      *repo.PluginRepo
+	tr      *repo.ThemeRepo
+	cr      *repo.CoreRepo
+	adhocCh chan repo.IndexTask
 }
 
 // NewManager creates a new Manager, initializes all repositories, and starts
@@ -50,7 +51,7 @@ func NewManager(ctx context.Context, l *zerolog.Logger, pr *repo.PluginRepo, tr 
 		return nil, firstErr
 	}
 
-	m := &Manager{pr: pr, tr: tr, cr: cr}
+	m := &Manager{pr: pr, tr: tr, cr: cr, adhocCh: make(chan repo.IndexTask, 32)}
 	m.startUpdater(ctx, l, concurrency)
 
 	return m, nil
@@ -120,14 +121,76 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 				l.Info().Msg("No pending updates")
 			}
 
+			// Drain any ad-hoc re-index requests queued while processing the batch.
+			m.drainAdhoc(sem)
+
 			select {
 			case <-time.After(repo.UpdateInterval):
+			case task := <-m.adhocCh:
+				l.Info().Msgf("Ad-hoc re-index request for %s: %s", task.RepoType, task.Slug)
+				sem <- struct{}{}
+				go func(t repo.IndexTask) {
+					defer func() { <-sem }()
+					t.Run()
+				}(task)
 			case <-ctx.Done():
 				l.Info().Msg("Stopping indexer updater")
 				return
 			}
 		}
 	}()
+}
+
+// drainAdhoc processes any pending ad-hoc re-index tasks from the channel.
+func (m *Manager) drainAdhoc(sem chan struct{}) {
+	for {
+		select {
+		case task := <-m.adhocCh:
+			sem <- struct{}{}
+			go func(t repo.IndexTask) {
+				defer func() { <-sem }()
+				t.Run()
+			}(task)
+		default:
+			return
+		}
+	}
+}
+
+// SubmitReindex queues an ad-hoc re-index task for the given extension.
+// Returns false if the extension is not found or the queue is full.
+func (m *Manager) SubmitReindex(repoType, slug string) bool {
+	var task repo.IndexTask
+
+	switch repoType {
+	case "plugins":
+		ext, ok := m.pr.Get(slug)
+		if !ok {
+			return false
+		}
+		task = m.pr.MakeReindexTask(ext)
+	case "themes":
+		ext, ok := m.tr.Get(slug)
+		if !ok {
+			return false
+		}
+		task = m.tr.MakeReindexTask(ext)
+	case "cores":
+		ext, ok := m.cr.Get(slug)
+		if !ok {
+			return false
+		}
+		task = m.cr.MakeReindexTask(ext)
+	default:
+		return false
+	}
+
+	select {
+	case m.adhocCh <- task:
+		return true
+	default:
+		return false
+	}
 }
 
 // SearchResult represents search results from a single extension (plugin/theme/core).
