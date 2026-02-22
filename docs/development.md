@@ -2,244 +2,176 @@
 
 ## Prerequisites
 
-- Go 1.24+
-- PostgreSQL 14+
-- Make (optional)
+- **Go 1.25.5+**
+- **PostgreSQL 17+** (via Docker or native install)
+- **MinIO** (S3-compatible storage, via Docker)
+- **goose** for migrations: `go install github.com/pressly/goose/v3/cmd/goose@latest`
 
-## Project Structure
+## Quick Start
 
-```
-veloria/
-├── cmd/
-│   ├── veloria/       # Main API server
-│   └── veloria-indexer/    # Indexer utility
-├── internal/
-│   ├── api/              # HTTP handlers
-│   │   ├── plugin/
-│   │   ├── theme/
-│   │   ├── search/
-│   │   └── user/
-│   ├── client/           # HTTP client utilities
-│   ├── config/           # Configuration management
-│   ├── db/               # Database connection
-│   ├── index/            # Trigram indexing (codesearch)
-│   ├── manager/          # Repository orchestration
-│   ├── repo/             # Data repositories
-│   └── router/           # chi router setup
-└── docs/                 # Documentation
-```
-
-## Getting Started
-
-### 1. Clone and Install Dependencies
+### 1. Start Infrastructure
 
 ```bash
-git clone https://github.com/your-org/veloria.git
-cd veloria
-go mod download
+docker compose up -d
 ```
 
-### 2. Set Up PostgreSQL
+This starts PostgreSQL, MinIO, and Mailpit. See `docker-compose.yml` for port mappings.
 
-Create a database and apply migrations (see [Migrations](migrations.md) for details):
+### 2. Configure Environment
+
+Copy the example env file and adjust values:
 
 ```bash
-go run ./cmd/veloria-migrate up
+cp .env.example .env
 ```
 
-### 3. Configure Environment
+Key values for local development:
 
-Create a `.env` file:
-
-```bash
+```env
 ENV=development
 DB_HOST=localhost
 DB_PORT=5432
 DB_DATABASE=veloria
 DB_USERNAME=postgres
-DB_PASSWORD=
-DATA_DIR=/tmp/veloria-data
+DB_PASSWORD=postgres
+S3_ENDPOINT=localhost:9000
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
 ```
 
-### 4. Prepare Test Data
+In development mode (`ENV=development`), the `.env` file is loaded automatically and `DB_SSLMODE` defaults to `disable`.
 
-For local development, create the data directory structure:
+### 3. Run Migrations
 
 ```bash
-mkdir -p /tmp/veloria-data/{plugins,themes,cores}/{source,index}
+go run ./cmd/veloria-migrate
 ```
 
-Download a plugin for testing:
+Or with goose directly:
 
 ```bash
-cd /tmp/veloria-data/plugins/source
-curl -O https://downloads.wordpress.org/plugin/hello-dolly.zip
-unzip hello-dolly.zip
-rm hello-dolly.zip
+goose -dir migrations postgres "host=localhost user=postgres password=postgres dbname=veloria sslmode=disable" up
 ```
 
-### 5. Build and Run
+### 4. Build and Run
 
 ```bash
-# Build both binaries
-go build -o veloria ./cmd/veloria
-go build -o veloria-indexer ./cmd/veloria-indexer
-
-# Index the test plugin
-./veloria-indexer -repo=plugins -slug=hello-dolly -zipurl=file:///tmp/veloria-data/plugins/source/hello-dolly.zip
+# Build all binaries
+go build ./...
 
 # Run the server
-./veloria
+go run ./cmd/veloria
+
+# Run with debug logging
+APP_DEBUG=true go run ./cmd/veloria
 ```
 
-### 6. Test the API
+The server starts on port 9071 by default (configurable via `PORT` env var).
+
+### 5. Build the Indexer
+
+The server invokes `veloria-indexer` as a subprocess, so it must be on your `PATH` or in the working directory:
 
 ```bash
-curl -X POST http://localhost:9071/api/v1/search \
-  -H "Content-Type: application/json" \
-  -d '{"term": "Hello", "repo": "plugins"}'
+go build -o veloria-indexer ./cmd/veloria-indexer
 ```
 
-## Building
+## Project Structure
 
-```bash
-# Development build
-go build ./cmd/veloria
-go build ./cmd/veloria-indexer
+```
+cmd/
+├── veloria/           # Main server binary
+├── veloria-indexer/   # CLI indexer subprocess
+├── veloria-migrate/   # Database migration runner
+└── veloria-converter/ # WPDirectory data converter (one-time use)
 
-# Production build (with optimizations)
-CGO_ENABLED=0 go build -ldflags="-s -w" -o veloria ./cmd/veloria
-CGO_ENABLED=0 go build -ldflags="-s -w" -o veloria-indexer ./cmd/veloria-indexer
+internal/              # All application packages (see architecture.md)
+migrations/            # SQL migration files (goose format)
+templates/             # Go html/template files (embedded via embed.FS)
+docs/                  # Developer documentation
 ```
 
-## Testing
+## Common Tasks
+
+### Adding a Migration
+
+Create a new migration file following the naming convention:
 
 ```bash
-# Run all tests
+goose -dir migrations create <description> sql
+```
+
+This creates a file like `migrations/20260222000001_<description>.sql` with `-- +goose Up` and `-- +goose Down` sections.
+
+### Adding a New API Endpoint
+
+1. Create a handler function in the appropriate package (`internal/plugin/`, `internal/theme/`, `internal/core/`, `internal/search/`)
+2. The handler should accept its dependencies as parameters (DB, stats provider, etc.) and return `http.Handler`
+3. Use `api.WriteJSON()` and `api.WriteSuccessJSON()` for consistent JSON responses
+4. Use `api.APIError` helpers (`api.ErrBadRequest`, `api.ErrNotFound`, etc.) for error responses
+5. Register the route in `internal/router/router.go`
+
+### Adding a New Web Page
+
+1. Create a template in `templates/`
+2. Add a handler in the appropriate package that takes `*web.Deps`
+3. Use `d.PageData(r)` to get common template data (user, search status, etc.)
+4. Register the route in `internal/router/router.go`
+
+### Working with the Extension Stores
+
+The stores follow a consistent pattern. Each concrete store (`PluginStore`, `ThemeStore`, `CoreStore`) embeds `ExtensionStore[T]` and implements `DataSource`:
+
+```go
+// Creating a store (done in app.go)
+pr := repo.NewPluginStore(ctx, db, cfg, logger, cache, apiClient)
+
+// The store satisfies DataSource
+var ds repo.DataSource = pr
+```
+
+Key methods on `DataSource`:
+- `Load()` — load from DB + disk indexes (called during startup)
+- `PrepareUpdates()` — discover new/changed extensions, return index tasks
+- `Search(term, opts, progressFn)` — search across all indexed extensions
+- `GetExtension(slug)` — look up a single extension by slug
+- `MakeReindexTaskBySlug(slug)` — create an ad-hoc reindex task
+
+### Modifying Web Dependencies
+
+If a handler needs access to a new capability from the Manager:
+
+1. Define a narrow interface in `internal/web/interfaces.go` (1-2 methods)
+2. Add the interface as a field on `web.Deps`
+3. Implement the interface on `*Manager`
+4. Wire it in `app.New()` when constructing `web.NewDeps()`
+
+## Code Style
+
+- **Error handling**: Use `fmt.Errorf("context: %w", err)` for wrapping. Return errors to callers; don't log and return.
+- **Logging**: Use the `*zerolog.Logger` passed via constructor. Debug-level for routine operations, Info for lifecycle events, Error for failures.
+- **Concurrency**: Use explicit variable capture in goroutine closures. Use `sync.RWMutex` for read-heavy shared state.
+- **Interfaces**: Define at the consumer site. Keep them narrow (1-3 methods). Use hand-written fakes for testing.
+- **Configuration**: All config comes from environment variables via struct tags. No config files.
+
+## Useful Commands
+
+```bash
+# Run all unit tests
 go test ./...
 
-# Run with verbose output
+# Run tests with verbose output
 go test -v ./...
 
-# Run specific package tests
-go test ./internal/index/...
+# Run integration tests (requires Docker services running)
+go test -tags integration ./...
 
-# Run with race detector
-go test -race ./...
-```
+# Run tests for a specific package
+go test ./internal/manager/
 
-## Code Quality
-
-```bash
-# Format code
-go fmt ./...
-
-# Vet for common issues
+# Check for issues
 go vet ./...
 
-# Run staticcheck (install: go install honnef.co/go/tools/cmd/staticcheck@latest)
-staticcheck ./...
+# Build all binaries
+go build ./...
 ```
-
-## Key Packages
-
-### internal/repo
-
-The repository layer uses Go generics to eliminate duplication:
-
-```go
-// Repository is a generic type for managing extensions
-type Repository[T Extension] struct {
-    List map[string]T
-    mu   sync.RWMutex
-    // ...
-}
-
-// Extension interface implemented by Plugin, Theme, Core
-type Extension interface {
-    GetSlug() string
-    GetName() string
-    GetVersion() string
-    GetDownloadLink() string
-    GetActiveInstalls() int
-    // Index management methods...
-}
-```
-
-### internal/index
-
-Trigram indexing uses the [google/codesearch](https://github.com/google/codesearch) library:
-
-1. **Index Creation**: `index.Create()` builds a trigram index from source files
-2. **Search**: `index.Search()` queries the index and greps matching files
-3. **Hot-swap**: Indexes are versioned with timestamps for safe updates
-
-### internal/manager
-
-The Manager orchestrates all repositories and provides a unified search interface:
-
-```go
-m.Search("plugins", "wp_enqueue_script", "\\.php$", false)
-```
-
-## Adding a New Extension Type
-
-1. Define the type in `internal/repo/`:
-   ```go
-   type MyExtension struct {
-       *IndexedExtension `gorm:"-" json:"-"`
-       // fields...
-   }
-   ```
-
-2. Implement the `Extension` interface
-
-3. Create a typed repository:
-   ```go
-   type MyExtensionRepo struct {
-       *Repository[*MyExtension]
-   }
-   ```
-
-4. Add to the Manager and router
-
-## Debugging
-
-### Enable Debug Logging
-
-The application uses zerolog. Set log level via code or compile-time configuration.
-
-### Inspect Indexes
-
-Indexes are stored as binary files in `$DATA_DIR/<type>/index/<slug>.<timestamp>/`. Use the codesearch CLI tools to inspect:
-
-```bash
-go install github.com/google/codesearch/cmd/cindex@latest
-go install github.com/google/codesearch/cmd/csearch@latest
-
-# Search an index directly
-CSEARCHINDEX=/tmp/veloria-data/plugins/index/hello-dolly.1234567890/.csearchindex \
-  csearch "Hello"
-```
-
-### Database Queries
-
-GORM debug mode can be enabled in `internal/db/db.go` for SQL logging.
-
-## Common Issues
-
-### "no indexes loaded"
-
-- Ensure `DATA_DIR` points to a directory with indexed content
-- Run the indexer on some plugins/themes first
-- Check file permissions
-
-### "context canceled"
-
-- Normal during shutdown - the app uses context cancellation for graceful termination
-- If occurring unexpectedly, check for timeout issues
-
-### "mmap: too many open files"
-
-- Increase ulimit: `ulimit -n 65536`
-- This occurs when many indexes are loaded simultaneously
