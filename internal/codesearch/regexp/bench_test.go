@@ -148,10 +148,7 @@ func BenchmarkDFAMatchIterative(b *testing.B) {
 					}
 					matches++
 					// Advance past matched line
-					lineEnd := m + 1
-					if lineEnd > end {
-						lineEnd = end
-					}
+					lineEnd := min(m+1, end)
 					chunkStart = lineEnd
 				}
 				b.ReportMetric(float64(matches), "matches/op")

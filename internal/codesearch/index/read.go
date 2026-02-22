@@ -337,11 +337,11 @@ func (ix *Index) Names(lo, hi int) iter.Seq[Path] {
 
 func (ix *Index) str(off int) []byte {
 	str := ix.slice(off, -1)
-	i := bytes.IndexByte(str, '\x00')
-	if i < 0 {
+	before, _, ok := bytes.Cut(str, []byte{'\x00'})
+	if !ok {
 		ix.corrupt()
 	}
-	return str[:i]
+	return before
 }
 
 // listAt returns the i'th posting index list entry.

@@ -80,9 +80,10 @@ type Config struct {
 	AppDebug bool `env:"APP_DEBUG" envDefault:"false"`
 
 	// Application URL (production TLS via certmagic)
-	AppURL             string `env:"APP_URL" envDefault:""`
-	ACMEEmail          string `env:"ACME_EMAIL" envDefault:""`
-	CloudflareAPIToken string `env:"CLOUDFLARE_API_TOKEN" envDefault:""`
+	AppURL             string   `env:"APP_URL" envDefault:""`
+	ACMEEmail          string   `env:"ACME_EMAIL" envDefault:""`
+	CloudflareAPIToken string   `env:"CLOUDFLARE_API_TOKEN" envDefault:""`
+	RedirectDomains    []string `env:"REDIRECT_DOMAINS" envSeparator:"," envDefault:""`
 }
 
 // EnsureDirs creates all required data directories if they don't already exist.

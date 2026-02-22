@@ -482,10 +482,7 @@ func (g *Grep) Reader(r io.Reader, name string) {
 				return
 			}
 			lineStart := bytes.LastIndex(buf[chunkStart:m1], nl) + 1 + chunkStart
-			lineEnd := m1 + 1
-			if lineEnd > end {
-				lineEnd = end
-			}
+			lineEnd := min(m1+1, end)
 			if needLineno {
 				lineno += countNL(buf[chunkStart:lineStart])
 			}
@@ -549,7 +546,7 @@ func (g *Grep) Reader(r io.Reader, name string) {
 
 func lineSuffixLen(buf []byte, n int) int {
 	end := len(buf)
-	for i := 0; i < n; i++ {
+	for range n {
 		j := bytes.LastIndex(buf[:end], nl)
 		if j < 0 {
 			break
@@ -564,7 +561,7 @@ func lineSuffixLen(buf []byte, n int) int {
 
 func linePrefixLen(buf []byte, lines int) int {
 	start := 0
-	for i := 0; i < lines; i++ {
+	for range lines {
 		j := bytes.IndexByte(buf[start:], '\n')
 		if j < 0 {
 			return len(buf)

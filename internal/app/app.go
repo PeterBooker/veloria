@@ -150,6 +150,8 @@ func New(ctx context.Context) (*App, error) {
 		SearchEnabled:    searchEnabled,
 		RateLimitEnabled: c.HTTPRateLimitEnabled,
 		LoggingEnabled:   c.HTTPLoggingEnabled,
+		AppURL:           c.AppURL,
+		RedirectDomains:  c.RedirectDomains,
 	})
 
 	srv, err := server.New(r, c, l)

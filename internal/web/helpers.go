@@ -86,7 +86,7 @@ func BuildChartData(values []int64) ChartData {
 func downsample(values []int64, n int) []int64 {
 	result := make([]int64, n)
 	last := len(values) - 1
-	for i := 0; i < n; i++ {
+	for i := range n {
 		result[i] = values[i*last/(n-1)]
 	}
 	return result
@@ -170,10 +170,7 @@ func ReadContextLines(path string, lineNumber int, radius int) (lines []SearchCo
 		}
 	}
 
-	start := lineNumber - radius
-	if start < 1 {
-		start = 1
-	}
+	start := max(lineNumber-radius, 1)
 	end := lineNumber + radius
 
 	scanner := bufio.NewScanner(r)

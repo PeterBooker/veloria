@@ -203,13 +203,13 @@ func BenchmarkPostingQuery(b *testing.B) {
 
 func BenchmarkExtractBeforeContext(b *testing.B) {
 	var buf bytes.Buffer
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		fmt.Fprintf(&buf, "line %d: some content here for context extraction benchmark\n", i)
 	}
 	data := buf.Bytes()
 
 	lineStart := 0
-	for i := 0; i < 500; i++ {
+	for range 500 {
 		nl := bytes.IndexByte(data[lineStart:], '\n')
 		if nl < 0 {
 			break
@@ -229,13 +229,13 @@ func BenchmarkExtractBeforeContext(b *testing.B) {
 
 func BenchmarkExtractAfterContext(b *testing.B) {
 	var buf bytes.Buffer
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		fmt.Fprintf(&buf, "line %d: some content here for context extraction benchmark\n", i)
 	}
 	data := buf.Bytes()
 
 	lineEnd := 0
-	for i := 0; i < 500; i++ {
+	for range 500 {
 		nl := bytes.IndexByte(data[lineEnd:], '\n')
 		if nl < 0 {
 			break

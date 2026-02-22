@@ -233,8 +233,8 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 			matchesCollected += len(matches)
 
 			relName := name
-			if idx := strings.Index(name, "/source/"); idx >= 0 {
-				relName = name[idx+8:]
+			if _, after, ok := strings.Cut(name, "/source/"); ok {
+				relName = after
 			}
 
 			results = append(results, &FileMatch{
@@ -497,10 +497,7 @@ func grepData(buf []byte, re *cregexp.Regexp, contextLines int, maxMatches int) 
 
 		// Find line boundaries around the match
 		lineStart := bytes.LastIndex(buf[chunkStart:m], nlByte) + 1 + chunkStart
-		lineEnd := m + 1
-		if lineEnd > end {
-			lineEnd = end
-		}
+		lineEnd := min(m+1, end)
 
 		// Track line numbers
 		lineno += countNL(buf[chunkStart:lineStart])

@@ -49,9 +49,9 @@ func ViewSearchV1(db *gorm.DB, s3 storage.ResultStorage) http.Handler {
 			return
 		}
 		idStr := chi.URLParam(r, "id")
-		id, err := uuid.Parse(idStr)
+		id, err := api.ParseID(idStr)
 		if err != nil {
-			api.WriteJSON(w, api.ErrBadRequest("invalid UUID"))
+			api.WriteJSON(w, api.ErrBadRequest("invalid search id"))
 			return
 		}
 

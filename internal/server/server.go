@@ -62,9 +62,10 @@ func New(handler http.Handler, c *config.Config, l *zerolog.Logger) (*Server, er
 			certmagic.DefaultACME.Email = c.ACMEEmail
 		}
 
+		domains := append([]string{domain}, c.RedirectDomains...)
 		cfg := certmagic.NewDefault()
-		if err := cfg.ManageSync(context.Background(), []string{domain}); err != nil {
-			return nil, fmt.Errorf("failed to manage TLS certificate for %s: %w", domain, err)
+		if err := cfg.ManageSync(context.Background(), domains); err != nil {
+			return nil, fmt.Errorf("failed to manage TLS certificates for %v: %w", domains, err)
 		}
 
 		tlsCfg := cfg.TLSConfig()
@@ -89,7 +90,7 @@ func New(handler http.Handler, c *config.Config, l *zerolog.Logger) (*Server, er
 			IdleTimeout:       5 * time.Second,
 		}
 
-		l.Info().Msgf("Managing TLS certificate for %s", domain)
+		l.Info().Msgf("Managing TLS certificates for %v", domains)
 	} else {
 		if c.Env != "development" && c.AppURL == "" {
 			l.Warn().Msg("APP_URL not set; running without TLS")

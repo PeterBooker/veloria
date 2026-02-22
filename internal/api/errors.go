@@ -2,7 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
 )
 
 // APIError is a structured error returned by API handlers.
@@ -44,6 +48,20 @@ func ErrUnavailable(msg string) *APIError {
 // ErrTimeout creates a 408 error.
 func ErrTimeout(msg string) *APIError {
 	return &APIError{Status: http.StatusRequestTimeout, Message: msg}
+}
+
+// ParseID parses a UUID or ULID string into a uuid.UUID.
+// If the input is a valid UUID it is returned directly; otherwise it is
+// parsed as a ULID and the same 128 bits are reinterpreted as a UUID.
+func ParseID(s string) (uuid.UUID, error) {
+	if id, err := uuid.Parse(s); err == nil {
+		return id, nil
+	}
+	ulidVal, err := ulid.Parse(s)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid id %q: not a valid UUID or ULID", s)
+	}
+	return uuid.UUID(ulidVal), nil
 }
 
 // WriteJSON writes an APIError as a JSON response.

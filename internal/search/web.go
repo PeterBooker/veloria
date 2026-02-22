@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	api "veloria/internal/api"
 	"veloria/internal/auth"
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
@@ -30,9 +31,13 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			return
 		}
 		idStr := chi.URLParam(r, "uuid")
-		id, err := uuid.Parse(idStr)
+		id, err := api.ParseID(idStr)
 		if err != nil {
 			http.Error(w, "invalid search id", http.StatusBadRequest)
+			return
+		}
+		if idStr != id.String() {
+			http.Redirect(w, r, "/search/"+id.String(), http.StatusMovedPermanently)
 			return
 		}
 
@@ -87,9 +92,18 @@ func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
 		}
 
 		idStr := chi.URLParam(r, "uuid")
-		id, err := uuid.Parse(idStr)
+		id, err := api.ParseID(idStr)
 		if err != nil {
 			http.Error(w, "invalid search id", http.StatusBadRequest)
+			return
+		}
+		if idStr != id.String() {
+			q := r.URL.Query().Encode()
+			target := "/search/" + id.String() + "/extensions"
+			if q != "" {
+				target += "?" + q
+			}
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
 			return
 		}
 
@@ -403,12 +417,16 @@ func ExtensionResultsPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		idStr := chi.URLParam(r, "uuid")
-		id, err := uuid.Parse(idStr)
+		id, err := api.ParseID(idStr)
 		if err != nil {
 			http.Error(w, "invalid search id", http.StatusBadRequest)
 			return
 		}
 		slug := chi.URLParam(r, "slug")
+		if idStr != id.String() {
+			http.Redirect(w, r, "/search/"+id.String()+"/extension/"+slug, http.StatusMovedPermanently)
+			return
+		}
 		if slug == "" {
 			http.Error(w, "missing slug", http.StatusBadRequest)
 			return
