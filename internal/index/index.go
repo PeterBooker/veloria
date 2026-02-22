@@ -496,14 +496,8 @@ func truncateMatchLine(line string, fre *regexp.Regexp) string {
 		}
 	}
 
-	start := center - truncateRadius
-	if start < 0 {
-		start = 0
-	}
-	end := center + truncateRadius
-	if end > len(line) {
-		end = len(line)
-	}
+	start := max(center-truncateRadius, 0)
+	end := min(center+truncateRadius, len(line))
 
 	return line[start:end]
 }
