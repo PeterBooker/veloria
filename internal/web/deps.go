@@ -8,15 +8,19 @@ import (
 	"veloria/internal/auth"
 	"veloria/internal/cache"
 	"veloria/internal/config"
-	"veloria/internal/manager"
 	"veloria/internal/storage"
 )
 
 // Deps holds shared dependencies for all web handlers.
+// Manager capabilities are exposed through narrow interfaces (SearchService,
+// ReindexService, SourceResolver, StatsProvider) defined in interfaces.go.
 type Deps struct {
 	Templates            *Templates
 	DB                   *gorm.DB
-	Manager              *manager.Manager
+	Search               SearchService
+	Reindex              ReindexService
+	Sources              SourceResolver
+	Stats                StatsProvider
 	S3                   storage.ResultStorage
 	Cache                cache.Cache
 	Config               *config.Config
@@ -26,11 +30,16 @@ type Deps struct {
 }
 
 // NewDeps creates a new shared dependency container for web handlers.
-func NewDeps(templates *Templates, db *gorm.DB, m *manager.Manager, s3 storage.ResultStorage, ch cache.Cache, cfg *config.Config, searchEnabled bool, searchDisabledReason string) *Deps {
+// All four interface parameters (search, reindex, sources, stats) may be nil
+// when the manager is unavailable (e.g. no database).
+func NewDeps(templates *Templates, db *gorm.DB, search SearchService, reindex ReindexService, sources SourceResolver, stats StatsProvider, s3 storage.ResultStorage, ch cache.Cache, cfg *config.Config, searchEnabled bool, searchDisabledReason string) *Deps {
 	return &Deps{
 		Templates:            templates,
 		DB:                   db,
-		Manager:              m,
+		Search:               search,
+		Reindex:              reindex,
+		Sources:              sources,
+		Stats:                stats,
 		S3:                   s3,
 		Cache:                ch,
 		Config:               cfg,
@@ -53,5 +62,5 @@ func (d *Deps) PageData(r *http.Request) PageData {
 
 // SearchAvailable returns whether the search feature is fully operational.
 func (d *Deps) SearchAvailable() bool {
-	return d.SearchEnabled && d.DB != nil && d.Manager != nil && d.S3 != nil
+	return d.SearchEnabled && d.DB != nil && d.Search != nil && d.S3 != nil
 }

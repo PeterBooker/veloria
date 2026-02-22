@@ -1,11 +1,20 @@
 package testutil
 
 import (
-	"veloria/internal/config"
-	"veloria/internal/repo"
+	"io"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+
+	"veloria/internal/config"
+	"veloria/internal/repo"
 )
+
+// NopLogger returns a zerolog.Logger that discards all output.
+func NopLogger() *zerolog.Logger {
+	l := zerolog.New(io.Discard)
+	return &l
+}
 
 // SampleConfig returns a valid Config with test-friendly defaults.
 func SampleConfig() *config.Config {

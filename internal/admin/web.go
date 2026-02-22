@@ -11,7 +11,7 @@ import (
 // Queues an ad-hoc re-index task for the given extension.
 func ReindexExtension(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.Manager == nil {
+		if d.Reindex == nil {
 			http.Error(w, "Indexer unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -29,7 +29,7 @@ func ReindexExtension(d *web.Deps) http.HandlerFunc {
 			return
 		}
 
-		ok := d.Manager.SubmitReindex(repoType, slug)
+		ok := d.Reindex.SubmitReindex(repoType, slug)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if !ok {
 			_, _ = fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg">Not found or queue full</span>`)

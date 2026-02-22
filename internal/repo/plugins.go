@@ -18,7 +18,6 @@ import (
 
 	"veloria/internal/cache"
 	"veloria/internal/config"
-	"veloria/internal/index"
 )
 
 // SourceWordPress is the source identifier for packages mirrored from wordpress.org.
@@ -71,6 +70,7 @@ func (p *Plugin) GetName() string         { return p.Name }
 func (p *Plugin) GetVersion() string      { return p.Version }
 func (p *Plugin) GetDownloadLink() string { return p.DownloadLink }
 func (p *Plugin) GetActiveInstalls() int  { return p.ActiveInstalls }
+func (p *Plugin) GetDownloaded() int      { return p.Downloaded }
 func (p *Plugin) GetIndexedExtension() *IndexedExtension {
 	return p.IndexedExtension
 }
@@ -81,32 +81,31 @@ func (p *Plugin) SetIndexedExtension(ext *IndexedExtension) {
 // TableName returns the database table name for GORM.
 func (p *Plugin) TableName() string { return "plugins" }
 
-// PluginRepo manages plugins using the generic Repository.
-type PluginRepo struct {
-	*Repository[*Plugin]
-	c            *config.Config
+// PluginStore manages plugins using the generic ExtensionStore.
+type PluginStore struct {
+	*ExtensionStore[*Plugin]
 	lastFullScan time.Time
 }
 
-// NewPluginRepo creates a new plugin repository.
-func NewPluginRepo(ctx context.Context, db *gorm.DB, c *config.Config, l *zerolog.Logger, ch cache.Cache) *PluginRepo {
-	repo := NewRepository[*Plugin](RepositoryConfig[*Plugin]{
-		Ctx:      ctx,
-		DB:       db,
-		Config:   c,
-		Logger:   l,
-		Cache:    ch,
-		RepoType: RepoPlugins,
+// NewPluginStore creates a new plugin store.
+func NewPluginStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zerolog.Logger, ch cache.Cache, api *APIClient) *PluginStore {
+	repo := NewExtensionStore[*Plugin](StoreConfig[*Plugin]{
+		Ctx:           ctx,
+		DB:            db,
+		Config:        c,
+		Logger:        l,
+		Cache:         ch,
+		API:           api,
+		ExtensionType: TypePlugins,
 	})
 
-	return &PluginRepo{
-		Repository: repo,
-		c:          c,
+	return &PluginStore{
+		ExtensionStore: repo,
 	}
 }
 
 // Load loads plugins from the database and their indexes.
-func (pr *PluginRepo) Load() error {
+func (pr *PluginStore) Load() error {
 	err := pr.LoadFromDB(func(db *gorm.DB) ([]*Plugin, error) {
 		var plugins []Plugin
 		if err := db.Where("deleted_at IS NULL").Find(&plugins).Error; err != nil {
@@ -130,7 +129,7 @@ func (pr *PluginRepo) Load() error {
 }
 
 // PrepareUpdates fetches pending plugins and returns IndexTasks for the shared worker pool.
-func (pr *PluginRepo) PrepareUpdates() []IndexTask {
+func (pr *PluginStore) PrepareUpdates() []IndexTask {
 	fetchFn := func() ([]*Plugin, error) {
 		if pr.lastFullScan.IsZero() || time.Since(pr.lastFullScan) >= FullScanInterval {
 			pr.l.Info().Msg("Running full plugin discovery scan...")
@@ -142,7 +141,7 @@ func (pr *PluginRepo) PrepareUpdates() []IndexTask {
 			return plugins, nil
 		}
 
-		plugins, err := FetchPluginUpdates(pr.ctx, pr.c, pr.l)
+		plugins, err := FetchPluginUpdates(pr.ctx, pr.c, pr.api, pr.l)
 		if err != nil {
 			return nil, err
 		}
@@ -173,12 +172,12 @@ func (pr *PluginRepo) PrepareUpdates() []IndexTask {
 		}
 	}
 
-	return pr.Repository.PrepareUpdates(fetchFn, saveFn)
+	return pr.ExtensionStore.PrepareUpdates(fetchFn, saveFn)
 }
 
 // discoverNewPlugins paginates the full AspireCloud plugin catalog and returns
 // plugins not yet known to the system.
-func (pr *PluginRepo) discoverNewPlugins() ([]*Plugin, error) {
+func (pr *PluginStore) discoverNewPlugins() ([]*Plugin, error) {
 	known, err := pr.getAllKnownSlugs()
 	if err != nil {
 		return nil, err
@@ -195,7 +194,7 @@ func (pr *PluginRepo) discoverNewPlugins() ([]*Plugin, error) {
 		}
 
 		pageURL := fmt.Sprintf("%s?action=query_plugins&browse=updated&posts_per_page=100&page=%d", basePluginsURL, page)
-		plugins, info, err := fetchPluginPage(pr.ctx, pageURL)
+		plugins, info, err := fetchPluginPage(pr.ctx, pr.api, pageURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch plugin page %d: %w", page, err)
 		}
@@ -247,7 +246,7 @@ func (pr *PluginRepo) discoverNewPlugins() ([]*Plugin, error) {
 // getAllKnownSlugs returns a set of all plugin slugs known to the system,
 // including active, closed, and unindexed plugins from both the in-memory
 // repository and the database.
-func (pr *PluginRepo) getAllKnownSlugs() (map[string]struct{}, error) {
+func (pr *PluginStore) getAllKnownSlugs() (map[string]struct{}, error) {
 	known := make(map[string]struct{})
 
 	pr.mu.RLock()
@@ -267,33 +266,6 @@ func (pr *PluginRepo) getAllKnownSlugs() (map[string]struct{}, error) {
 	return known, nil
 }
 
-// Search searches all plugins and returns results in the legacy format.
-func (pr *PluginRepo) Search(term string, opt *index.SearchOptions, progressFn ...func(searched, total int)) ([]*PluginSearchResult, error) {
-	var fn func(searched, total int)
-	if len(progressFn) > 0 {
-		fn = progressFn[0]
-	}
-	results, err := pr.Repository.Search(term, opt, fn)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert to legacy format
-	pluginResults := make([]*PluginSearchResult, len(results))
-	for i, r := range results {
-		pluginResults[i] = &PluginSearchResult{
-			Plugin:  r.Extension.(*Plugin),
-			Matches: r.Matches,
-		}
-	}
-	return pluginResults, nil
-}
-
-// PluginSearchResult contains search results for a single plugin.
-type PluginSearchResult struct {
-	Plugin  *Plugin
-	Matches []*index.FileMatch
-}
 
 // Info holds pagination info from the API response.
 type Info struct {
@@ -353,16 +325,16 @@ func (p *Plugin) UnmarshalJSON(data []byte) error {
 }
 
 // FetchPluginUpdates fetches plugin updates based on environment.
-func FetchPluginUpdates(ctx context.Context, c *config.Config, l *zerolog.Logger) ([]Plugin, error) {
+func FetchPluginUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zerolog.Logger) ([]Plugin, error) {
 	if c.Env == "production" || c.Env == "staging" {
-		return FetchPluginsUpdatedWithinLastHour(ctx, l)
+		return FetchPluginsUpdatedWithinLastHour(ctx, api, l)
 	}
-	return FetchLocalPlugins(ctx)
+	return FetchLocalPlugins(ctx, api)
 }
 
 // FetchPluginsUpdatedWithinLastHour fetches pages of plugins sorted by
 // update time and collects those updated within the last hour.
-func FetchPluginsUpdatedWithinLastHour(ctx context.Context, l *zerolog.Logger) ([]Plugin, error) {
+func FetchPluginsUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *zerolog.Logger) ([]Plugin, error) {
 	threshold := time.Now().UTC().Add(-1 * time.Hour)
 
 	var all []Plugin
@@ -370,7 +342,7 @@ func FetchPluginsUpdatedWithinLastHour(ctx context.Context, l *zerolog.Logger) (
 	for page := 1; ; page++ {
 		url := fmt.Sprintf("%s?action=query_plugins&browse=updated&posts_per_page=100&page=%d", basePluginsURL, page)
 
-		plugins, info, err := fetchPluginPage(ctx, url)
+		plugins, info, err := fetchPluginPage(ctx, api, url)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch page %d: %w", page, err)
 		}
@@ -420,9 +392,9 @@ func FetchPluginsUpdatedWithinLastHour(ctx context.Context, l *zerolog.Logger) (
 }
 
 // fetchPluginPage fetches a single page of plugins from the API.
-func fetchPluginPage(ctx context.Context, url string) (plugins []Plugin, info Info, err error) {
+func fetchPluginPage(ctx context.Context, api *APIClient, url string) (plugins []Plugin, info Info, err error) {
 	var pr PluginResponse
-	if err := fetchWPAPIJSON(ctx, url, &pr); err != nil {
+	if err := api.FetchJSON(ctx, url, &pr); err != nil {
 		return nil, Info{}, err
 	}
 
@@ -434,10 +406,10 @@ func fetchPluginPage(ctx context.Context, url string) (plugins []Plugin, info In
 }
 
 // FetchPluginInfo fetches information for a single plugin.
-func FetchPluginInfo(ctx context.Context, slug string) (plugin *Plugin, err error) {
+func FetchPluginInfo(ctx context.Context, api *APIClient, slug string) (plugin *Plugin, err error) {
 	url := fmt.Sprintf("%s?action=plugin_information&request[slug]=%s", basePluginsURL, url.QueryEscape(slug))
 	var p Plugin
-	if err := fetchWPAPIJSON(ctx, url, &p); err != nil {
+	if err := api.FetchJSON(ctx, url, &p); err != nil {
 		return nil, fmt.Errorf("failed to fetch plugin info for %s: %w", slug, err)
 	}
 

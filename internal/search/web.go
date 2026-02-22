@@ -2,10 +2,8 @@ package search
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"net/http"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -262,7 +260,7 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 	d.DB.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusProcessing)
 	defer d.Progress.Delete(searchID)
 
-	results, err := d.Manager.Search(repo, term, &manager.SearchParams{
+	results, err := d.Search.Search(repo, term, &manager.SearchParams{
 		FileMatch:        fileMatch,
 		ExcludeFileMatch: excludeMatch,
 		CaseInsensitive:  caseInsensitive,
@@ -490,7 +488,7 @@ func ContextPage(d *web.Deps) http.HandlerFunc {
 			Slug:     slug,
 			Filename: filename,
 		}
-		if d.Manager == nil {
+		if d.Sources == nil {
 			data.Error = "Search context is unavailable."
 			renderSearchContext(d, w, data)
 			return
@@ -543,21 +541,5 @@ func renderSearchContext(d *web.Deps, w http.ResponseWriter, data web.SearchCont
 }
 
 func resolveSourceDir(d *web.Deps, repoType string, slug string) (string, error) {
-	switch repoType {
-	case "plugins":
-		if ext, ok := d.Manager.GetPluginRepo().Get(slug); ok && ext.GetIndex() != nil {
-			return filepath.Dir(ext.GetIndex().SourceDir()), nil
-		}
-	case "themes":
-		if ext, ok := d.Manager.GetThemeRepo().Get(slug); ok && ext.GetIndex() != nil {
-			return filepath.Dir(ext.GetIndex().SourceDir()), nil
-		}
-	case "cores":
-		if ext, ok := d.Manager.GetCoreRepo().Get(slug); ok && ext.GetIndex() != nil {
-			return filepath.Dir(ext.GetIndex().SourceDir()), nil
-		}
-	default:
-		return "", fmt.Errorf("unknown repository type")
-	}
-	return "", fmt.Errorf("source files are not available")
+	return d.Sources.ResolveSourceDir(repoType, slug)
 }

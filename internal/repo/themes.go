@@ -16,7 +16,6 @@ import (
 
 	"veloria/internal/cache"
 	"veloria/internal/config"
-	"veloria/internal/index"
 )
 
 // Theme represents a WordPress theme.
@@ -66,6 +65,7 @@ func (t *Theme) GetName() string         { return t.Name }
 func (t *Theme) GetVersion() string      { return t.Version }
 func (t *Theme) GetDownloadLink() string { return t.DownloadLink }
 func (t *Theme) GetActiveInstalls() int  { return t.ActiveInstalls }
+func (t *Theme) GetDownloaded() int      { return t.Downloaded }
 func (t *Theme) GetIndexedExtension() *IndexedExtension {
 	return t.IndexedExtension
 }
@@ -76,32 +76,31 @@ func (t *Theme) SetIndexedExtension(ext *IndexedExtension) {
 // TableName returns the database table name for GORM.
 func (t *Theme) TableName() string { return "themes" }
 
-// ThemeRepo manages themes using the generic Repository.
-type ThemeRepo struct {
-	*Repository[*Theme]
-	c            *config.Config
+// ThemeStore manages themes using the generic ExtensionStore.
+type ThemeStore struct {
+	*ExtensionStore[*Theme]
 	lastFullScan time.Time
 }
 
-// NewThemeRepo creates a new theme repository.
-func NewThemeRepo(ctx context.Context, db *gorm.DB, c *config.Config, l *zerolog.Logger, ch cache.Cache) *ThemeRepo {
-	repo := NewRepository[*Theme](RepositoryConfig[*Theme]{
-		Ctx:      ctx,
-		DB:       db,
-		Config:   c,
-		Logger:   l,
-		Cache:    ch,
-		RepoType: RepoThemes,
+// NewThemeStore creates a new theme store.
+func NewThemeStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zerolog.Logger, ch cache.Cache, api *APIClient) *ThemeStore {
+	repo := NewExtensionStore[*Theme](StoreConfig[*Theme]{
+		Ctx:           ctx,
+		DB:            db,
+		Config:        c,
+		Logger:        l,
+		Cache:         ch,
+		API:           api,
+		ExtensionType: TypeThemes,
 	})
 
-	return &ThemeRepo{
-		Repository: repo,
-		c:          c,
+	return &ThemeStore{
+		ExtensionStore: repo,
 	}
 }
 
 // Load loads themes from the database and their indexes.
-func (tr *ThemeRepo) Load() error {
+func (tr *ThemeStore) Load() error {
 	err := tr.LoadFromDB(func(db *gorm.DB) ([]*Theme, error) {
 		var themes []Theme
 		if err := db.Where("deleted_at IS NULL").Find(&themes).Error; err != nil {
@@ -125,7 +124,7 @@ func (tr *ThemeRepo) Load() error {
 }
 
 // PrepareUpdates fetches pending themes and returns IndexTasks for the shared worker pool.
-func (tr *ThemeRepo) PrepareUpdates() []IndexTask {
+func (tr *ThemeStore) PrepareUpdates() []IndexTask {
 	fetchFn := func() ([]*Theme, error) {
 		if tr.lastFullScan.IsZero() || time.Since(tr.lastFullScan) >= FullScanInterval {
 			tr.l.Info().Msg("Running full theme discovery scan...")
@@ -137,7 +136,7 @@ func (tr *ThemeRepo) PrepareUpdates() []IndexTask {
 			return themes, nil
 		}
 
-		themes, err := FetchThemeUpdates(tr.ctx, tr.c, tr.l)
+		themes, err := FetchThemeUpdates(tr.ctx, tr.c, tr.api, tr.l)
 		if err != nil {
 			return nil, err
 		}
@@ -168,12 +167,12 @@ func (tr *ThemeRepo) PrepareUpdates() []IndexTask {
 		}
 	}
 
-	return tr.Repository.PrepareUpdates(fetchFn, saveFn)
+	return tr.ExtensionStore.PrepareUpdates(fetchFn, saveFn)
 }
 
 // discoverNewThemes paginates the full AspireCloud theme catalog and returns
 // themes not yet known to the system.
-func (tr *ThemeRepo) discoverNewThemes() ([]*Theme, error) {
+func (tr *ThemeStore) discoverNewThemes() ([]*Theme, error) {
 	known, err := tr.getAllKnownSlugs()
 	if err != nil {
 		return nil, err
@@ -190,7 +189,7 @@ func (tr *ThemeRepo) discoverNewThemes() ([]*Theme, error) {
 		}
 
 		pageURL := fmt.Sprintf("%s?action=query_themes&browse=updated&posts_per_page=100&page=%d", baseThemesURL, page)
-		themes, info, err := fetchThemePage(tr.ctx, pageURL)
+		themes, info, err := fetchThemePage(tr.ctx, tr.api, pageURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch theme page %d: %w", page, err)
 		}
@@ -243,7 +242,7 @@ func (tr *ThemeRepo) discoverNewThemes() ([]*Theme, error) {
 // getAllKnownSlugs returns a set of all theme slugs known to the system,
 // including active, closed, and unindexed themes from both the in-memory
 // repository and the database.
-func (tr *ThemeRepo) getAllKnownSlugs() (map[string]struct{}, error) {
+func (tr *ThemeStore) getAllKnownSlugs() (map[string]struct{}, error) {
 	known := make(map[string]struct{})
 
 	tr.mu.RLock()
@@ -261,33 +260,6 @@ func (tr *ThemeRepo) getAllKnownSlugs() (map[string]struct{}, error) {
 	}
 
 	return known, nil
-}
-
-// Search searches all themes and returns results.
-func (tr *ThemeRepo) Search(term string, opt *index.SearchOptions, progressFn ...func(searched, total int)) ([]*ThemeSearchResult, error) {
-	var fn func(searched, total int)
-	if len(progressFn) > 0 {
-		fn = progressFn[0]
-	}
-	results, err := tr.Repository.Search(term, opt, fn)
-	if err != nil {
-		return nil, err
-	}
-
-	themeResults := make([]*ThemeSearchResult, len(results))
-	for i, r := range results {
-		themeResults[i] = &ThemeSearchResult{
-			Theme:   r.Extension.(*Theme),
-			Matches: r.Matches,
-		}
-	}
-	return themeResults, nil
-}
-
-// ThemeSearchResult contains search results for a single theme.
-type ThemeSearchResult struct {
-	Theme   *Theme
-	Matches []*index.FileMatch
 }
 
 // ThemeResponse represents the JSON response from the WordPress Themes API.
@@ -372,16 +344,16 @@ func fillWordPressDownloadLink(t *Theme) {
 }
 
 // FetchThemeUpdates fetches theme updates based on environment.
-func FetchThemeUpdates(ctx context.Context, c *config.Config, l *zerolog.Logger) ([]Theme, error) {
+func FetchThemeUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zerolog.Logger) ([]Theme, error) {
 	if c.Env == "production" || c.Env == "staging" {
-		return FetchThemesUpdatedWithinLastHour(ctx, l)
+		return FetchThemesUpdatedWithinLastHour(ctx, api, l)
 	}
-	return FetchLocalThemes(ctx)
+	return FetchLocalThemes(ctx, api)
 }
 
 // FetchThemesUpdatedWithinLastHour fetches pages of themes sorted by
 // update time and collects those updated within the last hour.
-func FetchThemesUpdatedWithinLastHour(ctx context.Context, l *zerolog.Logger) ([]Theme, error) {
+func FetchThemesUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *zerolog.Logger) ([]Theme, error) {
 	threshold := time.Now().UTC().Add(-1 * time.Hour)
 
 	var all []Theme
@@ -389,7 +361,7 @@ func FetchThemesUpdatedWithinLastHour(ctx context.Context, l *zerolog.Logger) ([
 	for page := 1; ; page++ {
 		url := fmt.Sprintf("%s?action=query_themes&browse=updated&posts_per_page=100&page=%d", baseThemesURL, page)
 
-		themes, info, err := fetchThemePage(ctx, url)
+		themes, info, err := fetchThemePage(ctx, api, url)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch page %d: %w", page, err)
 		}
@@ -440,9 +412,9 @@ func FetchThemesUpdatedWithinLastHour(ctx context.Context, l *zerolog.Logger) ([
 }
 
 // fetchThemePage fetches a single page of themes from the API.
-func fetchThemePage(ctx context.Context, url string) (themes []Theme, info Info, err error) {
+func fetchThemePage(ctx context.Context, api *APIClient, url string) (themes []Theme, info Info, err error) {
 	var tr ThemeResponse
-	if err := fetchWPAPIJSON(ctx, url, &tr); err != nil {
+	if err := api.FetchJSON(ctx, url, &tr); err != nil {
 		return nil, Info{}, err
 	}
 
@@ -454,10 +426,10 @@ func fetchThemePage(ctx context.Context, url string) (themes []Theme, info Info,
 }
 
 // FetchThemeInfo fetches information for a single theme.
-func FetchThemeInfo(ctx context.Context, slug string) (theme *Theme, err error) {
+func FetchThemeInfo(ctx context.Context, api *APIClient, slug string) (theme *Theme, err error) {
 	url := fmt.Sprintf("%s?action=theme_information&request[slug]=%s", baseThemesURL, url.QueryEscape(slug))
 	var t Theme
-	if err := fetchWPAPIJSON(ctx, url, &t); err != nil {
+	if err := api.FetchJSON(ctx, url, &t); err != nil {
 		return nil, fmt.Errorf("failed to fetch theme info for %s: %w", slug, err)
 	}
 

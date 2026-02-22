@@ -14,22 +14,20 @@ import (
 )
 
 type Manager struct {
-	pr      *repo.PluginRepo
-	tr      *repo.ThemeRepo
-	cr      *repo.CoreRepo
+	sources map[repo.ExtensionType]repo.DataSource
 	adhocCh chan repo.IndexTask
 }
 
-// NewManager creates a new Manager, initializes all repositories, and starts
-// a single shared updater loop that pulls work from all three repos.
-func NewManager(ctx context.Context, l *zerolog.Logger, pr *repo.PluginRepo, tr *repo.ThemeRepo, cr *repo.CoreRepo, concurrency int) (*Manager, error) {
+// NewManager creates a new Manager, initializes all data sources, and starts
+// a single shared updater loop that pulls work from all sources.
+func NewManager(ctx context.Context, l *zerolog.Logger, sources []repo.DataSource, concurrency int) (*Manager, error) {
 	var (
 		wg       sync.WaitGroup
 		errMu    sync.Mutex
 		firstErr error
 	)
 
-	loadRepo := func(name string, loadFn func() error) {
+	loadSource := func(name string, loadFn func() error) {
 		defer wg.Done()
 		if err := loadFn(); err != nil {
 			errMu.Lock()
@@ -41,24 +39,44 @@ func NewManager(ctx context.Context, l *zerolog.Logger, pr *repo.PluginRepo, tr 
 	}
 
 	// Load data and indexes from disk concurrently.
-	wg.Add(3)
-	go loadRepo("plugins", pr.Load)
-	go loadRepo("themes", tr.Load)
-	go loadRepo("cores", cr.Load)
+	wg.Add(len(sources))
+	for _, ds := range sources {
+		go loadSource(string(ds.Type()), ds.Load)
+	}
 	wg.Wait()
 
 	if firstErr != nil {
 		return nil, firstErr
 	}
 
-	m := &Manager{pr: pr, tr: tr, cr: cr, adhocCh: make(chan repo.IndexTask, 32)}
+	srcMap := make(map[repo.ExtensionType]repo.DataSource, len(sources))
+	for _, ds := range sources {
+		srcMap[ds.Type()] = ds
+	}
+
+	m := &Manager{sources: srcMap, adhocCh: make(chan repo.IndexTask, 32)}
 	m.startUpdater(ctx, l, concurrency)
 
 	return m, nil
 }
 
+// NewTestManager creates a Manager for testing without loading data or starting
+// the updater goroutine. It is intentionally minimal so unit tests stay fast.
+func NewTestManager(l *zerolog.Logger, sources []repo.DataSource) (*Manager, error) {
+	srcMap := make(map[repo.ExtensionType]repo.DataSource, len(sources))
+	for _, ds := range sources {
+		srcMap[ds.Type()] = ds
+	}
+	return &Manager{sources: srcMap, adhocCh: make(chan repo.IndexTask, 32)}, nil
+}
+
+// GetSource returns the DataSource for the given extension type, or nil.
+func (m *Manager) GetSource(t repo.ExtensionType) repo.DataSource {
+	return m.sources[t]
+}
+
 // startUpdater runs a single background loop that collects pending work from
-// all three repos and executes it through a shared worker pool, giving you one
+// all sources and executes it through a shared worker pool, giving you one
 // place to control total concurrency via INDEXER_CONCURRENCY.
 func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurrency int) {
 	if concurrency < 1 {
@@ -69,9 +87,10 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 		sem := make(chan struct{}, concurrency)
 
 		// Resume any extensions that were saved to DB but not indexed (e.g. interrupted runs).
-		resumeTasks := m.pr.ResumeUnindexed()
-		resumeTasks = append(resumeTasks, m.tr.ResumeUnindexed()...)
-		resumeTasks = append(resumeTasks, m.cr.ResumeUnindexed()...)
+		var resumeTasks []repo.IndexTask
+		for _, ds := range m.sources {
+			resumeTasks = append(resumeTasks, ds.ResumeUnindexed()...)
+		}
 		if len(resumeTasks) > 0 {
 			l.Info().Msgf("Resuming %d unindexed extensions", len(resumeTasks))
 			var wg sync.WaitGroup
@@ -95,11 +114,11 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 			default:
 			}
 
-			// Collect tasks from all repo types
+			// Collect tasks from all sources
 			var tasks []repo.IndexTask
-			tasks = append(tasks, m.pr.PrepareUpdates()...)
-			tasks = append(tasks, m.tr.PrepareUpdates()...)
-			tasks = append(tasks, m.cr.PrepareUpdates()...)
+			for _, ds := range m.sources {
+				tasks = append(tasks, ds.PrepareUpdates()...)
+			}
 
 			if len(tasks) > 0 {
 				l.Info().Msgf("Processing %d index tasks with concurrency %d", len(tasks), concurrency)
@@ -127,7 +146,7 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 			select {
 			case <-time.After(repo.UpdateInterval):
 			case task := <-m.adhocCh:
-				l.Info().Msgf("Ad-hoc re-index request for %s: %s", task.RepoType, task.Slug)
+				l.Info().Msgf("Ad-hoc re-index request for %s: %s", task.ExtensionType, task.Slug)
 				sem <- struct{}{}
 				go func(t repo.IndexTask) {
 					defer func() { <-sem }()
@@ -160,28 +179,13 @@ func (m *Manager) drainAdhoc(sem chan struct{}) {
 // SubmitReindex queues an ad-hoc re-index task for the given extension.
 // Returns false if the extension is not found or the queue is full.
 func (m *Manager) SubmitReindex(repoType, slug string) bool {
-	var task repo.IndexTask
+	ds, ok := m.sources[repo.ExtensionType(repoType)]
+	if !ok {
+		return false
+	}
 
-	switch repoType {
-	case "plugins":
-		ext, ok := m.pr.Get(slug)
-		if !ok {
-			return false
-		}
-		task = m.pr.MakeReindexTask(ext)
-	case "themes":
-		ext, ok := m.tr.Get(slug)
-		if !ok {
-			return false
-		}
-		task = m.tr.MakeReindexTask(ext)
-	case "cores":
-		ext, ok := m.cr.Get(slug)
-		if !ok {
-			return false
-		}
-		task = m.cr.MakeReindexTask(ext)
-	default:
+	task, found := ds.MakeReindexTaskBySlug(slug)
+	if !found {
 		return false
 	}
 
@@ -191,6 +195,43 @@ func (m *Manager) SubmitReindex(repoType, slug string) bool {
 	default:
 		return false
 	}
+}
+
+// Stats returns the total and indexed counts for the given extension type.
+func (m *Manager) Stats(repoType string) (total int, indexed int, ok bool) {
+	ds, found := m.sources[repo.ExtensionType(repoType)]
+	if !found {
+		return 0, 0, false
+	}
+	total, indexed = ds.Stats()
+	return total, indexed, true
+}
+
+// IndexStatus returns a snapshot of index availability by slug for the given type.
+func (m *Manager) IndexStatus(repoType string) map[string]bool {
+	ds, ok := m.sources[repo.ExtensionType(repoType)]
+	if !ok {
+		return nil
+	}
+	return ds.IndexStatus()
+}
+
+// GetExtension retrieves an extension from the specified source.
+func (m *Manager) GetExtension(repoType string, slug string) (repo.Extension, bool) {
+	ds, ok := m.sources[repo.ExtensionType(repoType)]
+	if !ok {
+		return nil, false
+	}
+	return ds.GetExtension(slug)
+}
+
+// ResolveSourceDir returns the source directory for an extension.
+func (m *Manager) ResolveSourceDir(repoType string, slug string) (string, error) {
+	ds, ok := m.sources[repo.ExtensionType(repoType)]
+	if !ok {
+		return "", fmt.Errorf("unknown extension type: %s", repoType)
+	}
+	return ds.ResolveSourceDir(slug)
 }
 
 // SearchResult represents search results from a single extension (plugin/theme/core).
@@ -222,10 +263,15 @@ type SearchParams struct {
 	OnProgress       ProgressFunc
 }
 
-// Search searches the specified repository for the given term.
+// Search searches the specified source for the given term.
 func (m *Manager) Search(repoType string, term string, params *SearchParams) (*SearchResponse, error) {
 	if params == nil {
 		params = &SearchParams{}
+	}
+
+	ds, ok := m.sources[repo.ExtensionType(repoType)]
+	if !ok {
+		return nil, fmt.Errorf("unknown extension type: %s", repoType)
 	}
 
 	opt := &index.SearchOptions{
@@ -236,65 +282,23 @@ func (m *Manager) Search(repoType string, term string, params *SearchParams) (*S
 		MaxResults:        100,
 	}
 
+	results, err := ds.Search(term, opt, params.OnProgress)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &SearchResponse{}
-
-	switch repoType {
-	case "plugins":
-		results, err := m.pr.Search(term, opt, params.OnProgress)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, r := range results {
-			totalMatches := countMatches(r.Matches)
-			response.Results = append(response.Results, &SearchResult{
-				Slug:           r.Plugin.Slug,
-				Name:           r.Plugin.Name,
-				Version:        r.Plugin.Version,
-				ActiveInstalls: r.Plugin.ActiveInstalls,
-				Downloaded:     r.Plugin.Downloaded,
-				Matches:        r.Matches,
-				TotalMatches:   totalMatches,
-			})
-		}
-
-	case "themes":
-		results, err := m.tr.Search(term, opt, params.OnProgress)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, r := range results {
-			totalMatches := countMatches(r.Matches)
-			response.Results = append(response.Results, &SearchResult{
-				Slug:           r.Theme.Slug,
-				Name:           r.Theme.Name,
-				Version:        r.Theme.Version,
-				ActiveInstalls: r.Theme.ActiveInstalls,
-				Downloaded:     r.Theme.Downloaded,
-				Matches:        r.Matches,
-				TotalMatches:   totalMatches,
-			})
-		}
-
-	case "cores":
-		results, err := m.cr.Search(term, opt, params.OnProgress)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, r := range results {
-			totalMatches := countMatches(r.Matches)
-			response.Results = append(response.Results, &SearchResult{
-				Slug:           r.Core.Version,
-				Name:           r.Core.Name,
-				Version:        r.Core.Version,
-				ActiveInstalls: 0, // Cores don't have install counts
-				Downloaded:     0,
-				Matches:        r.Matches,
-				TotalMatches:   totalMatches,
-			})
-		}
+	for _, r := range results {
+		totalMatches := countMatches(r.Matches)
+		response.Results = append(response.Results, &SearchResult{
+			Slug:           r.Extension.GetSlug(),
+			Name:           r.Extension.GetName(),
+			Version:        r.Extension.GetVersion(),
+			ActiveInstalls: r.Extension.GetActiveInstalls(),
+			Downloaded:     r.Extension.GetDownloaded(),
+			Matches:        r.Matches,
+			TotalMatches:   totalMatches,
+		})
 	}
 
 	// Sort results by active_installs descending, then by slug for consistency
@@ -316,19 +320,4 @@ func countMatches(matches []*index.FileMatch) int {
 		total += len(fm.Matches)
 	}
 	return total
-}
-
-// GetPluginRepo returns the plugin repository.
-func (m *Manager) GetPluginRepo() *repo.PluginRepo {
-	return m.pr
-}
-
-// GetThemeRepo returns the theme repository.
-func (m *Manager) GetThemeRepo() *repo.ThemeRepo {
-	return m.tr
-}
-
-// GetCoreRepo returns the core repository.
-func (m *Manager) GetCoreRepo() *repo.CoreRepo {
-	return m.cr
 }
