@@ -26,6 +26,13 @@ const (
 	reasonInvalidMode        = "Invalid file mode."
 	reasonNotText            = "Not a text file."
 	reasonBinary             = "Binary files are excluded."
+
+	// maxLineLen is the threshold above which matched and context lines are
+	// truncated. This protects against minified files producing huge results.
+	maxLineLen = 250
+	// truncateRadius is the number of characters to keep before and after
+	// the match position when truncating a long line.
+	truncateRadius = 100
 )
 
 type Index struct {
@@ -67,6 +74,7 @@ type CompiledSearch struct {
 	rePool         sync.Pool // pool of *cregexp.Regexp; not safe to copy CompiledSearch
 	fre            *regexp.Regexp
 	excludeFre     *regexp.Regexp
+	contentRe      *regexp.Regexp // standard regexp for finding match positions within lines
 	maxResults     int
 	linesOfContext int
 	offset         int
@@ -91,6 +99,11 @@ func CompileSearch(pat string, opt *SearchOptions) (*CompiledSearch, error) {
 		return nil, err
 	}
 
+	contentRe, err := regexp.Compile(fullPat)
+	if err != nil {
+		return nil, err
+	}
+
 	cs := &CompiledSearch{
 		query:   cindex.RegexpQuery(cre.Syntax),
 		pattern: fullPat,
@@ -101,6 +114,7 @@ func CompileSearch(pat string, opt *SearchOptions) (*CompiledSearch, error) {
 				return re
 			},
 		},
+		contentRe:      contentRe,
 		maxResults:     opt.MaxResults,
 		linesOfContext: int(min(opt.LinesOfContext, uint(math.MaxInt))), // #nosec G115 -- clamped to MaxInt
 		offset:         opt.Offset,
@@ -217,7 +231,7 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 			continue
 		}
 
-		matches := grepData(data, re, cs.linesOfContext, cs.maxResults-matchesCollected)
+		matches := grepData(data, re, cs.contentRe, cs.linesOfContext, cs.maxResults-matchesCollected)
 
 		if len(matches) > 0 {
 			filesFound++
@@ -467,19 +481,51 @@ func readSourceFileBuf(filename string, buf *bytes.Buffer) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// truncateMatchLine shortens a long line around the match position.
+// For lines longer than maxLineLen, it uses fre to find where the match occurs
+// and returns up to truncateRadius characters before and after it.
+func truncateMatchLine(line string, fre *regexp.Regexp) string {
+	if len(line) <= maxLineLen {
+		return line
+	}
+
+	center := 0
+	if fre != nil {
+		if loc := fre.FindStringIndex(line); loc != nil {
+			center = loc[0]
+		}
+	}
+
+	start := max(center-truncateRadius, 0)
+	end := min(center+truncateRadius, len(line))
+
+	return line[start:end]
+}
+
+// truncateContextLines caps each context line to maxLineLen characters.
+func truncateContextLines(lines []string) []string {
+	for i, line := range lines {
+		if len(line) > maxLineLen {
+			lines[i] = line[:maxLineLen]
+		}
+	}
+	return lines
+}
+
 // grepFile searches a file for lines matching the regex and returns matches with context.
 // Uses the codesearch DFA regexp engine on a whole-file buffer, jumping directly between
 // matches without scanning non-matching lines.
-func grepFile(filename string, re *cregexp.Regexp, contextLines int, maxMatches int) ([]*Match, error) {
+func grepFile(filename string, re *cregexp.Regexp, fre *regexp.Regexp, contextLines int, maxMatches int) ([]*Match, error) {
 	buf, err := readSourceFile(filename)
 	if err != nil {
 		return nil, err
 	}
-	return grepData(buf, re, contextLines, maxMatches), nil
+	return grepData(buf, re, fre, contextLines, maxMatches), nil
 }
 
 // grepData searches a byte buffer for lines matching the regex and returns matches with context.
-func grepData(buf []byte, re *cregexp.Regexp, contextLines int, maxMatches int) []*Match {
+// fre is the standard regexp used to locate match positions for truncating long lines.
+func grepData(buf []byte, re *cregexp.Regexp, fre *regexp.Regexp, contextLines int, maxMatches int) []*Match {
 	var (
 		matches    []*Match
 		chunkStart int
@@ -504,6 +550,7 @@ func grepData(buf []byte, re *cregexp.Regexp, contextLines int, maxMatches int) 
 
 		// Extract matched line without trailing newline/CR
 		line := string(bytes.TrimRight(buf[lineStart:lineEnd], "\r\n"))
+		line = truncateMatchLine(line, fre)
 
 		match := &Match{
 			Line:       line,
@@ -511,8 +558,8 @@ func grepData(buf []byte, re *cregexp.Regexp, contextLines int, maxMatches int) 
 		}
 
 		if contextLines > 0 {
-			match.Before = extractBeforeContext(buf, lineStart, contextLines)
-			match.After = extractAfterContext(buf, lineEnd, contextLines)
+			match.Before = truncateContextLines(extractBeforeContext(buf, lineStart, contextLines))
+			match.After = truncateContextLines(extractAfterContext(buf, lineEnd, contextLines))
 		}
 
 		matches = append(matches, match)

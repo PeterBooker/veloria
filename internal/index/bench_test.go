@@ -126,7 +126,7 @@ func BenchmarkGrepFile(b *testing.B) {
 					b.ResetTimer()
 
 					for b.Loop() {
-						_, err := grepFile(srcFile, re, 0, 1000)
+						_, err := grepFile(srcFile, re, nil, 0, 1000)
 						if err != nil {
 							b.Fatal(err)
 						}
@@ -156,7 +156,7 @@ func BenchmarkGrepFileContext(b *testing.B) {
 			b.ResetTimer()
 
 			for b.Loop() {
-				_, err := grepFile(srcFile, re, ctx, 1000)
+				_, err := grepFile(srcFile, re, nil, ctx, 1000)
 				if err != nil {
 					b.Fatal(err)
 				}
