@@ -52,7 +52,19 @@ func main() {
 		log.Fatal("--wpdir-db is required")
 	}
 
+	if dryRun {
+		log.Println("mode: dry-run (no writes will be performed)")
+	} else {
+		log.Println("mode: live import")
+	}
+
 	// Open wpdir BoltDB read-only.
+	fi, err := os.Stat(wpDirDB)
+	if err != nil {
+		log.Fatalf("cannot stat wpdir db %q: %v", wpDirDB, err)
+	}
+	log.Printf("opening wpdir db: %s (%.2f MB)", wpDirDB, float64(fi.Size())/(1024*1024))
+
 	boltDB, err := bolt.Open(wpDirDB, 0o600, &bolt.Options{
 		ReadOnly: true,
 		Timeout:  5 * time.Second,
@@ -90,10 +102,12 @@ func main() {
 		}
 
 		// Connect to veloria PostgreSQL.
+		log.Printf("connecting to database: %s:%d/%s", c.DBHost, c.DBPort, c.DBName)
 		db, err = openDB(c)
 		if err != nil {
 			log.Fatalf("failed to connect to database: %v", err)
 		}
+		log.Println("database connection established")
 		sqlDB, err := db.DB()
 		if err != nil {
 			log.Fatalf("failed to get underlying sql.DB: %v", err)
@@ -105,6 +119,7 @@ func main() {
 		}()
 
 		// Initialize S3.
+		log.Printf("connecting to S3: endpoint=%s bucket=%s ssl=%v", c.S3Endpoint, c.S3Bucket, c.S3UseSSL)
 		zl := zerolog.New(os.Stderr).With().Timestamp().Logger()
 		s3Client, err := storage.NewS3Client(c, &zl)
 		if err != nil {
@@ -113,9 +128,12 @@ func main() {
 		if err := s3Client.EnsureBucket(context.Background()); err != nil {
 			log.Fatalf("failed to ensure S3 bucket: %v", err)
 		}
+		log.Println("S3 connection established")
 		s3 = s3Client
 	}
 
+	log.Printf("starting import of %d searches...", len(searchIDs))
+	importStart := time.Now()
 	var stats importStats
 	bar := newProgress(len(searchIDs))
 	for i, wpID := range searchIDs {
@@ -128,8 +146,8 @@ func main() {
 	bar.set(len(searchIDs), "done")
 	bar.finish()
 
-	log.Printf("import complete: %d imported, %d skipped (not completed), %d skipped (duplicate), %d skipped (invalid), %d errors",
-		stats.imported, stats.skippedStatus, stats.skippedDup, stats.skippedInvalid, stats.errors)
+	log.Printf("import complete in %s: %d imported, %d skipped (not completed), %d skipped (duplicate), %d skipped (invalid), %d errors",
+		time.Since(importStart).Truncate(time.Millisecond), stats.imported, stats.skippedStatus, stats.skippedDup, stats.skippedInvalid, stats.errors)
 }
 
 type importStats struct {
@@ -254,6 +272,7 @@ func importSearch(boltDB *bolt.DB, db *gorm.DB, s3 storage.ResultStorage, wpID s
 
 	// Only import completed searches.
 	if wpSearch.Status != wpdirpb.Search_Completed {
+		bar.logf("skipping search %s: status=%s (not completed)", wpID, wpSearch.Status)
 		stats.skippedStatus++
 		return nil
 	}
@@ -303,6 +322,7 @@ func importSearch(boltDB *bolt.DB, db *gorm.DB, s3 storage.ResultStorage, wpID s
 		return fmt.Errorf("dedup check failed: %w", err)
 	}
 	if count > 0 {
+		bar.logf("skipping search %s: duplicate (term=%q repo=%s created=%s already exists)", wpID, wpSearch.Input, wpSearch.Repo, createdAt.Format(time.RFC3339))
 		stats.skippedDup++
 		return nil
 	}
@@ -325,19 +345,23 @@ func importSearch(boltDB *bolt.DB, db *gorm.DB, s3 storage.ResultStorage, wpID s
 	}
 
 	// Build veloria SearchResponse from summary + per-slug matches.
+	bar.logf("search %s: building response from %d extensions", wpID, len(wpSummary.GetList()))
 	veloriaResp, totalMatches, err := buildSearchResponse(boltDB, wpID, &wpSummary, bar)
 	if err != nil {
 		return fmt.Errorf("building search response: %w", err)
 	}
+	bar.logf("search %s: assembled %d extensions, %d total matches", wpID, len(veloriaResp.GetResults()), totalMatches)
 
 	// Upload to S3 with timeout.
 	newID := uuid.New()
+	s3Start := time.Now()
 	s3Ctx, s3Cancel := context.WithTimeout(context.Background(), s3Timeout)
 	defer s3Cancel()
 	size, err := s3.UploadResult(s3Ctx, newID.String(), veloriaResp)
 	if err != nil {
 		return fmt.Errorf("uploading to S3: %w", err)
 	}
+	bar.logf("search %s: uploaded to S3 (%.2f KB, %s)", wpID, float64(size)/1024, time.Since(s3Start).Truncate(time.Millisecond))
 
 	// Insert search record into PostgreSQL.
 	totalExtensions := len(wpSummary.GetList())
@@ -386,14 +410,15 @@ func buildSearchResponse(boltDB *bolt.DB, wpID string, summary *wpdirpb.Summary,
 			return err
 		}
 		for slug := range summaryList {
-			raw := data.Get([]byte(wpID + "_matches_" + slug))
+			key := wpID + "_matches_" + slug
+			raw := data.Get([]byte(key))
 			if raw == nil {
 				bar.logf("warning: no match data stored for search=%s slug=%s (matches will be empty)", wpID, slug)
 				continue
 			}
 			var m wpdirpb.Matches
 			if err := proto.Unmarshal(raw, &m); err != nil {
-				return fmt.Errorf("unmarshalling matches for slug %q: %w", slug, err)
+				return fmt.Errorf("unmarshalling matches for slug %q (%d bytes): %w", slug, len(raw), err)
 			}
 			matchesBySlug[slug] = &m
 		}
