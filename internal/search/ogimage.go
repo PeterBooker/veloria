@@ -79,5 +79,5 @@ func OGImage(d *web.Deps, gen *ogimage.Generator) http.HandlerFunc {
 func writeImage(w http.ResponseWriter, data []byte) {
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
-	w.Write(data)
+	_, _ = w.Write(data)
 }

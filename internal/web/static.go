@@ -15,6 +15,6 @@ func StaticImage(fsys fs.FS, filename string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/png")
 		w.Header().Set("Cache-Control", "public, max-age=604800, immutable")
-		w.Write(data)
+		_, _ = w.Write(data)
 	}
 }

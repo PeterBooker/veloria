@@ -25,7 +25,7 @@ func New(fsys fs.FS) (*Generator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open base image: %w", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // best-effort close on read-only file
 
 	baseImg, err := png.Decode(f)
 	if err != nil {

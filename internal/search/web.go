@@ -242,12 +242,12 @@ func ExportCSV(d *web.Deps) http.HandlerFunc {
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="search-%s.csv"`, s.ID))
 
 		cw := csv.NewWriter(w)
-		cw.Write([]string{"Extension", "Slug", "Version", "Active Installs", "File", "Line Number", "Line"})
+		_ = cw.Write([]string{"Extension", "Slug", "Version", "Active Installs", "File", "Line Number", "Line"})
 
 		for _, result := range results.Results {
 			for _, fm := range result.Matches {
 				for _, m := range fm.Matches {
-					cw.Write([]string{
+					_ = cw.Write([]string{
 						result.Name,
 						result.Slug,
 						result.Version,
