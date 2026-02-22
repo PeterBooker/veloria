@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -27,8 +28,12 @@ func ReposPage(d *Deps) http.HandlerFunc {
 			BuildRepoSummary("cores", "Core", coreTotal, coreIndexed),
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = "Repositories - Veloria"
+		pd.OG.Description = "Browse WordPress plugin, theme, and core repositories indexed by Veloria."
+
 		data := ReposData{
-			PageData:      d.PageData(r),
+			PageData:      pd,
 			RepoSummaries: repoSummaries,
 		}
 
@@ -80,8 +85,12 @@ func RepoPage(d *Deps) http.HandlerFunc {
 			return
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = fmt.Sprintf("%s Repository - Veloria", title)
+		pd.OG.Description = fmt.Sprintf("Browse %d %s (%d indexed) in the Veloria code search index.", total, repoType, indexed)
+
 		data := RepoData{
-			PageData:           d.PageData(r),
+			PageData:           pd,
 			RepoSummary:        BuildRepoSummary(repoType, title, total, indexed),
 			ActiveInstalls:     activeInstalls,
 			FileCount:          fileCount,

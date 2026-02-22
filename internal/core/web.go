@@ -44,8 +44,12 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			indexStatus = d.Stats.IndexStatus("cores")
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = row.Name + " - Veloria"
+		pd.OG.Description = "WordPress " + row.Version + " core source code indexed by Veloria."
+
 		data := web.ExtensionData{
-			PageData:     d.PageData(r),
+			PageData:     pd,
 			RepoType:     "cores",
 			Name:         row.Name,
 			Slug:         row.Version,

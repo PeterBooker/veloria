@@ -5,8 +5,12 @@ import "net/http"
 // AboutPage renders the about page.
 func AboutPage(d *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		pd := d.PageData(r)
+		pd.OG.Title = "About - Veloria"
+		pd.OG.Description = "Learn about Veloria, the open-source WordPress code search engine."
+
 		data := struct{ PageData }{
-			PageData: d.PageData(r),
+			PageData: pd,
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

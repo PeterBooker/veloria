@@ -51,8 +51,12 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			return
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = fmt.Sprintf("Search \"%s\" - Veloria", s.Term)
+		pd.OG.Description = fmt.Sprintf("Code search for \"%s\" in %s.", s.Term, s.Repo)
+
 		data := web.SearchViewData{
-			PageData: d.PageData(r),
+			PageData: pd,
 			Search:   s,
 		}
 		if s.CompletedAt != nil {
@@ -72,6 +76,14 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			}
 			if s.TotalExtensions != nil {
 				data.TotalExtensions = *s.TotalExtensions
+			}
+			data.OG.Description = fmt.Sprintf(
+				"%d matches across %d %s for \"%s\".",
+				data.TotalMatches, data.TotalExtensions, s.Repo, s.Term,
+			)
+			appURL := d.Config.AppURL
+			if appURL != "" {
+				data.OG.Image = appURL + "/search/" + s.ID.String() + "/og.png"
 			}
 		}
 
@@ -402,8 +414,12 @@ func ListPage(d *web.Deps) http.HandlerFunc {
 			summaries[i] = web.BuildSearchSummary(s)
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = "Recent Searches - Veloria"
+		pd.OG.Description = "Browse recent WordPress code searches on Veloria."
+
 		data := web.SearchesData{
-			PageData:   d.PageData(r),
+			PageData:   pd,
 			Searches:   summaries,
 			Page:       page,
 			TotalPages: totalPages,
@@ -456,8 +472,12 @@ func MyListPage(d *web.Deps) http.HandlerFunc {
 			summaries[i] = web.BuildSearchSummary(s)
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = "My Searches - Veloria"
+		pd.OG.Description = "View and manage your WordPress code searches on Veloria."
+
 		data := web.MySearchesData{
-			PageData:   d.PageData(r),
+			PageData:   pd,
 			Searches:   summaries,
 			Page:       page,
 			TotalPages: totalPages,
