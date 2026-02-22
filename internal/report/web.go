@@ -2,6 +2,7 @@ package report
 
 import (
 	"fmt"
+	"html"
 	"math"
 	"net/http"
 	"strconv"
@@ -181,6 +182,6 @@ func ResolveReport(d *web.Deps) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = fmt.Fprintf(w, `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-green-50 text-green-600 border border-green-200">Resolved by %s</span>`, currentUser.Name)
+		_, _ = fmt.Fprintf(w, `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-green-50 text-green-600 border border-green-200">Resolved by %s</span>`, html.EscapeString(currentUser.Name))
 	}
 }
