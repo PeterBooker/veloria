@@ -132,6 +132,16 @@
             <span class="text-gray-900 font-semibold">{{formatNumber .TotalMatches}}</span> matches across
             <span class="text-brand-600 font-semibold">{{formatNumber .TotalExtensions}}</span> extensions
         </p>
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+        <a href="/search/{{.Search.ID}}/export"
+           class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-white/40 border border-white/50 rounded-lg hover:bg-white/60 transition shrink-0">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export CSV
+        </a>
         <div class="relative w-full sm:max-w-xs">
             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
@@ -148,6 +158,7 @@
                 hx-include="this"
                 class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/50 border border-white/60 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition"
             >
+        </div>
         </div>
     </div>
 

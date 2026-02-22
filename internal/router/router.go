@@ -125,6 +125,7 @@ func New(deps RouterDeps) *chi.Mux {
 		r.Get("/search/{uuid}/context", search.ContextPage(deps.WebDeps))
 		r.Get("/search/{uuid}/extensions", search.SearchExtensionsPartial(deps.WebDeps))
 		r.Get("/search/{uuid}/extension/{slug}", search.ExtensionResultsPage(deps.WebDeps))
+		r.Get("/search/{uuid}/export", search.ExportCSV(deps.WebDeps))
 		r.Post("/search", search.SubmitSearch(deps.WebDeps))
 		r.Get("/my-searches", search.MyListPage(deps.WebDeps))
 
