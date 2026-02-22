@@ -19,7 +19,8 @@ var (
 	ErrDownloadNotFound = errors.New("download not found")
 )
 
-// Extension defines the common interface for all WordPress extension types.
+// Extension defines the data contract for all WordPress extension types.
+// This is the narrow interface used by API handlers, templates, and search results.
 type Extension interface {
 	GetSlug() string
 	GetSource() string
@@ -27,21 +28,16 @@ type Extension interface {
 	GetVersion() string
 	GetDownloadLink() string
 	GetActiveInstalls() int
+	GetDownloaded() int
+}
 
-	// IndexedExtension wiring
+// Indexable extends Extension with index wiring methods.
+// This is the constraint for the generic ExtensionStore[T] and is used
+// internally by the store and manager — not by API handlers or templates.
+type Indexable interface {
+	Extension
 	GetIndexedExtension() *IndexedExtension
 	SetIndexedExtension(ext *IndexedExtension)
-
-	// Index management
-	GetIndex() *index.Index
-	SetIndex(idx *index.Index)
-	HasIndex() bool
-	Search(term string, opt *index.SearchOptions) (*index.SearchResponse, error)
-	UpdateIndex(idx *index.Index)
-
-	// Update locking
-	LockUpdates()
-	UnlockUpdates()
 }
 
 // IndexedExtension provides index management for extensions.

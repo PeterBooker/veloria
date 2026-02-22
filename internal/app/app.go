@@ -92,13 +92,13 @@ func New(ctx context.Context) (*App, error) {
 		_ = a.Tasks.AddJob(workerCtx, "search-cleanup", tasks.CleanupStuckSearches(a.DB, l), tasks.SearchCleanupInterval)
 		a.Tasks.Start()
 
-		repo.SetAPIKey(c.AspireCloudAPIKey)
+		apiClient := repo.NewAPIClient(c.AspireCloudAPIKey)
 
-		pr := repo.NewPluginRepo(workerCtx, a.DB, c, l, appCache)
-		tr := repo.NewThemeRepo(workerCtx, a.DB, c, l, appCache)
-		cr := repo.NewCoreRepo(workerCtx, a.DB, c, l, appCache)
+		pr := repo.NewPluginStore(workerCtx, a.DB, c, l, appCache, apiClient)
+		tr := repo.NewThemeStore(workerCtx, a.DB, c, l, appCache, apiClient)
+		cr := repo.NewCoreStore(workerCtx, a.DB, c, l, appCache, apiClient)
 
-		m, err := manager.NewManager(workerCtx, l, pr, tr, cr, c.IndexerConcurrency)
+		m, err := manager.NewManager(workerCtx, l, []repo.DataSource{pr, tr, cr}, c.IndexerConcurrency)
 		if err != nil {
 			l.Error().Err(err).Msg("Failed to load repositories; running in no-search mode")
 		} else {
@@ -143,15 +143,35 @@ func New(ctx context.Context) (*App, error) {
 		}
 		l.Warn().Msgf("Search disabled: %s", searchDisabledReason)
 	}
-	deps := web.NewDeps(tmpl, a.DB, a.Manager, a.S3, appCache, c, searchEnabled, searchDisabledReason)
+	deps := web.NewDeps(tmpl, a.DB, a.Manager, a.Manager, a.Manager, a.Manager, a.S3, appCache, c, searchEnabled, searchDisabledReason)
 
-	r := router.New(l, nil, a.DB, a.Manager, a.S3, deps, a.SessionStore, a.AuthHandler, router.Options{
-		HandlerTimeout:   c.HTTPHandlerTimeout,
-		SearchEnabled:    searchEnabled,
-		RateLimitEnabled: c.HTTPRateLimitEnabled,
-		LoggingEnabled:   c.HTTPLoggingEnabled,
-		AppURL:           c.AppURL,
-		RedirectDomains:  c.RedirectDomains,
+	// Build per-type stats map for the router's API list handlers.
+	var statsMap map[string]manager.RepoStatsProvider
+	if a.Manager != nil {
+		statsMap = map[string]manager.RepoStatsProvider{
+			"plugins": a.Manager.GetSource(repo.TypePlugins),
+			"themes":  a.Manager.GetSource(repo.TypeThemes),
+			"cores":   a.Manager.GetSource(repo.TypeCores),
+		}
+	}
+
+	r := router.New(router.RouterDeps{
+		Logger:  l,
+		DB:      a.DB,
+		Search:  a.Manager,
+		Stats:   statsMap,
+		S3:      a.S3,
+		WebDeps: deps,
+		Session: a.SessionStore,
+		Auth:    a.AuthHandler,
+		Options: router.Options{
+			HandlerTimeout:   c.HTTPHandlerTimeout,
+			SearchEnabled:    searchEnabled,
+			RateLimitEnabled: c.HTTPRateLimitEnabled,
+			LoggingEnabled:   c.HTTPLoggingEnabled,
+			AppURL:           c.AppURL,
+			RedirectDomains:  c.RedirectDomains,
+		},
 	})
 
 	srv, err := server.New(r, c, l)

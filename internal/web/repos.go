@@ -13,13 +13,13 @@ import (
 // ReposPage renders the repositories listing page.
 func ReposPage(d *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.Manager == nil {
+		if d.Stats == nil {
 			http.Error(w, "Repositories are unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
-		pluginTotal, pluginIndexed := d.Manager.GetPluginRepo().Stats()
-		themeTotal, themeIndexed := d.Manager.GetThemeRepo().Stats()
-		coreTotal, coreIndexed := d.Manager.GetCoreRepo().Stats()
+		pluginTotal, pluginIndexed, _ := d.Stats.Stats("plugins")
+		themeTotal, themeIndexed, _ := d.Stats.Stats("themes")
+		coreTotal, coreIndexed, _ := d.Stats.Stats("cores")
 
 		repoSummaries := []RepoSummary{
 			BuildRepoSummary("plugins", "Plugins", pluginTotal, pluginIndexed),
@@ -42,7 +42,7 @@ func ReposPage(d *Deps) http.HandlerFunc {
 // RepoPage renders a single repository view.
 func RepoPage(d *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.Manager == nil || d.DB == nil {
+		if d.Stats == nil || d.DB == nil {
 			http.Error(w, "Repository data is unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
@@ -56,21 +56,21 @@ func RepoPage(d *Deps) http.HandlerFunc {
 
 		switch repoType {
 		case "plugins":
-			total, indexed = d.Manager.GetPluginRepo().Stats()
+			total, indexed, _ = d.Stats.Stats("plugins")
 			title = "Plugins"
 			activeInstalls = fetchActiveInstallsChart(d, "plugins")
 			fileCount, fileSize = fetchFileStatsCharts(d, "plugins")
 			largestBySize = fetchLargestExtensions(d, "plugins", 25, "total_size")
 			largestByFileCount = fetchLargestExtensions(d, "plugins", 25, "file_count")
 		case "themes":
-			total, indexed = d.Manager.GetThemeRepo().Stats()
+			total, indexed, _ = d.Stats.Stats("themes")
 			title = "Themes"
 			activeInstalls = fetchActiveInstallsChart(d, "themes")
 			fileCount, fileSize = fetchFileStatsCharts(d, "themes")
 			largestBySize = fetchLargestExtensions(d, "themes", 25, "total_size")
 			largestByFileCount = fetchLargestExtensions(d, "themes", 25, "file_count")
 		case "cores":
-			total, indexed = d.Manager.GetCoreRepo().Stats()
+			total, indexed, _ = d.Stats.Stats("cores")
 			title = "Core"
 			fileCount, fileSize = fetchFileStatsCharts(d, "cores")
 			largestBySize = fetchLargestExtensions(d, "cores", 25, "total_size")
@@ -100,7 +100,7 @@ func RepoPage(d *Deps) http.HandlerFunc {
 // RepoItemsPartial renders the paginated, searchable items list as an HTMX partial.
 func RepoItemsPartial(d *Deps, repoType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.Manager == nil || d.DB == nil {
+		if d.Stats == nil || d.DB == nil {
 			http.Error(w, "Repository data is unavailable.", http.StatusServiceUnavailable)
 			return
 		}
@@ -183,7 +183,7 @@ func fetchPluginItems(d *Deps, page int, pageSize int, search string) ([]RepoIte
 		Offset(offset).
 		Scan(&rows)
 
-	indexStatus := d.Manager.GetPluginRepo().IndexStatus()
+	indexStatus := d.Stats.IndexStatus("plugins")
 	items := make([]RepoItem, len(rows))
 	for i, row := range rows {
 		items[i] = RepoItem{
@@ -231,7 +231,7 @@ func fetchThemeItems(d *Deps, page int, pageSize int, search string) ([]RepoItem
 		Offset(offset).
 		Scan(&rows)
 
-	indexStatus := d.Manager.GetThemeRepo().IndexStatus()
+	indexStatus := d.Stats.IndexStatus("themes")
 	items := make([]RepoItem, len(rows))
 	for i, row := range rows {
 		items[i] = RepoItem{
@@ -275,7 +275,7 @@ func fetchCoreItems(d *Deps, page int, pageSize int, search string) ([]RepoItem,
 		Offset(offset).
 		Scan(&rows)
 
-	indexStatus := d.Manager.GetCoreRepo().IndexStatus()
+	indexStatus := d.Stats.IndexStatus("cores")
 	items := make([]RepoItem, len(rows))
 	for i, row := range rows {
 		items[i] = RepoItem{

@@ -17,10 +17,10 @@ var localThemeSlugs = []string{
 	"oceanwp",
 }
 
-func FetchLocalThemes(ctx context.Context) ([]Theme, error) {
+func FetchLocalThemes(ctx context.Context, api *APIClient) ([]Theme, error) {
 	var themes []Theme
 	for _, slug := range localThemeSlugs {
-		p, err := FetchThemeInfo(ctx, slug)
+		p, err := FetchThemeInfo(ctx, api, slug)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch theme info for %s: %w", slug, err)
 		}

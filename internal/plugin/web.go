@@ -50,8 +50,8 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		indexStatus := map[string]bool{}
-		if d.Manager != nil {
-			indexStatus = d.Manager.GetPluginRepo().IndexStatus()
+		if d.Stats != nil {
+			indexStatus = d.Stats.IndexStatus("plugins")
 		}
 
 		data := web.ExtensionData{

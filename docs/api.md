@@ -1,236 +1,213 @@
-# API Reference
+# REST API Reference
 
-Veloria exposes a RESTful JSON API for searching WordPress code.
+All API endpoints are under `/api/v1/`. Requests must include `Content-Type: application/json`.
 
-## Base URL
+Rate limiting is enabled by default: 100 requests/minute for general API routes, 10 requests/minute for search.
 
-```
-http://localhost:9071/api/v1
-```
+## Response Format
 
-## Authentication
+All responses follow a consistent envelope:
 
-Currently no authentication is required. Rate limiting is enabled by default.
-
-## Endpoints
-
-### Health Check
-
-```
-GET /up
-```
-
-Returns `200 OK` if the service is running.
-
-### Metrics
-
-```
-GET /metrics
-```
-
-Returns Prometheus metrics in text format.
-
----
-
-## Search
-
-### Create Search
-
-Performs a code search across the specified repository.
-
-```
-POST /api/v1/search
-```
-
-#### Request Body
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `term` | string | Yes | The search term or pattern |
-| `repo` | string | No | Repository to search: `plugins`, `themes`, or `cores`. Defaults to `plugins` |
-| `file_match` | string | No | Regex pattern to filter filenames |
-| `case_sensitive` | boolean | No | Enable case-sensitive search. Defaults to `false` |
-
-#### Example Request
-
-```bash
-curl -X POST http://localhost:9071/api/v1/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "term": "wp_enqueue_script",
-    "repo": "plugins",
-    "file_match": "\\.php$",
-    "case_sensitive": false
-  }'
-```
-
-#### Response
-
+**Success:**
 ```json
 {
-  "term": "wp_enqueue_script",
-  "repo": "plugins",
-  "results": [
-    {
-      "slug": "woocommerce",
-      "name": "WooCommerce",
-      "version": "8.5.2",
-      "active_installs": 5000000,
-      "matches": [
-        {
-          "filename": "woocommerce/includes/class-wc-frontend-scripts.php",
-          "matches": [
-            {
-              "line": "        wp_enqueue_script( 'wc-cart', ... );",
-              "line_number": 245,
-              "before": [],
-              "after": []
-            }
-          ]
-        }
-      ],
-      "total_matches": 42
-    }
-  ],
-  "total": 1
+  "status": 200,
+  "data": { ... }
 }
 ```
 
-#### Response Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `term` | string | The search term used |
-| `repo` | string | The repository searched |
-| `results` | array | Array of extension results |
-| `results[].slug` | string | Extension slug (or version for cores) |
-| `results[].name` | string | Extension display name |
-| `results[].version` | string | Current version |
-| `results[].active_installs` | integer | Active install count (0 for cores) |
-| `results[].matches` | array | File matches within this extension |
-| `results[].matches[].filename` | string | Relative file path |
-| `results[].matches[].matches` | array | Line matches within the file |
-| `results[].matches[].matches[].line` | string | The matching line content |
-| `results[].matches[].matches[].line_number` | integer | 1-indexed line number |
-| `results[].total_matches` | integer | Total line matches in this extension |
-| `total` | integer | Total extensions with matches |
-
-Results are sorted by `active_installs` descending, then by `slug` alphabetically.
-
----
-
-### View Search
-
-Retrieves a previously saved search by ID.
-
+**Error:**
+```json
+{
+  "status": 400,
+  "message": "invalid UUID"
+}
 ```
-GET /api/v1/search/{id}
-```
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `id` | UUID | The search record ID |
-
-#### Example Request
-
-```bash
-curl http://localhost:9071/api/v1/search/550e8400-e29b-41d4-a716-446655440000
-```
-
----
 
 ## Plugins
 
-### View Plugin
+### GET /api/v1/plugin/{id}
 
-Retrieves metadata for a single plugin.
+Get a single plugin by UUID.
 
-```
-GET /api/v1/plugin/{id}
-```
+**Parameters:**
+- `id` (path) — Plugin UUID
 
-#### Parameters
+**Response:** Full plugin object.
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `id` | UUID | The plugin's internal ID |
+**Errors:**
+- `400` — Invalid UUID format
+- `404` — Plugin not found
+- `503` — Plugins unavailable (no database)
 
-#### Response
+### GET /api/v1/plugins/
 
+List all plugins with pagination.
+
+**Query Parameters:**
+- `page` (int, default: 1) — Page number
+- `per_page` (int, default: 100) — Items per page
+
+**Response:**
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "name": "WooCommerce",
-  "slug": "woocommerce",
-  "version": "8.5.2",
-  "requires": "6.4",
-  "tested": "6.5",
-  "requires_php": "7.4",
-  "rating": 92,
-  "active_installs": 5000000,
-  "downloaded": 350000000,
-  "short_description": "An eCommerce toolkit that helps you sell anything.",
-  "download_link": "https://downloads.wordpress.org/plugin/woocommerce.8.5.2.zip",
-  "tags": {
-    "ecommerce": "ecommerce",
-    "store": "store"
+  "status": 200,
+  "data": {
+    "items": [
+      {
+        "id": "uuid",
+        "name": "Plugin Name",
+        "slug": "plugin-slug",
+        "version": "1.0.0",
+        "updated_at": "2026-02-22T00:00:00Z",
+        "indexed": true
+      }
+    ],
+    "total": 50000,
+    "indexed": 48000,
+    "page": 1,
+    "per_page": 100
   }
 }
 ```
 
----
-
 ## Themes
 
-### View Theme
+### GET /api/v1/theme/{id}
 
-```
-GET /api/v1/theme/{id}
-```
+Get a single theme by UUID.
 
-*Currently not implemented - returns 404.*
+**Parameters:**
+- `id` (path) — Theme UUID
 
----
+**Errors:**
+- `400` — Invalid UUID format
+- `404` — Theme not found
+- `503` — Themes unavailable
+
+### GET /api/v1/themes/
+
+List all themes with pagination. Same query parameters and response format as plugins.
 
 ## Cores
 
-### View Core
+### GET /api/v1/core/{id}
 
+Get a single core (WordPress version) by UUID.
+
+**Parameters:**
+- `id` (path) — Core UUID
+
+**Errors:**
+- `400` — Invalid UUID format
+- `404` — Core not found
+- `503` — Cores unavailable
+
+### GET /api/v1/cores/
+
+List all cores with pagination. Same query parameters and response format as plugins.
+
+## Search
+
+### POST /api/v1/search/
+
+Create a new code search. This is an asynchronous operation — the search is queued and results are polled via the GET endpoint.
+
+**Request Body:**
+```json
+{
+  "term": "wp_enqueue_script",
+  "repo": "plugins",
+  "file_match": "\\.php$",
+  "exclude_file_match": "vendor/",
+  "case_sensitive": false,
+  "public": true
+}
 ```
-GET /api/v1/core/{id}
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `term` | string | yes | Search term (regex supported) |
+| `repo` | string | yes | Extension type: `plugins`, `themes`, or `cores` |
+| `file_match` | string | no | Regex to include only matching filenames |
+| `exclude_file_match` | string | no | Regex to exclude matching filenames |
+| `case_sensitive` | bool | no | Case-sensitive search (default: false) |
+| `public` | bool | no | Whether the search is publicly visible (default: true) |
+
+**Response:**
+```json
+{
+  "status": 200,
+  "data": {
+    "id": "uuid",
+    "term": "wp_enqueue_script",
+    "repo": "plugins",
+    "status": "queued",
+    "created_at": "2026-02-22T00:00:00Z"
+  }
+}
 ```
 
-*Currently not implemented - returns 404.*
+**Errors:**
+- `400` — Missing or invalid fields
+- `503` — Search unavailable
 
----
+### GET /api/v1/search/{id}
 
-## Error Responses
+Get search status and results.
 
-All endpoints return errors in plain text format with appropriate HTTP status codes.
+**Parameters:**
+- `id` (path) — Search UUID
 
-| Status Code | Description |
-|-------------|-------------|
-| 400 | Bad Request - Invalid input or missing required fields |
-| 404 | Not Found - Resource doesn't exist |
-| 500 | Internal Server Error - Server-side error |
+**Response:** The search object, including results if the search is completed. Results are stored in S3 and loaded on demand.
 
-### Example Error Response
+Search status values: `queued`, `in_progress`, `completed`, `failed`.
 
-```
-HTTP/1.1 400 Bad Request
-Content-Type: text/plain
+**Errors:**
+- `400` — Invalid UUID format
+- `404` — Search not found
 
-term is a required field
-```
+### GET /api/v1/searches/
 
----
+List recent searches with pagination. Same pagination parameters as other list endpoints.
 
-## Rate Limiting
+## Health Check
 
-Rate limiting is enabled by default. The service uses chi middleware for request throttling. Configure via the `HTTP_RATE_LIMIT_ENABLED` environment variable.
+### GET /up
 
-## Request Timeout
+Returns `200 OK` with an empty body. No authentication or content-type required.
 
-All requests have a 5-second timeout configured via middleware.
+## Metrics
+
+### GET /metrics
+
+Prometheus-format metrics endpoint.
+
+## Web Routes
+
+These serve the HTML web interface:
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | Home page |
+| GET | `/about` | About page |
+| GET | `/repos` | Repository overview |
+| GET | `/repos/{type}` | Repository detail (plugins/themes/cores) |
+| GET | `/repos/plugins/{slug}` | Plugin detail page |
+| GET | `/repos/themes/{slug}` | Theme detail page |
+| GET | `/repos/cores/{version}` | Core detail page |
+| GET | `/searches` | Public search list |
+| GET | `/search/{uuid}` | Search result page |
+| POST | `/search` | Submit search (web form) |
+| GET | `/my-searches` | Current user's searches |
+| GET | `/login` | OAuth login page |
+| GET | `/logout` | Logout |
+
+## Admin Routes (Require Authentication + Admin Role)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/reports` | View flagged search reports |
+| POST | `/admin/reports/{id}/resolve` | Resolve a report |
+| POST | `/admin/search/{uuid}/visibility` | Toggle search visibility |
+| POST | `/admin/reindex` | Queue ad-hoc reindex (form: `repo_type`, `slug`) |

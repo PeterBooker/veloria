@@ -31,24 +31,25 @@ const (
 	globalMatchCap   = 100_000
 )
 
-// RepoType identifies the type of repository.
-type RepoType string
+// ExtensionType identifies the type of extension store.
+type ExtensionType string
 
 const (
-	RepoPlugins RepoType = "plugins"
-	RepoThemes  RepoType = "themes"
-	RepoCores   RepoType = "cores"
+	TypePlugins ExtensionType = "plugins"
+	TypeThemes  ExtensionType = "themes"
+	TypeCores   ExtensionType = "cores"
 )
 
-// Repository is a generic repository for managing WordPress extensions.
+// ExtensionStore is a generic in-memory store for managing WordPress extensions.
 // It provides common functionality for loading, indexing, and searching extensions.
-type Repository[T Extension] struct {
+type ExtensionStore[T Indexable] struct {
 	l        *zerolog.Logger
 	c        *config.Config
 	db       *gorm.DB
 	ctx      context.Context
 	cache    cache.Cache
-	repoType RepoType
+	api      *APIClient
+	repoType ExtensionType
 	filesDir string
 
 	// List holds all loaded extensions, keyed by slug
@@ -62,37 +63,39 @@ type Repository[T Extension] struct {
 // The Run function contains all the work: invoking veloria-indexer,
 // opening the resulting index, and swapping it into the repository.
 type IndexTask struct {
-	RepoType RepoType
+	ExtensionType ExtensionType
 	Slug     string
 	Run      func()
 }
 
-// RepositoryConfig holds configuration for creating a new repository.
-type RepositoryConfig[T Extension] struct {
-	Ctx      context.Context
-	DB       *gorm.DB
-	Config   *config.Config
-	Logger   *zerolog.Logger
-	Cache    cache.Cache
-	RepoType RepoType
+// StoreConfig holds configuration for creating a new extension store.
+type StoreConfig[T Indexable] struct {
+	Ctx           context.Context
+	DB            *gorm.DB
+	Config        *config.Config
+	Logger        *zerolog.Logger
+	Cache         cache.Cache
+	API           *APIClient
+	ExtensionType ExtensionType
 }
 
-// NewRepository creates a new generic repository.
-func NewRepository[T Extension](cfg RepositoryConfig[T]) *Repository[T] {
-	return &Repository[T]{
+// NewExtensionStore creates a new generic extension store.
+func NewExtensionStore[T Indexable](cfg StoreConfig[T]) *ExtensionStore[T] {
+	return &ExtensionStore[T]{
 		l:        cfg.Logger,
 		c:        cfg.Config,
 		db:       cfg.DB,
 		ctx:      cfg.Ctx,
 		cache:    cfg.Cache,
-		repoType: cfg.RepoType,
-		filesDir: filepath.Join(cfg.Config.DataDir, string(cfg.RepoType)),
+		api:      cfg.API,
+		repoType: cfg.ExtensionType,
+		filesDir: filepath.Join(cfg.Config.DataDir, string(cfg.ExtensionType)),
 		List:     make(map[string]T),
 	}
 }
 
 // LoadFromDB loads extensions from the database using the provided loader function.
-func (r *Repository[T]) LoadFromDB(loader func(db *gorm.DB) ([]T, error)) error {
+func (r *ExtensionStore[T]) LoadFromDB(loader func(db *gorm.DB) ([]T, error)) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -114,7 +117,7 @@ func (r *Repository[T]) LoadFromDB(loader func(db *gorm.DB) ([]T, error)) error 
 // LoadIndexes loads all existing indexes from disk.
 // It handles both the new single-directory layout (slug/) and the legacy
 // versioned layout (slug.timestamp/) for backwards compatibility.
-func (r *Repository[T]) LoadIndexes() error {
+func (r *ExtensionStore[T]) LoadIndexes() error {
 	indexDir := filepath.Join(r.filesDir, "index")
 
 	dirs, err := os.ReadDir(indexDir)
@@ -230,7 +233,7 @@ func isTimestampSuffix(s string) bool {
 }
 
 // Exists checks if an extension exists in the repository.
-func (r *Repository[T]) Exists(slug string) bool {
+func (r *ExtensionStore[T]) Exists(slug string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	_, ok := r.List[slug]
@@ -238,7 +241,7 @@ func (r *Repository[T]) Exists(slug string) bool {
 }
 
 // Get retrieves an extension by slug.
-func (r *Repository[T]) Get(slug string) (T, bool) {
+func (r *ExtensionStore[T]) Get(slug string) (T, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	ext, ok := r.List[slug]
@@ -246,7 +249,7 @@ func (r *Repository[T]) Get(slug string) (T, bool) {
 }
 
 // Set adds or updates an extension in the repository.
-func (r *Repository[T]) Set(slug string, ext T) {
+func (r *ExtensionStore[T]) Set(slug string, ext T) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.List[slug] = ext
@@ -254,7 +257,7 @@ func (r *Repository[T]) Set(slug string, ext T) {
 }
 
 // Unlist removes an extension from the in-memory list but keeps the DB row.
-func (r *Repository[T]) Unlist(slug string) {
+func (r *ExtensionStore[T]) Unlist(slug string) {
 	r.mu.Lock()
 	delete(r.List, slug)
 	r.Total = len(r.List)
@@ -262,11 +265,11 @@ func (r *Repository[T]) Unlist(slug string) {
 }
 
 // Remove deletes an extension from the in-memory list and the database.
-func (r *Repository[T]) Remove(slug string) {
+func (r *ExtensionStore[T]) Remove(slug string) {
 	r.Unlist(slug)
 
 	col := "slug"
-	if r.repoType == RepoCores {
+	if r.repoType == TypeCores {
 		col = "version"
 	}
 	var zero T
@@ -274,7 +277,7 @@ func (r *Repository[T]) Remove(slug string) {
 }
 
 // Stats returns totals for the repository and how many extensions have indexes loaded.
-func (r *Repository[T]) Stats() (total int, indexed int) {
+func (r *ExtensionStore[T]) Stats() (total int, indexed int) {
 	cacheKey := "stats:" + string(r.repoType)
 	if r.cache != nil {
 		if v, ok := r.cache.Get(cacheKey); ok {
@@ -288,7 +291,7 @@ func (r *Repository[T]) Stats() (total int, indexed int) {
 
 	total = r.Total
 	for _, ext := range r.List {
-		if ext.HasIndex() {
+		if ie := ext.GetIndexedExtension(); ie != nil && ie.HasIndex() {
 			indexed++
 		}
 	}
@@ -301,7 +304,7 @@ func (r *Repository[T]) Stats() (total int, indexed int) {
 }
 
 // IndexStatus returns a snapshot of index availability by slug.
-func (r *Repository[T]) IndexStatus() map[string]bool {
+func (r *ExtensionStore[T]) IndexStatus() map[string]bool {
 	cacheKey := "index_status:" + string(r.repoType)
 	if r.cache != nil {
 		if v, ok := r.cache.Get(cacheKey); ok {
@@ -314,7 +317,8 @@ func (r *Repository[T]) IndexStatus() map[string]bool {
 
 	status := make(map[string]bool, len(r.List))
 	for slug, ext := range r.List {
-		status[slug] = ext.HasIndex()
+		ie := ext.GetIndexedExtension()
+		status[slug] = ie != nil && ie.HasIndex()
 	}
 
 	if r.cache != nil {
@@ -325,7 +329,7 @@ func (r *Repository[T]) IndexStatus() map[string]bool {
 }
 
 // UpdateIndex updates the index for a specific extension.
-func (r *Repository[T]) UpdateIndex(idx *index.Index, slug string) error {
+func (r *ExtensionStore[T]) UpdateIndex(idx *index.Index, slug string) error {
 	r.mu.RLock()
 	ext, ok := r.List[slug]
 	r.mu.RUnlock()
@@ -334,7 +338,7 @@ func (r *Repository[T]) UpdateIndex(idx *index.Index, slug string) error {
 		return ErrExtNotFound
 	}
 
-	ext.UpdateIndex(idx)
+	ext.GetIndexedExtension().UpdateIndex(idx)
 
 	// Invalidate cached stats and index status so the next request sees the change.
 	if r.cache != nil {
@@ -350,7 +354,7 @@ func (r *Repository[T]) UpdateIndex(idx *index.Index, slug string) error {
 // and searches extensions concurrently with a worker pool.
 // If progressFn is non-nil, it is called after each extension is searched
 // with the number of extensions searched so far and the total count.
-func (r *Repository[T]) Search(term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error) {
+func (r *ExtensionStore[T]) Search(term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error) {
 	// Compile search patterns once for reuse across all extensions
 	cs, err := index.CompileSearch(term, opt)
 	if err != nil {
@@ -361,7 +365,7 @@ func (r *Repository[T]) Search(term string, opt *index.SearchOptions, progressFn
 	r.mu.RLock()
 	extensions := make([]T, 0, len(r.List))
 	for _, ext := range r.List {
-		if ext.HasIndex() {
+		if ie := ext.GetIndexedExtension(); ie != nil && ie.HasIndex() {
 			extensions = append(extensions, ext)
 		}
 	}
@@ -449,7 +453,7 @@ func (r *Repository[T]) Search(term string, opt *index.SearchOptions, progressFn
 // PrepareUpdates fetches pending items, saves them to the database, and returns
 // IndexTasks ready for execution by a shared worker pool. The caller is
 // responsible for running the tasks with appropriate concurrency control.
-func (r *Repository[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn func(db *gorm.DB, ext T) error) []IndexTask {
+func (r *ExtensionStore[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn func(db *gorm.DB, ext T) error) []IndexTask {
 	extensions, err := fetchFn()
 	if err != nil {
 		r.l.Error().Err(err).Msgf("Failed to fetch updated %s", r.repoType)
@@ -509,25 +513,26 @@ func (r *Repository[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn func(
 
 // MakeReindexTask creates an IndexTask for re-indexing an already-loaded extension.
 // This is used for admin-triggered ad-hoc re-indexing.
-func (r *Repository[T]) MakeReindexTask(ext T) IndexTask {
+func (r *ExtensionStore[T]) MakeReindexTask(ext T) IndexTask {
 	return r.makeIndexTask(ext, ext.GetSlug(), ext.GetSource())
 }
 
 // makeIndexTask creates an IndexTask that runs the indexer for the given extension.
-func (r *Repository[T]) makeIndexTask(taskExt T, taskSlug, taskSource string) IndexTask {
+func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string) IndexTask {
 	return IndexTask{
-		RepoType: r.repoType,
+		ExtensionType: r.repoType,
 		Slug:     taskSlug,
 		Run: func() {
 			r.l.Info().Msgf("Indexing %s: %s", r.repoType, taskSlug)
 
-			taskExt.LockUpdates()
-			defer taskExt.UnlockUpdates()
+			taskIE := taskExt.GetIndexedExtension()
+			taskIE.LockUpdates()
+			defer taskIE.UnlockUpdates()
 
 			result, err := r.runIndexer(taskSlug, taskExt.GetDownloadLink())
 			if err != nil {
 				if errors.Is(err, ErrDownloadNotFound) {
-					if taskExt.HasIndex() {
+					if taskIE.HasIndex() {
 						r.l.Warn().Msgf("Download not found for %s %s, keeping existing index", r.repoType, taskSlug)
 					} else {
 						r.l.Warn().Msgf("Download not found for %s %s, skipping", r.repoType, taskSlug)
@@ -566,7 +571,7 @@ type IndexerResult struct {
 }
 
 // runIndexer executes the veloria-indexer command and returns the index path and stats.
-func (r *Repository[T]) runIndexer(slug, downloadLink string) (*IndexerResult, error) {
+func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*IndexerResult, error) {
 	ctx, cancel := context.WithTimeout(r.ctx, IndexTimeout)
 	defer cancel()
 
@@ -614,16 +619,16 @@ func (r *Repository[T]) runIndexer(slug, downloadLink string) (*IndexerResult, e
 }
 
 // saveExtractStats saves extraction statistics to the database for the given extension.
-func (r *Repository[T]) saveExtractStats(slug, source, name string, stats *ExtractStats) {
+func (r *ExtensionStore[T]) saveExtractStats(slug, source, name string, stats *ExtractStats) {
 	tableName := string(r.repoType)
 	identifierCol := "slug"
-	if r.repoType == RepoCores {
+	if r.repoType == TypeCores {
 		identifierCol = "version"
 	}
 
 	query := r.db.Table(tableName).Where(identifierCol+" = ?", slug)
 	// Plugins and themes have a source column; cores do not.
-	if r.repoType != RepoCores {
+	if r.repoType != TypeCores {
 		query = query.Where("source = ?", source)
 	}
 
@@ -641,7 +646,7 @@ func (r *Repository[T]) saveExtractStats(slug, source, name string, stats *Extra
 }
 
 // saveLargestRepoFiles replaces the largest_repo_files rows for a given extension.
-func (r *Repository[T]) saveLargestRepoFiles(slug, name string, files []*FileStat) {
+func (r *ExtensionStore[T]) saveLargestRepoFiles(slug, name string, files []*FileStat) {
 	repoType := string(r.repoType)
 
 	// Remove old entries for this extension.
@@ -676,11 +681,12 @@ func (r *Repository[T]) saveLargestRepoFiles(slug, name string, files []*FileSta
 // ResumeUnindexed returns IndexTasks for extensions that are in memory (loaded
 // from DB) but don't have an index on disk. This handles the case where the
 // server was restarted mid-indexing.
-func (r *Repository[T]) ResumeUnindexed() []IndexTask {
+func (r *ExtensionStore[T]) ResumeUnindexed() []IndexTask {
 	r.mu.RLock()
 	var unindexed []T
 	for _, ext := range r.List {
-		if !ext.HasIndex() && ext.GetDownloadLink() != "" {
+		ie := ext.GetIndexedExtension()
+		if (ie == nil || !ie.HasIndex()) && ext.GetDownloadLink() != "" {
 			unindexed = append(unindexed, ext)
 		}
 	}
@@ -705,7 +711,7 @@ func (r *Repository[T]) ResumeUnindexed() []IndexTask {
 }
 
 // GetAll returns all extensions as a slice.
-func (r *Repository[T]) GetAll() []T {
+func (r *ExtensionStore[T]) GetAll() []T {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -716,7 +722,44 @@ func (r *Repository[T]) GetAll() []T {
 	return result
 }
 
-// RepoType returns the repository type.
-func (r *Repository[T]) Type() RepoType {
+// Type returns the extension type.
+func (r *ExtensionStore[T]) Type() ExtensionType {
 	return r.repoType
+}
+
+// GetExtension retrieves an extension by slug, returning it as the Extension interface.
+func (r *ExtensionStore[T]) GetExtension(slug string) (Extension, bool) {
+	ext, ok := r.Get(slug)
+	if !ok {
+		var zero T
+		return zero, false
+	}
+	return ext, true
+}
+
+// MakeReindexTaskBySlug creates an IndexTask for re-indexing an extension by slug.
+// Returns false if the extension is not found.
+func (r *ExtensionStore[T]) MakeReindexTaskBySlug(slug string) (IndexTask, bool) {
+	ext, ok := r.Get(slug)
+	if !ok {
+		return IndexTask{}, false
+	}
+	return r.MakeReindexTask(ext), true
+}
+
+// ResolveSourceDir returns the parent directory of the extension's source files.
+func (r *ExtensionStore[T]) ResolveSourceDir(slug string) (string, error) {
+	ext, ok := r.Get(slug)
+	if !ok {
+		return "", ErrExtNotFound
+	}
+	ie := ext.GetIndexedExtension()
+	if ie == nil {
+		return "", ErrNoIndex
+	}
+	idx := ie.GetIndex()
+	if idx == nil {
+		return "", ErrNoIndex
+	}
+	return filepath.Dir(idx.SourceDir()), nil
 }

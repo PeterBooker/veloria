@@ -16,7 +16,6 @@ import (
 
 	"veloria/internal/cache"
 	"veloria/internal/config"
-	"veloria/internal/index"
 )
 
 // Core represents a WordPress core release.
@@ -43,6 +42,7 @@ func (c *Core) GetName() string         { return c.Name }
 func (c *Core) GetVersion() string      { return c.Version }
 func (c *Core) GetDownloadLink() string { return c.ZipURL }
 func (c *Core) GetActiveInstalls() int  { return 0 } // Cores don't have install counts
+func (c *Core) GetDownloaded() int      { return 0 } // Cores don't have download counts
 func (c *Core) GetIndexedExtension() *IndexedExtension {
 	return c.IndexedExtension
 }
@@ -53,31 +53,30 @@ func (c *Core) SetIndexedExtension(ext *IndexedExtension) {
 // TableName returns the database table name for GORM.
 func (c *Core) TableName() string { return "cores" }
 
-// CoreRepo manages WordPress core releases using the generic Repository.
-type CoreRepo struct {
-	*Repository[*Core]
-	c *config.Config
+// CoreStore manages WordPress core releases using the generic ExtensionStore.
+type CoreStore struct {
+	*ExtensionStore[*Core]
 }
 
-// NewCoreRepo creates a new core repository.
-func NewCoreRepo(ctx context.Context, db *gorm.DB, c *config.Config, l *zerolog.Logger, ch cache.Cache) *CoreRepo {
-	repo := NewRepository[*Core](RepositoryConfig[*Core]{
-		Ctx:      ctx,
-		DB:       db,
-		Config:   c,
-		Logger:   l,
-		Cache:    ch,
-		RepoType: RepoCores,
+// NewCoreStore creates a new core store.
+func NewCoreStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zerolog.Logger, ch cache.Cache, api *APIClient) *CoreStore {
+	store := NewExtensionStore[*Core](StoreConfig[*Core]{
+		Ctx:           ctx,
+		DB:            db,
+		Config:        c,
+		Logger:        l,
+		Cache:         ch,
+		API:           api,
+		ExtensionType: TypeCores,
 	})
 
-	return &CoreRepo{
-		Repository: repo,
-		c:          c,
+	return &CoreStore{
+		ExtensionStore: store,
 	}
 }
 
 // Load loads cores from the database and their indexes.
-func (cr *CoreRepo) Load() error {
+func (cr *CoreStore) Load() error {
 	err := cr.LoadFromDB(func(db *gorm.DB) ([]*Core, error) {
 		var cores []Core
 		if err := db.Where("deleted_at IS NULL").Find(&cores).Error; err != nil {
@@ -101,7 +100,7 @@ func (cr *CoreRepo) Load() error {
 }
 
 // PrepareUpdates fetches pending core versions and returns IndexTasks for the shared worker pool.
-func (cr *CoreRepo) PrepareUpdates() []IndexTask {
+func (cr *CoreStore) PrepareUpdates() []IndexTask {
 	fetchFn := func() ([]*Core, error) {
 		cores, err := FetchCoreUpdates(cr.ctx, cr.c)
 		if err != nil {
@@ -139,13 +138,15 @@ func (cr *CoreRepo) PrepareUpdates() []IndexTask {
 		}
 	}
 
-	return cr.Repository.PrepareUpdates(fetchFn, saveFn)
+	return cr.ExtensionStore.PrepareUpdates(fetchFn, saveFn)
 }
 
 // isVersionIndexed checks if a core version has already been indexed.
-func (cr *CoreRepo) isVersionIndexed(version string) bool {
-	if existing, ok := cr.Get(version); ok && existing.HasIndex() {
-		return true
+func (cr *CoreStore) isVersionIndexed(version string) bool {
+	if existing, ok := cr.Get(version); ok {
+		if ie := existing.GetIndexedExtension(); ie != nil && ie.HasIndex() {
+			return true
+		}
 	}
 	return false
 }
@@ -189,33 +190,6 @@ func compareVersions(a, b string) int {
 	}
 
 	return 0
-}
-
-// Search searches all cores and returns results.
-func (cr *CoreRepo) Search(term string, opt *index.SearchOptions, progressFn ...func(searched, total int)) ([]*CoreSearchResult, error) {
-	var fn func(searched, total int)
-	if len(progressFn) > 0 {
-		fn = progressFn[0]
-	}
-	results, err := cr.Repository.Search(term, opt, fn)
-	if err != nil {
-		return nil, err
-	}
-
-	coreResults := make([]*CoreSearchResult, len(results))
-	for i, r := range results {
-		coreResults[i] = &CoreSearchResult{
-			Core:    r.Extension.(*Core),
-			Matches: r.Matches,
-		}
-	}
-	return coreResults, nil
-}
-
-// CoreSearchResult contains search results for a single core release.
-type CoreSearchResult struct {
-	Core    *Core
-	Matches []*index.FileMatch
 }
 
 // FetchCoreUpdates fetches core updates based on environment.
