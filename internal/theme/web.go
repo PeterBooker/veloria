@@ -54,8 +54,14 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			indexStatus = d.Stats.IndexStatus("themes")
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = row.Name + " - Veloria"
+		if row.ShortDescription != "" {
+			pd.OG.Description = row.ShortDescription
+		}
+
 		data := web.ExtensionData{
-			PageData:         d.PageData(r),
+			PageData:         pd,
 			RepoType:         "themes",
 			Name:             row.Name,
 			Slug:             row.Slug,

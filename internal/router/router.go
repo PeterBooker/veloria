@@ -13,12 +13,14 @@ import (
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 
+	"veloria/assets"
 	"veloria/internal/admin"
 	api "veloria/internal/api"
 	"veloria/internal/auth"
 	"veloria/internal/core"
 	"veloria/internal/logger"
 	"veloria/internal/manager"
+	"veloria/internal/ogimage"
 	"veloria/internal/plugin"
 	"veloria/internal/report"
 	"veloria/internal/search"
@@ -48,6 +50,7 @@ type RouterDeps struct {
 	WebDeps *web.Deps
 	Session *auth.SessionStore
 	Auth    *auth.Handler
+	OGGen   *ogimage.Generator                     // OG image generator; or nil
 	Options Options
 }
 
@@ -108,6 +111,9 @@ func New(deps RouterDeps) *chi.Mux {
 		})
 	}
 
+	// Static OG default image
+	r.Get("/og-default.png", web.StaticImage(assets.FS, "og-default.png"))
+
 	// Web UI routes
 	if deps.WebDeps != nil {
 		r.Get("/", web.HomePage(deps.WebDeps))
@@ -125,6 +131,15 @@ func New(deps RouterDeps) *chi.Mux {
 		r.Get("/search/{uuid}/context", search.ContextPage(deps.WebDeps))
 		r.Get("/search/{uuid}/extensions", search.SearchExtensionsPartial(deps.WebDeps))
 		r.Get("/search/{uuid}/extension/{slug}", search.ExtensionResultsPage(deps.WebDeps))
+		r.Get("/search/{uuid}/export", search.ExportCSV(deps.WebDeps))
+		if deps.OGGen != nil {
+			ogHandler := search.OGImage(deps.WebDeps, deps.OGGen)
+			if opts.RateLimitEnabled {
+				r.With(httprate.LimitByIP(60, time.Minute)).Get("/search/{uuid}/og.png", ogHandler)
+			} else {
+				r.Get("/search/{uuid}/og.png", ogHandler)
+			}
+		}
 		r.Post("/search", search.SubmitSearch(deps.WebDeps))
 		r.Get("/my-searches", search.MyListPage(deps.WebDeps))
 

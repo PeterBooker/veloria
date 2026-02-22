@@ -51,12 +51,22 @@ func NewDeps(templates *Templates, db *gorm.DB, search SearchService, reindex Re
 
 // PageData returns common data for all page templates.
 func (d *Deps) PageData(r *http.Request) PageData {
+	appURL := d.Config.AppURL
+	canonicalURL := appURL + r.URL.Path
+
 	return PageData{
 		User:                 auth.UserFromContext(r.Context()),
 		SearchEnabled:        d.SearchEnabled,
 		SearchDisabledReason: d.SearchDisabledReason,
 		CurrentPath:          r.URL.Path,
 		Version:              config.Version,
+		OG: OGMeta{
+			Title:       "Veloria - WordPress Code Search",
+			Description: "Search through every WordPress plugin, theme, and core version with powerful regex patterns.",
+			URL:         canonicalURL,
+			Image:       appURL + "/og-default.png",
+			Type:        "website",
+		},
 	}
 }
 

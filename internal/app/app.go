@@ -13,11 +13,13 @@ import (
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
+	"veloria/assets"
 	"veloria/internal/auth"
 	"veloria/internal/cache"
 	"veloria/internal/config"
 	"veloria/internal/logger"
 	"veloria/internal/manager"
+	"veloria/internal/ogimage"
 	"veloria/internal/repo"
 	"veloria/internal/router"
 	"veloria/internal/sentry"
@@ -145,6 +147,12 @@ func New(ctx context.Context) (*App, error) {
 	}
 	deps := web.NewDeps(tmpl, a.DB, a.Manager, a.Manager, a.Manager, a.Manager, a.S3, appCache, c, searchEnabled, searchDisabledReason)
 
+	// Initialize OG image generator
+	ogGen, err := ogimage.New(assets.FS)
+	if err != nil {
+		l.Error().Err(err).Msg("Failed to initialize OG image generator; OG images disabled")
+	}
+
 	// Build per-type stats map for the router's API list handlers.
 	var statsMap map[string]manager.RepoStatsProvider
 	if a.Manager != nil {
@@ -164,6 +172,7 @@ func New(ctx context.Context) (*App, error) {
 		WebDeps: deps,
 		Session: a.SessionStore,
 		Auth:    a.AuthHandler,
+		OGGen:   ogGen,
 		Options: router.Options{
 			HandlerTimeout:   c.HTTPHandlerTimeout,
 			SearchEnabled:    searchEnabled,

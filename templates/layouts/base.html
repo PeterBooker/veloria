@@ -6,6 +6,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="view-transition" content="same-origin">
     <title>{{block "title" .}}Veloria - WordPress Code Search{{end}}</title>
+
+    {{block "meta" .}}
+    <!-- Open Graph -->
+    <meta property="og:title" content="{{.OG.Title}}">
+    <meta property="og:description" content="{{.OG.Description}}">
+    <meta property="og:url" content="{{.OG.URL}}">
+    <meta property="og:image" content="{{.OG.Image}}">
+    <meta property="og:type" content="{{.OG.Type}}">
+    <meta property="og:site_name" content="Veloria">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{.OG.Title}}">
+    <meta name="twitter:description" content="{{.OG.Description}}">
+    <meta name="twitter:image" content="{{.OG.Image}}">
+
+    <!-- Standard meta -->
+    <meta name="description" content="{{.OG.Description}}">
+    {{if .OG.URL}}<link rel="canonical" href="{{.OG.URL}}">{{end}}
+    {{end}}
+
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>

@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"veloria/internal/auth"
-	"veloria/internal/config"
 	searchmodel "veloria/internal/search/model"
 )
 
@@ -45,15 +44,14 @@ func LoginPage(d *Deps) http.HandlerFunc {
 			return
 		}
 
+		pd := d.PageData(r)
+		pd.EnabledProviders = auth.GetEnabledProviders(d.Config)
+		pd.OG.Title = "Login - Veloria"
+		pd.OG.Description = "Sign in to Veloria to manage your code searches."
+
 		data := LoginData{
-			PageData: PageData{
-				EnabledProviders:     auth.GetEnabledProviders(d.Config),
-				SearchEnabled:        d.SearchEnabled,
-				SearchDisabledReason: d.SearchDisabledReason,
-				CurrentPath:          r.URL.Path,
-				Version:              config.Version,
-			},
-			Error: r.URL.Query().Get("error"),
+			PageData: pd,
+			Error:    r.URL.Query().Get("error"),
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")

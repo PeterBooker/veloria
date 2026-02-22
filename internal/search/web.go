@@ -2,6 +2,8 @@ package search
 
 import (
 	"context"
+	"encoding/csv"
+	"fmt"
 	"math"
 	"net/http"
 	"regexp"
@@ -49,8 +51,12 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			return
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = fmt.Sprintf("Search \"%s\" - Veloria", s.Term)
+		pd.OG.Description = fmt.Sprintf("Code search for \"%s\" in %s.", s.Term, s.Repo)
+
 		data := web.SearchViewData{
-			PageData: d.PageData(r),
+			PageData: pd,
 			Search:   s,
 		}
 		if s.CompletedAt != nil {
@@ -70,6 +76,14 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			}
 			if s.TotalExtensions != nil {
 				data.TotalExtensions = *s.TotalExtensions
+			}
+			data.OG.Description = fmt.Sprintf(
+				"%d matches across %d %s for \"%s\".",
+				data.TotalMatches, data.TotalExtensions, s.Repo, s.Term,
+			)
+			appURL := d.Config.AppURL
+			if appURL != "" {
+				data.OG.Image = appURL + "/search/" + s.ID.String() + "/og.png"
 			}
 		}
 
@@ -185,6 +199,68 @@ func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
 		if err := d.Templates.Render(w, "search-extensions.html", data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
+	}
+}
+
+// ExportCSV streams the search results as a CSV download.
+func ExportCSV(d *web.Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if d.DB == nil || d.S3 == nil {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+
+		idStr := chi.URLParam(r, "uuid")
+		id, err := api.ParseID(idStr)
+		if err != nil {
+			http.Error(w, "invalid search id", http.StatusBadRequest)
+			return
+		}
+
+		var s searchmodel.Search
+		if err := d.DB.First(&s, "id = ?", id).Error; err != nil {
+			http.Error(w, "search not found", http.StatusNotFound)
+			return
+		}
+		if s.Status != searchmodel.StatusCompleted {
+			http.Error(w, "search not completed", http.StatusBadRequest)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+
+		var protoResults typespb.SearchResponse
+		if err := d.S3.DownloadResult(ctx, s.ID.String(), &protoResults); err != nil {
+			http.Error(w, "failed to load results", http.StatusInternalServerError)
+			return
+		}
+
+		results := searchmodel.SearchResponseFromProto(&protoResults)
+
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="search-%s.csv"`, s.ID))
+
+		cw := csv.NewWriter(w)
+		_ = cw.Write([]string{"Extension", "Slug", "Version", "Active Installs", "File", "Line Number", "Line"})
+
+		for _, result := range results.Results {
+			for _, fm := range result.Matches {
+				for _, m := range fm.Matches {
+					_ = cw.Write([]string{
+						result.Name,
+						result.Slug,
+						result.Version,
+						strconv.Itoa(result.ActiveInstalls),
+						fm.Filename,
+						strconv.Itoa(m.LineNumber),
+						m.Line,
+					})
+				}
+			}
+		}
+
+		cw.Flush()
 	}
 }
 
@@ -338,8 +414,12 @@ func ListPage(d *web.Deps) http.HandlerFunc {
 			summaries[i] = web.BuildSearchSummary(s)
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = "Recent Searches - Veloria"
+		pd.OG.Description = "Browse recent WordPress code searches on Veloria."
+
 		data := web.SearchesData{
-			PageData:   d.PageData(r),
+			PageData:   pd,
 			Searches:   summaries,
 			Page:       page,
 			TotalPages: totalPages,
@@ -392,8 +472,12 @@ func MyListPage(d *web.Deps) http.HandlerFunc {
 			summaries[i] = web.BuildSearchSummary(s)
 		}
 
+		pd := d.PageData(r)
+		pd.OG.Title = "My Searches - Veloria"
+		pd.OG.Description = "View and manage your WordPress code searches on Veloria."
+
 		data := web.MySearchesData{
-			PageData:   d.PageData(r),
+			PageData:   pd,
 			Searches:   summaries,
 			Page:       page,
 			TotalPages: totalPages,

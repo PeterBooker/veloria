@@ -8,6 +8,15 @@ import (
 	"veloria/internal/user"
 )
 
+// OGMeta holds Open Graph and Twitter Card meta tag values for a page.
+type OGMeta struct {
+	Title       string // og:title
+	Description string // og:description
+	URL         string // og:url — canonical URL
+	Image       string // og:image — absolute URL to OG image
+	Type        string // og:type — "website" or "article"
+}
+
 // PageData contains common data for all pages.
 type PageData struct {
 	User                 *user.User
@@ -16,6 +25,7 @@ type PageData struct {
 	SearchDisabledReason string
 	CurrentPath          string
 	Version              string
+	OG                   OGMeta
 }
 
 // LoginData contains data for the login page.
