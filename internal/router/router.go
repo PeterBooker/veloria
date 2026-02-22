@@ -33,6 +33,8 @@ type Options struct {
 	SearchEnabled    bool
 	RateLimitEnabled bool
 	LoggingEnabled   bool
+	AppURL           string   // Target URL for legacy domain redirects (e.g., "https://veloria.dev")
+	RedirectDomains  []string // Legacy domains to redirect (e.g., ["wpdirectory.net", "www.wpdirectory.net"])
 }
 
 func New(l *zerolog.Logger, v *validator.Validate, db *gorm.DB, m *manager.Manager, s3 storage.ResultStorage, deps *web.Deps, sessionStore *auth.SessionStore, authHandler *auth.Handler, opts Options) *chi.Mux {
@@ -44,8 +46,10 @@ func New(l *zerolog.Logger, v *validator.Validate, db *gorm.DB, m *manager.Manag
 		Timeout:         2 * time.Second,
 	})
 
-	// Redirect legacy domain
-	r.Use(legacyDomainRedirect)
+	// Redirect legacy domains
+	if opts.AppURL != "" && len(opts.RedirectDomains) > 0 {
+		r.Use(legacyDomainRedirect(opts.AppURL, opts.RedirectDomains))
+	}
 
 	// Security headers
 	r.Use(securityHeaders)
@@ -199,18 +203,25 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// legacyDomainRedirect redirects requests from wpdirectory.net to veloria.dev.
-// Search URLs are preserved; all other paths redirect to root.
-func legacyDomainRedirect(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Host == "wpdirectory.net" || r.Host == "www.wpdirectory.net" {
-			target := "https://veloria.dev"
-			if strings.HasPrefix(r.URL.Path, "/search/") {
-				target += r.URL.Path
+// legacyDomainRedirect returns middleware that redirects requests from legacy
+// domains to the primary app URL. Search URLs are preserved; all other paths
+// redirect to root.
+func legacyDomainRedirect(appURL string, domains []string) func(http.Handler) http.Handler {
+	domainSet := make(map[string]struct{}, len(domains))
+	for _, d := range domains {
+		domainSet[d] = struct{}{}
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if _, ok := domainSet[r.Host]; ok {
+				target := appURL
+				if strings.HasPrefix(r.URL.Path, "/search/") {
+					target += r.URL.Path
+				}
+				http.Redirect(w, r, target, http.StatusMovedPermanently)
+				return
 			}
-			http.Redirect(w, r, target, http.StatusMovedPermanently)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+			next.ServeHTTP(w, r)
+		})
+	}
 }
