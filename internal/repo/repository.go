@@ -372,16 +372,13 @@ func (r *Repository[T]) Search(term string, opt *index.SearchOptions, progressFn
 	}
 
 	// Parallel search with worker pool
-	workers := r.c.SearchConcurrency
-	if workers > len(extensions) {
-		workers = len(extensions)
-	}
+	workers := min(r.c.SearchConcurrency, len(extensions))
 
 	var (
-		mu               sync.Mutex
-		results          []*SearchResult
-		totalMatches     atomic.Int64
-		searched         atomic.Int64
+		mu           sync.Mutex
+		results      []*SearchResult
+		totalMatches atomic.Int64
+		searched     atomic.Int64
 	)
 
 	total := len(extensions)
@@ -598,10 +595,10 @@ func (r *Repository[T]) runIndexer(slug, downloadLink string) (*IndexerResult, e
 	scanner := bufio.NewScanner(&stdout)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "INDEX_READY:") {
-			result.IndexPath = strings.TrimPrefix(line, "INDEX_READY:")
-		} else if strings.HasPrefix(line, "EXTRACT_STATS:") {
-			statsJSON := strings.TrimPrefix(line, "EXTRACT_STATS:")
+		if after, ok := strings.CutPrefix(line, "INDEX_READY:"); ok {
+			result.IndexPath = after
+		} else if after, ok := strings.CutPrefix(line, "EXTRACT_STATS:"); ok {
+			statsJSON := after
 			var stats ExtractStats
 			if err := json.Unmarshal([]byte(statsJSON), &stats); err == nil {
 				result.Stats = &stats

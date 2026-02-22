@@ -302,17 +302,17 @@ const baseThemesURL = "https://api.aspirecloud.net/themes/info/1.2/"
 func (t *Theme) UnmarshalJSON(data []byte) error {
 	type Alias Theme
 	aux := &struct {
-		Version         interface{} `json:"version"`
-		Requires        interface{} `json:"requires"`
-		Tested          interface{} `json:"tested"`
-		RequiresPHP     interface{} `json:"requires_php"`
-		TagsRaw         interface{} `json:"tags"`
-		ReqPluginsRaw   interface{} `json:"requires_plugins"`
-		Downloaded      interface{} `json:"downloaded"`
-		ActiveInstalls  interface{} `json:"active_installs"`
-		Rating          interface{} `json:"rating"`
-		LastUpdatedTime string      `json:"last_updated_time"`
-		AuthorRaw       interface{} `json:"author"`
+		Version         any    `json:"version"`
+		Requires        any    `json:"requires"`
+		Tested          any    `json:"tested"`
+		RequiresPHP     any    `json:"requires_php"`
+		TagsRaw         any    `json:"tags"`
+		ReqPluginsRaw   any    `json:"requires_plugins"`
+		Downloaded      any    `json:"downloaded"`
+		ActiveInstalls  any    `json:"active_installs"`
+		Rating          any    `json:"rating"`
+		LastUpdatedTime string `json:"last_updated_time"`
+		AuthorRaw       any    `json:"author"`
 		Sections        struct {
 			Description string `json:"description"`
 		} `json:"sections"`
@@ -336,7 +336,7 @@ func (t *Theme) UnmarshalJSON(data []byte) error {
 
 	// Tags: sometimes the map values might not be strings
 	t.Tags = make(map[string]string)
-	if m, ok := aux.TagsRaw.(map[string]interface{}); ok {
+	if m, ok := aux.TagsRaw.(map[string]any); ok {
 		for k, raw := range m {
 			t.Tags[k] = toString(raw)
 		}
@@ -346,7 +346,7 @@ func (t *Theme) UnmarshalJSON(data []byte) error {
 	t.RequiresPlugins = parseStringSlice(aux.ReqPluginsRaw)
 
 	// Author and profile (themes have nested author object, but sometimes false)
-	if m, ok := aux.AuthorRaw.(map[string]interface{}); ok {
+	if m, ok := aux.AuthorRaw.(map[string]any); ok {
 		t.Author = toString(m["author"])
 		t.AuthorProfile = toString(m["profile"])
 	}
@@ -467,4 +467,3 @@ func FetchThemeInfo(ctx context.Context, slug string) (theme *Theme, err error) 
 	fillWordPressDownloadLink(&t)
 	return &t, nil
 }
-

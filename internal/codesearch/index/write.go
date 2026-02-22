@@ -154,7 +154,7 @@ func (ix *IndexWriter) AddFile(name string) error {
 // It logs errors using package log.
 func (ix *IndexWriter) Add(name string, f io.Reader) error {
 	if !isValidName(name) {
-		for _, f := range strings.Split(name, string(filepath.Separator)) {
+		for f := range strings.SplitSeq(name, string(filepath.Separator)) {
 			if !isValidName(f) {
 				return fmt.Errorf("malformed name %q", f)
 			}

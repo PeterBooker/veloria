@@ -314,15 +314,15 @@ const basePluginsURL = "https://api.aspirecloud.net/plugins/info/1.2/"
 func (p *Plugin) UnmarshalJSON(data []byte) error {
 	type Alias Plugin
 	aux := &struct {
-		Version        interface{} `json:"version"`
-		Requires       interface{} `json:"requires"`
-		Tested         interface{} `json:"tested"`
-		RequiresPHP    interface{} `json:"requires_php"`
-		TagsRaw        interface{} `json:"tags"`
-		ReqPluginsRaw  interface{} `json:"requires_plugins"`
-		Downloaded     interface{} `json:"downloaded"`
-		ActiveInstalls interface{} `json:"active_installs"`
-		Rating         interface{} `json:"rating"`
+		Version        any `json:"version"`
+		Requires       any `json:"requires"`
+		Tested         any `json:"tested"`
+		RequiresPHP    any `json:"requires_php"`
+		TagsRaw        any `json:"tags"`
+		ReqPluginsRaw  any `json:"requires_plugins"`
+		Downloaded     any `json:"downloaded"`
+		ActiveInstalls any `json:"active_installs"`
+		Rating         any `json:"rating"`
 		*Alias
 	}{Alias: (*Alias)(p)}
 
@@ -340,7 +340,7 @@ func (p *Plugin) UnmarshalJSON(data []byte) error {
 
 	// Tags: sometimes the map values might not be strings
 	p.Tags = make(map[string]string)
-	if m, ok := aux.TagsRaw.(map[string]interface{}); ok {
+	if m, ok := aux.TagsRaw.(map[string]any); ok {
 		for k, raw := range m {
 			p.Tags[k] = toString(raw)
 		}
@@ -450,7 +450,7 @@ func FetchPluginInfo(ctx context.Context, slug string) (plugin *Plugin, err erro
 // Helper functions for JSON unmarshaling
 
 // toString coerces string|bool|number -> string
-func toInt(i interface{}) int {
+func toInt(i any) int {
 	switch v := i.(type) {
 	case float64:
 		return int(v)
@@ -462,7 +462,7 @@ func toInt(i interface{}) int {
 	}
 }
 
-func toString(i interface{}) string {
+func toString(i any) string {
 	switch v := i.(type) {
 	case string:
 		return v
@@ -482,11 +482,11 @@ func toString(i interface{}) string {
 }
 
 // parseStringSlice handles requires_plugins which can be false or []string
-func parseStringSlice(raw interface{}) []string {
+func parseStringSlice(raw any) []string {
 	switch v := raw.(type) {
 	case bool:
 		return []string{}
-	case []interface{}:
+	case []any:
 		result := make([]string, 0, len(v))
 		for _, item := range v {
 			if s, ok := item.(string); ok {
