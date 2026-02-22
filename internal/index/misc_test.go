@@ -3,6 +3,8 @@ package index
 import (
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -156,5 +158,87 @@ func TestIsTextFile_NonexistentFile(t *testing.T) {
 	}
 	if ok {
 		t.Errorf("expected false for nonexistent file, got true")
+	}
+}
+
+func TestTruncateMatchLine(t *testing.T) {
+	fre := regexp.MustCompile(`(?i)target`)
+
+	tests := []struct {
+		name       string
+		line       string
+		wantLen    int
+		wantSubstr string
+	}{
+		{
+			name:       "Short line unchanged",
+			line:       "short line with target word",
+			wantLen:    len("short line with target word"),
+			wantSubstr: "target",
+		},
+		{
+			name:       "Exactly 250 chars unchanged",
+			line:       strings.Repeat("a", 250),
+			wantLen:    250,
+			wantSubstr: "",
+		},
+		{
+			name:       "Long line truncated around match",
+			line:       strings.Repeat("a", 200) + "target" + strings.Repeat("b", 200),
+			wantLen:    200, // truncateRadius * 2
+			wantSubstr: "target",
+		},
+		{
+			name:       "Match near start",
+			line:       "target" + strings.Repeat("x", 300),
+			wantLen:    100, // center=0 → window [0:100]
+			wantSubstr: "target",
+		},
+		{
+			name:       "Match near end",
+			line:       strings.Repeat("x", 300) + "target",
+			wantLen:    106, // truncateRadius before match + 6 chars of "target"
+			wantSubstr: "target",
+		},
+		{
+			name:       "Nil regexp truncates from start",
+			line:       strings.Repeat("z", 400),
+			wantLen:    100, // center=0, so [0:100]
+			wantSubstr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var re *regexp.Regexp
+			if tt.name != "Nil regexp truncates from start" {
+				re = fre
+			}
+			got := truncateMatchLine(tt.line, re)
+			if len(got) != tt.wantLen {
+				t.Errorf("len = %d, want %d", len(got), tt.wantLen)
+			}
+			if tt.wantSubstr != "" && !strings.Contains(got, tt.wantSubstr) {
+				t.Errorf("result %q does not contain %q", got, tt.wantSubstr)
+			}
+		})
+	}
+}
+
+func TestTruncateContextLines(t *testing.T) {
+	short := "short line"
+	long := strings.Repeat("x", 300)
+
+	lines := []string{short, long, short}
+	got := truncateContextLines(lines)
+
+	if got[0] != short {
+		t.Errorf("short line was modified: %q", got[0])
+	}
+	if len(got[1]) != maxLineLen {
+		t.Errorf("long line len = %d, want %d", len(got[1]), maxLineLen)
+	}
+	if got[2] != short {
+		t.Errorf("second short line was modified: %q", got[2])
 	}
 }
