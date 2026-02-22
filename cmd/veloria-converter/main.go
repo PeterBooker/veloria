@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
@@ -352,8 +353,12 @@ func importSearch(boltDB *bolt.DB, db *gorm.DB, s3 storage.ResultStorage, wpID s
 	}
 	bar.logf("search %s: assembled %d extensions, %d total matches", wpID, len(veloriaResp.GetResults()), totalMatches)
 
-	// Upload to S3 with timeout.
-	newID := uuid.New()
+	// Deterministically convert the wpdir ULID to a UUID so old URLs can be
+	// resolved by reinterpreting the same 128 bits.
+	newID, err := ulidToUUID(wpID)
+	if err != nil {
+		return fmt.Errorf("converting wpdir ID: %w", err)
+	}
 	s3Start := time.Now()
 	s3Ctx, s3Cancel := context.WithTimeout(context.Background(), s3Timeout)
 	defer s3Cancel()
@@ -486,6 +491,17 @@ func groupMatchesByFile(wpMatches []*wpdirpb.Match) []*typespb.FileMatch {
 		})
 	}
 	return result
+}
+
+// ulidToUUID deterministically converts a ULID string to a UUID by
+// reinterpreting the same 128 bits. This preserves a mathematical link
+// between the old wpdir IDs and new veloria IDs with no mapping table.
+func ulidToUUID(s string) (uuid.UUID, error) {
+	id, err := ulid.Parse(s)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("parsing ULID %q: %w", s, err)
+	}
+	return uuid.UUID(id), nil
 }
 
 func openDB(c *config.Config) (*gorm.DB, error) {

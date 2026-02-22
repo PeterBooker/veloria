@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	api "veloria/internal/api"
 	"veloria/internal/auth"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/web"
@@ -29,7 +30,7 @@ func SubmitReport(d *web.Deps) http.HandlerFunc {
 		}
 
 		searchIDStr := chi.URLParam(r, "uuid")
-		searchID, err := uuid.Parse(searchIDStr)
+		searchID, err := api.ParseID(searchIDStr)
 		if err != nil {
 			http.Error(w, "invalid search id", http.StatusBadRequest)
 			return

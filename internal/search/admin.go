@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 
+	api "veloria/internal/api"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/web"
 )
@@ -20,7 +20,7 @@ func ToggleVisibility(d *web.Deps) http.HandlerFunc {
 		}
 
 		searchIDStr := chi.URLParam(r, "uuid")
-		searchID, err := uuid.Parse(searchIDStr)
+		searchID, err := api.ParseID(searchIDStr)
 		if err != nil {
 			http.Error(w, "invalid search id", http.StatusBadRequest)
 			return
