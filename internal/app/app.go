@@ -19,7 +19,7 @@ import (
 	"veloria/internal/config"
 	"veloria/internal/logger"
 	"veloria/internal/manager"
-	"veloria/internal/ogimage"
+	ogimage "veloria/internal/image"
 	"veloria/internal/repo"
 	"veloria/internal/router"
 	"veloria/internal/sentry"

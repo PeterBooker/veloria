@@ -14,7 +14,7 @@ import (
 
 	"veloria/assets"
 	"veloria/internal/config"
-	"veloria/internal/ogimage"
+	ogimage "veloria/internal/image"
 	"veloria/internal/web"
 )
 
