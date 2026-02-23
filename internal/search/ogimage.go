@@ -78,6 +78,7 @@ func OGImage(d *web.Deps, gen *ogimage.Generator) http.HandlerFunc {
 
 func writeImage(w http.ResponseWriter, data []byte) {
 	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
-	_, _ = w.Write(data)
+	_, _ = w.Write(data) // #nosec G705 -- content is a generated PNG served with image/png and nosniff
 }
