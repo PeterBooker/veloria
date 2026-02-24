@@ -260,6 +260,7 @@ type SearchParams struct {
 	FileMatch        string
 	ExcludeFileMatch string
 	CaseInsensitive  bool
+	LinesOfContext   uint
 	OnProgress       ProgressFunc
 }
 
@@ -277,6 +278,7 @@ func (m *Manager) Search(repoType string, term string, params *SearchParams) (*S
 	opt := &index.SearchOptions{
 		IgnoreCase:        params.CaseInsensitive,
 		LiteralSearch:     false,
+		LinesOfContext:    params.LinesOfContext,
 		FileRegexp:        params.FileMatch,
 		ExcludeFileRegexp: params.ExcludeFileMatch,
 		MaxResults:        100,

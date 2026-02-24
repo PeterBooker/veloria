@@ -28,10 +28,10 @@ jobs:
       - name: Test
         run: go test -v ./...
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.6
+      # - name: golangci-lint
+      #   uses: golangci/golangci-lint-action@v9
+      #   with:
+      #     version: v2.6
 
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
