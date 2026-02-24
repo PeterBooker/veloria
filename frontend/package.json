@@ -1,0 +1,16 @@
+{
+  "name": "veloria-frontend",
+  "private": true,
+  "scripts": {
+    "build": "tailwindcss -i css/main.css -o ../assets/static/css/styles.css --minify",
+    "postbuild": "cp node_modules/htmx.org/dist/htmx.min.js ../assets/static/js/htmx.min.js && cp node_modules/echarts/dist/echarts.min.js ../assets/static/js/echarts.min.js",
+    "watch": "tailwindcss -i css/main.css -o ../assets/static/css/styles.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4"
+  },
+  "dependencies": {
+    "htmx.org": "^2.0.4",
+    "echarts": "^5"
+  }
+}

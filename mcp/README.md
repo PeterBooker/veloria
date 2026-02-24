@@ -15,10 +15,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "veloria": {
       "command": "npx",
-      "args": ["-y", "@veloria/mcp"],
-      "env": {
-        "VELORIA_URL": "https://veloria.dev"
-      }
+      "args": ["-y", "@veloria/mcp"]
     }
   }
 }
@@ -35,14 +32,8 @@ claude mcp add veloria -- npx -y @veloria/mcp
 Any client that supports the stdio transport:
 
 ```bash
-VELORIA_URL=https://veloria.dev npx @veloria/mcp
+npx @veloria/mcp
 ```
-
-## Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VELORIA_URL` | `http://localhost:9071` | Veloria instance URL |
 
 ## Tools
 

@@ -6,37 +6,37 @@
 
 {{define "content"}}
 <!-- Heading -->
-<div class="mb-6 lg:px-7 py-6 lg:py-0 lg:pt-5">
-    <nav class="text-sm text-gray-400 mb-3">
-        <a href="/repos" class="hover:text-brand-600 transition-colors">Repositories</a>
+<div class="mb-6 pt-8 lg:pt-10">
+    <nav class="text-sm text-[#4e5666] mb-3">
+        <a href="/data-sources" class="hover:text-neon-pink transition-colors">Data Sources</a>
         <span class="mx-2">/</span>
-        <a href="/repos/{{.RepoType}}" class="hover:text-brand-600 transition-colors capitalize">{{.RepoType}}</a>
+        <a href="/data-sources/{{.RepoType}}" class="hover:text-neon-pink transition-colors capitalize">{{.RepoType}}</a>
         <span class="mx-2">/</span>
-        <span class="text-gray-700 font-medium">{{.Name}}</span>
+        <span class="text-[#cdd5e0] font-medium">{{.Name}}</span>
     </nav>
     <div class="flex items-center gap-4">
-        <div class="w-14 h-14 rounded-xl bg-white/60 border border-white/50 flex items-center justify-center">
+        <div class="w-14 h-14 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center">
             {{if eq .RepoType "plugins"}}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff2d7b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
             </svg>
             {{else if eq .RepoType "themes"}}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#b44dff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
             {{else}}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffd700" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/>
             </svg>
             {{end}}
         </div>
         <div>
-            <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-gray-900">{{.Name}}</h1>
-            <p class="text-sm text-gray-600">v{{.Version}} &middot;
+            <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-[#f4f6f9]">{{.Name}}</h1>
+            <p class="text-sm text-[#cdd5e0]">v{{.Version}} &middot;
                 {{if .Indexed}}
-                <span class="text-green-600">Indexed</span>
+                <span class="text-green-400">Indexed</span>
                 {{else}}
-                <span class="text-gray-400">Pending</span>
+                <span class="text-[#4e5666]">Pending</span>
                 {{end}}
             </p>
         </div>
@@ -46,7 +46,7 @@
                     hx-vals='{"repo_type": "{{.RepoType}}", "slug": "{{.Slug}}"}'
                     hx-target="#reindex-btn"
                     hx-swap="innerHTML"
-                    class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-white/40 border border-white/50 rounded-lg hover:bg-white/60 transition">
+                    class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#cdd5e0] bg-white/5 border border-white/10 rounded-lg hover:bg-white/[0.08] transition">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="23 4 23 10 17 10"></polyline>
                     <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
@@ -58,11 +58,9 @@
     </div>
 </div>
 
-<!-- Outer Glass Container -->
-<div class="glass-outer p-5 lg:p-7 flex-1 flex flex-col min-h-0">
     {{if .ShortDescription}}
     <div class="glass-inner p-6 mb-6">
-        <p class="text-gray-600">{{.ShortDescription}}</p>
+        <p class="text-[#cdd5e0]">{{.ShortDescription}}</p>
     </div>
     {{end}}
 
@@ -70,20 +68,20 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {{if or (eq .RepoType "plugins") (eq .RepoType "themes")}}
         <div class="glass-inner p-4">
-            <p class="text-sm text-gray-500 mb-1">Active Installs</p>
-            <p class="text-2xl font-bold text-gray-900">{{formatCompact .ActiveInstalls}}</p>
+            <p class="text-sm text-[#7a8394] mb-1">Active Installs</p>
+            <p class="text-2xl font-bold text-[#f4f6f9]">{{formatCompact .ActiveInstalls}}</p>
         </div>
         <div class="glass-inner p-4">
-            <p class="text-sm text-gray-500 mb-1">Downloads</p>
-            <p class="text-2xl font-bold text-gray-900">{{formatCompact .Downloaded}}</p>
+            <p class="text-sm text-[#7a8394] mb-1">Downloads</p>
+            <p class="text-2xl font-bold text-[#f4f6f9]">{{formatCompact .Downloaded}}</p>
         </div>
         {{end}}
         <div class="glass-inner p-4">
-            <p class="text-sm text-gray-500 mb-1">Total Files</p>
+            <p class="text-sm text-[#7a8394] mb-1">Total Files</p>
             <p class="text-2xl font-bold text-brand-600">{{formatNumber .FileCount}}</p>
         </div>
         <div class="glass-inner p-4">
-            <p class="text-sm text-gray-500 mb-1">Total Size</p>
+            <p class="text-sm text-[#7a8394] mb-1">Total Size</p>
             <p class="text-2xl font-bold text-brand-700">{{formatBytes .TotalSize}}</p>
         </div>
     </div>
@@ -93,30 +91,30 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <!-- Compatibility -->
         <div class="glass-inner p-5">
-            <h3 class="text-sm font-semibold text-gray-900 mb-3">Compatibility</h3>
+            <h3 class="text-sm font-semibold text-[#f4f6f9] mb-3">Compatibility</h3>
             <dl class="space-y-2 text-sm">
                 {{if .Requires}}
                 <div class="flex justify-between">
-                    <dt class="text-gray-500">Requires WordPress</dt>
-                    <dd class="text-gray-900 font-medium">{{.Requires}}+</dd>
+                    <dt class="text-[#7a8394]">Requires WordPress</dt>
+                    <dd class="text-[#f4f6f9] font-medium">{{.Requires}}+</dd>
                 </div>
                 {{end}}
                 {{if .Tested}}
                 <div class="flex justify-between">
-                    <dt class="text-gray-500">Tested up to</dt>
-                    <dd class="text-gray-900 font-medium">{{.Tested}}</dd>
+                    <dt class="text-[#7a8394]">Tested up to</dt>
+                    <dd class="text-[#f4f6f9] font-medium">{{.Tested}}</dd>
                 </div>
                 {{end}}
                 {{if .RequiresPHP}}
                 <div class="flex justify-between">
-                    <dt class="text-gray-500">Requires PHP</dt>
-                    <dd class="text-gray-900 font-medium">{{.RequiresPHP}}+</dd>
+                    <dt class="text-[#7a8394]">Requires PHP</dt>
+                    <dd class="text-[#f4f6f9] font-medium">{{.RequiresPHP}}+</dd>
                 </div>
                 {{end}}
                 {{if .Source}}
                 <div class="flex justify-between">
-                    <dt class="text-gray-500">Source</dt>
-                    <dd class="text-gray-900 font-medium">{{.Source}}</dd>
+                    <dt class="text-[#7a8394]">Source</dt>
+                    <dd class="text-[#f4f6f9] font-medium">{{.Source}}</dd>
                 </div>
                 {{end}}
             </dl>
@@ -124,22 +122,22 @@
 
         <!-- Rating & Links -->
         <div class="glass-inner p-5">
-            <h3 class="text-sm font-semibold text-gray-900 mb-3">Details</h3>
+            <h3 class="text-sm font-semibold text-[#f4f6f9] mb-3">Details</h3>
             <dl class="space-y-2 text-sm">
                 {{if gt .Rating 0}}
                 <div class="flex justify-between items-center">
-                    <dt class="text-gray-500">Rating</dt>
+                    <dt class="text-[#7a8394]">Rating</dt>
                     <dd class="flex items-center gap-2">
-                        <div class="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="w-20 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                             <div class="h-full rounded-full bg-amber-400" style="width: {{.Rating}}%;"></div>
                         </div>
-                        <span class="text-gray-900 font-medium">{{.Rating}}%</span>
+                        <span class="text-[#f4f6f9] font-medium">{{.Rating}}%</span>
                     </dd>
                 </div>
                 {{end}}
                 {{if .DownloadLink}}
                 <div class="flex justify-between items-center">
-                    <dt class="text-gray-500">Download</dt>
+                    <dt class="text-[#7a8394]">Download</dt>
                     <dd><a href="{{.DownloadLink}}" class="text-brand-600 hover:text-brand-700 font-medium transition-colors" target="_blank" rel="noopener">v{{.Version}} zip</a></dd>
                 </div>
                 {{end}}
@@ -149,10 +147,10 @@
 
     {{if .Tags}}
     <div class="glass-inner p-5 mb-6">
-        <h3 class="text-sm font-semibold text-gray-900 mb-3">Tags</h3>
+        <h3 class="text-sm font-semibold text-[#f4f6f9] mb-3">Tags</h3>
         <div class="flex flex-wrap gap-2">
             {{range $key, $value := .Tags}}
-            <span class="inline-block px-2.5 py-1 rounded-lg bg-white/50 border border-white/60 text-xs text-gray-600">{{$value}}</span>
+            <span class="inline-block px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-[#cdd5e0]">{{$value}}</span>
             {{end}}
         </div>
     </div>
@@ -162,11 +160,11 @@
     {{if eq .RepoType "cores"}}
     <!-- Core Details -->
     <div class="glass-inner p-5 mb-6">
-        <h3 class="text-sm font-semibold text-gray-900 mb-3">Details</h3>
+        <h3 class="text-sm font-semibold text-[#f4f6f9] mb-3">Details</h3>
         <dl class="space-y-2 text-sm">
             {{if .DownloadLink}}
             <div class="flex justify-between items-center">
-                <dt class="text-gray-500">Download</dt>
+                <dt class="text-[#7a8394]">Download</dt>
                 <dd><a href="{{.DownloadLink}}" class="text-brand-600 hover:text-brand-700 font-medium transition-colors" target="_blank" rel="noopener">v{{.Version}} zip</a></dd>
             </div>
             {{end}}
@@ -177,9 +175,9 @@
     {{if and .Indexed .LargestFiles}}
     <!-- Largest Files -->
     <div class="glass-inner overflow-hidden mb-6">
-        <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
-            <h2 class="text-base font-semibold text-gray-900">Largest Files</h2>
-            <p class="text-sm text-gray-500">Top {{len .LargestFiles}} by size</p>
+        <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <h2 class="text-base font-semibold text-[#f4f6f9]">Largest Files</h2>
+            <p class="text-sm text-[#7a8394]">Top {{len .LargestFiles}} by size</p>
         </div>
         <div class="p-6">
             {{$maxFileSize := 0}}
@@ -190,12 +188,12 @@
                 {{range .LargestFiles}}
                 <div>
                     <div class="flex items-center justify-between text-sm mb-1">
-                        <span class="text-gray-700 font-mono text-xs truncate">{{.Path}}</span>
-                        <span class="text-gray-500 ml-2 flex-shrink-0">{{formatBytes .Size}}</span>
+                        <span class="text-[#cdd5e0] font-mono text-xs truncate">{{.Path}}</span>
+                        <span class="text-[#7a8394] ml-2 flex-shrink-0">{{formatBytes .Size}}</span>
                     </div>
-                    <div class="h-1.5 bg-gray-200/70 rounded-full overflow-hidden">
+                    <div class="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                         <div class="h-full rounded-full"
-                             style="width: {{if gt $maxFileSize 0}}{{printf "%.1f" (divideFloat .Size $maxFileSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+                             style="width: {{if gt $maxFileSize 0}}{{printf "%.1f" (divideFloat .Size $maxFileSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #ff2d7b, #b44dff);"></div>
                     </div>
                 </div>
                 {{end}}
@@ -206,19 +204,16 @@
 
     {{if not .Indexed}}
     <div class="glass-inner p-12 text-center">
-        <div class="w-16 h-16 rounded-full bg-white/30 flex items-center justify-center mx-auto mb-4">
-            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+        <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-[#4e5666]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="12" y1="8" x2="12" y2="12"></line>
                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
         </div>
-        <h3 class="text-lg font-medium text-gray-900 mb-2">Not Yet Indexed</h3>
-        <p class="text-gray-500">File statistics will be available once this {{.RepoType}} is indexed.</p>
+        <h3 class="text-lg font-medium text-[#f4f6f9] mb-2">Not Yet Indexed</h3>
+        <p class="text-[#7a8394]">File statistics will be available once this {{.RepoType}} is indexed.</p>
     </div>
     {{end}}
 
-    <!-- Footer -->
-    {{template "footer" .}}
-</div>
 {{end}}

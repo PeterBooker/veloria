@@ -1,13 +1,13 @@
 {{define "admin_visibility_toggle.html"}}
 <div class="flex items-center gap-2">
     {{if .Private}}
-    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 border border-gray-200">Private</span>
+    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-white/5 text-[#cdd5e0] border border-white/10">Private</span>
     <button hx-post="/admin/search/{{.SearchID}}/visibility" hx-target="closest div" hx-swap="outerHTML"
         class="text-xs text-brand-600 hover:text-brand-700 font-medium">Make Public</button>
     {{else}}
-    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-50 text-green-600 border border-green-200">Public</span>
+    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-500/10 text-green-400 border border-green-500/30">Public</span>
     <button hx-post="/admin/search/{{.SearchID}}/visibility" hx-target="closest div" hx-swap="outerHTML"
-        class="text-xs text-red-600 hover:text-red-700 font-medium">Make Private</button>
+        class="text-xs text-red-400 hover:text-red-700 font-medium">Make Private</button>
     {{end}}
 </div>
 {{end}}

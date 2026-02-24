@@ -191,11 +191,11 @@ These serve the HTML web interface:
 |---|---|---|
 | GET | `/` | Home page |
 | GET | `/about` | About page |
-| GET | `/repos` | Repository overview |
-| GET | `/repos/{type}` | Repository detail (plugins/themes/cores) |
-| GET | `/repos/plugins/{slug}` | Plugin detail page |
-| GET | `/repos/themes/{slug}` | Theme detail page |
-| GET | `/repos/cores/{version}` | Core detail page |
+| GET | `/data-sources` | Data sources overview |
+| GET | `/data-sources/{type}` | Data source detail (plugins/themes/cores) |
+| GET | `/data-sources/plugins/{slug}` | Plugin detail page |
+| GET | `/data-sources/themes/{slug}` | Theme detail page |
+| GET | `/data-sources/cores/{version}` | Core detail page |
 | GET | `/searches` | Public search list |
 | GET | `/search/{uuid}` | Search result page |
 | POST | `/search` | Submit search (web form) |

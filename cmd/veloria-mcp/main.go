@@ -13,14 +13,9 @@ import (
 	veloriamc "veloria/internal/mcp"
 )
 
-const defaultURL = "http://localhost:9071"
+const baseURL = "https://veloria.dev"
 
 func main() {
-	baseURL := os.Getenv("VELORIA_URL")
-	if baseURL == "" {
-		baseURL = defaultURL
-	}
-
 	svc, err := veloriamc.NewAPIService(baseURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "veloria-mcp: %v\n", err)

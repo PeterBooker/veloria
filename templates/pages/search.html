@@ -6,12 +6,12 @@
 
 {{define "content"}}
 <!-- Heading -->
-<div class="mb-6 lg:px-7 py-6 lg:py-0 lg:pt-5">
-    <p class="text-xs text-gray-900 uppercase tracking-widest mb-1.5">Search Result</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold tracking-tight text-gray-900 mb-2 break-all">
-        <span class="text-gray-400">"</span>{{.Search.Term}}<span class="text-gray-400">"</span>
+<div class="mb-6 pt-8 lg:pt-10">
+    <p class="text-xs text-[#f4f6f9] uppercase tracking-widest mb-1.5">Search Result</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold tracking-tight text-[#f4f6f9] mb-2 break-all">
+        <span class="text-[#4e5666]">"</span>{{.Search.Term}}<span class="text-[#4e5666]">"</span>
     </h1>
-    <div class="flex items-center gap-2 lg:gap-3 text-xs lg:text-sm text-gray-500 flex-wrap">
+    <div class="flex items-center gap-2 lg:gap-3 text-xs lg:text-sm text-[#7a8394] flex-wrap">
         <span class="inline-flex items-center gap-1.5 text-brand-600 font-medium capitalize">
             {{if eq .Search.Repo "plugins"}}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -35,8 +35,7 @@
     </div>
 </div>
 
-<!-- Outer Glass Container -->
-<div id="search-content" class="glass-outer p-5 lg:p-7 flex-1 flex flex-col min-h-0 min-w-0"
+<div id="search-content" class="flex-1 flex flex-col min-h-0 min-w-0"
     {{if or (eq .Search.Status "queued") (eq .Search.Status "processing")}}
     hx-get="/search/{{.Search.ID}}"
     hx-trigger="every 2s"
@@ -46,21 +45,21 @@
     <!-- Status & Back -->
     <div class="flex items-center gap-2 lg:gap-3 mb-6">
         {{if eq .Search.Status "completed"}}
-        <span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-green-50 text-green-600 border border-green-200">
+        <span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-green-500/10 text-green-400 border border-green-500/30">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
             {{.Search.Status}}
         </span>
         {{else if or (eq .Search.Status "processing") (eq .Search.Status "queued")}}
-        <span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-amber-50 text-amber-600 border border-amber-200">
+        <span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
             <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
             </svg>
             {{.Search.Status}}
         </span>
         {{else if eq .Search.Status "failed"}}
-        <span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-red-50 text-red-600 border border-red-200">
+        <span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-red-500/10 text-red-400 border border-red-500/30">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -68,7 +67,7 @@
             {{.Search.Status}}
         </span>
         {{else}}
-        <span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+        <span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-white/5 text-[#7a8394] border border-white/10">
             {{.Search.Status}}
         </span>
         {{end}}
@@ -76,13 +75,13 @@
         <div id="admin-visibility-{{.Search.ID}}">
             {{if .Search.Private}}
             <div class="flex items-center gap-2">
-                <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600 border border-gray-200">Private</span>
+                <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-white/5 text-[#cdd5e0] border border-white/10">Private</span>
                 <button hx-post="/admin/search/{{.Search.ID}}/visibility" hx-target="#admin-visibility-{{.Search.ID}}" hx-swap="innerHTML"
                     class="text-xs text-brand-600 hover:text-brand-700 font-medium">Make Public</button>
             </div>
             {{else}}
             <div class="flex items-center gap-2">
-                <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-50 text-green-600 border border-green-200">Public</span>
+                <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-500/10 text-green-400 border border-green-500/30">Public</span>
                 <button hx-post="/admin/search/{{.Search.ID}}/visibility" hx-target="#admin-visibility-{{.Search.ID}}" hx-swap="innerHTML"
                     class="text-xs text-red-600 hover:text-red-700 font-medium">Make Private</button>
             </div>
@@ -94,7 +93,7 @@
             <button hx-post="/search/{{.Search.ID}}/report"
                     hx-target="#report-btn-{{.Search.ID}}"
                     hx-swap="innerHTML"
-                    class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-white/40 border border-white/50 rounded-lg hover:bg-red-50 hover:border-red-200 transition">
+                    class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-white/5 border border-white/10 rounded-lg hover:bg-red-50 hover:border-red-200 transition">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
                     <line x1="4" y1="22" x2="4" y2="15"></line>
@@ -103,7 +102,7 @@
             </button>
         </div>
         {{end}}
-        <a href="/searches" class="inline-flex items-center gap-1.5 lg:gap-2 px-3 lg:px-4 py-2 text-xs font-medium text-gray-600 bg-white/40 border border-white/50 rounded-lg hover:bg-white/60 transition ml-auto">
+        <a href="/searches" class="inline-flex items-center gap-1.5 lg:gap-2 px-3 lg:px-4 py-2 text-xs font-medium text-[#cdd5e0] bg-white/5 border border-white/10 rounded-lg hover:bg-white/[0.08] transition ml-auto">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 18 9 12 15 6"></polyline>
             </svg>
@@ -127,14 +126,14 @@
 
     {{if gt .TotalExtensions 0}}
     <!-- Results Summary -->
-    <div class="glass-inner p-4 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <p class="text-gray-500 text-sm">
-            <span class="text-gray-900 font-semibold">{{formatNumber .TotalMatches}}</span> matches across
-            <span class="text-brand-600 font-semibold">{{formatNumber .TotalExtensions}}</span> extensions
+    <div class="glass-inner p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <p class="text-[#cdd5e0] text-base">
+            <span class="text-[#f4f6f9] font-bold text-lg">{{formatNumber .TotalMatches}}</span> matches across
+            <span class="text-neon-cyan font-bold text-lg">{{formatNumber .TotalExtensions}}</span> extensions
         </p>
         <div class="flex items-center gap-3 w-full sm:w-auto">
-        <a href="/search/{{.Search.ID}}/export"
-           class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-white/40 border border-white/50 rounded-lg hover:bg-white/60 transition shrink-0">
+        <a href="/search/{{.Search.ID}}/export" hx-boost="false"
+           class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#cdd5e0] bg-white/5 border border-white/10 rounded-lg hover:bg-white/[0.08] transition shrink-0">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
@@ -143,7 +142,7 @@
             Export CSV
         </a>
         <div class="relative w-full sm:max-w-xs">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4e5666] pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
@@ -156,23 +155,23 @@
                 hx-target="#search-extensions"
                 hx-swap="innerHTML"
                 hx-include="this"
-                class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/50 border border-white/60 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition"
+                class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-[#cdd5e0] focus:outline-none focus:border-neon-cyan/40 focus:ring-2 focus:ring-neon-cyan/20 transition"
             >
         </div>
         </div>
     </div>
 
-    <div class="glass-inner p-3 lg:p-4">
+    <div>
         <div id="search-extensions"
              hx-get="/search/{{.Search.ID}}/extensions"
              hx-trigger="load"
              hx-swap="innerHTML">
-            <div class="flex items-center justify-center gap-2 py-12 text-gray-400">
+            <div class="flex items-center justify-center gap-2 py-12 text-[#4e5666]">
                 <svg class="animate-spin w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
-                <span class="text-sm text-gray-500">Loading extensions...</span>
+                <span class="text-sm text-[#7a8394]">Loading extensions...</span>
             </div>
         </div>
     </div>
@@ -202,43 +201,40 @@
     {{else if eq .Search.Status "completed"}}
     <!-- No Results -->
     <div class="glass-inner text-center py-12 lg:py-16">
-        <div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/30 border border-white/50 mb-4 lg:mb-6">
-            <svg class="w-8 h-8 lg:w-10 lg:h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/5 border border-white/10 mb-4 lg:mb-6">
+            <svg class="w-8 h-8 lg:w-10 lg:h-10 text-[#4e5666]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
                 <path d="m21 21-4.3-4.3"></path>
                 <path d="M8 11h6"></path>
             </svg>
         </div>
-        <h3 class="text-lg lg:text-xl text-gray-700 mb-2">No matches found</h3>
-        <p class="text-gray-500 text-sm lg:text-base">Try a different regex pattern or repository.</p>
+        <h3 class="text-lg lg:text-xl text-[#cdd5e0] mb-2">No matches found</h3>
+        <p class="text-[#7a8394] text-sm lg:text-base">Try a different regex pattern or repository.</p>
     </div>
     {{else}}
     <!-- Processing/Unavailable State -->
     <div class="glass-inner text-center py-12 lg:py-16">
-        <div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/30 border border-white/50 mb-4 lg:mb-6">
+        <div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/5 border border-white/10 mb-4 lg:mb-6">
             <svg class="w-8 h-8 lg:w-10 lg:h-10 text-brand-500 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
             </svg>
         </div>
-        <h3 class="text-lg lg:text-xl text-gray-700 mb-2">Search in progress</h3>
+        <h3 class="text-lg lg:text-xl text-[#cdd5e0] mb-2">Search in progress</h3>
         {{if gt .ProgressTotal 0}}
-        <p class="text-gray-500 text-sm lg:text-base mb-4">
-            Searched <span class="text-gray-900 font-semibold">{{formatNumber .ProgressSearched}}</span> of
+        <p class="text-[#7a8394] text-sm lg:text-base mb-4">
+            Searched <span class="text-[#f4f6f9] font-semibold">{{formatNumber .ProgressSearched}}</span> of
             <span class="text-brand-600 font-semibold">{{formatNumber .ProgressTotal}}</span> extensions
         </p>
         <div class="max-w-xs mx-auto">
-            <div class="w-full h-2 rounded-full bg-white/40 border border-white/50 overflow-hidden">
+            <div class="w-full h-2 rounded-full bg-white/5 border border-white/10 overflow-hidden">
                 <div class="h-full rounded-full bg-brand-500 transition-all duration-500 ease-out" style="width: {{percentage .ProgressSearched .ProgressTotal}}%"></div>
             </div>
         </div>
         {{else}}
-        <p class="text-gray-500 text-sm lg:text-base">Results will appear automatically when the search completes.</p>
+        <p class="text-[#7a8394] text-sm lg:text-base">Results will appear automatically when the search completes.</p>
         {{end}}
     </div>
     {{end}}
 
-    <!-- Footer -->
-    {{template "footer" .}}
 </div>
-<div id="context-modal"></div>
 {{end}}
