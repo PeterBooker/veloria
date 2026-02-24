@@ -97,8 +97,8 @@ jobs:
             pkg_dir="dist/mcp-${npm_platform}"
             mkdir -p "$pkg_dir"
 
-            # Find the binary from GoReleaser output
-            binary=$(find "dist/veloria-mcp_${gr_name}" -name 'veloria-mcp*' -type f | head -1)
+            # Find the binary from GoReleaser output (GoReleaser v2 appends _v1 to amd64 dirs)
+            binary=$(find dist/ -maxdepth 2 -path "*veloria-mcp_${gr_name}*" -name 'veloria-mcp*' -type f | head -1)
             cp "$binary" "$pkg_dir/"
 
             ext=""
