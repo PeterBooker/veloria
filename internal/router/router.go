@@ -20,7 +20,7 @@ import (
 	"veloria/internal/core"
 	"veloria/internal/logger"
 	"veloria/internal/manager"
-	"veloria/internal/ogimage"
+	ogimage "veloria/internal/image"
 	"veloria/internal/plugin"
 	"veloria/internal/report"
 	"veloria/internal/search"

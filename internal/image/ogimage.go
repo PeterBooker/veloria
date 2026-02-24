@@ -1,9 +1,9 @@
-package ogimage
+package image
 
 import (
 	"bytes"
 	"fmt"
-	"image"
+	stdimage "image"
 	"image/png"
 	"io/fs"
 
@@ -14,7 +14,7 @@ import (
 // Generator renders dynamic OG images using a base template image and overlaid text.
 // It is safe for concurrent use after initialization.
 type Generator struct {
-	baseImage   image.Image
+	baseImage   stdimage.Image
 	boldFont    *truetype.Font
 	regularFont *truetype.Font
 }
@@ -107,4 +107,3 @@ func loadFont(fsys fs.FS, path string) (*truetype.Font, error) {
 	}
 	return f, nil
 }
-

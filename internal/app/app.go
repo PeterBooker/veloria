@@ -22,6 +22,7 @@ import (
 	"veloria/internal/manager"
 	veloriamc "veloria/internal/mcp"
 	"veloria/internal/ogimage"
+	ogimage "veloria/internal/image"
 	"veloria/internal/repo"
 	"veloria/internal/router"
 	"veloria/internal/sentry"

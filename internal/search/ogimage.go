@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	api "veloria/internal/api"
-	"veloria/internal/ogimage"
+	ogimage "veloria/internal/image"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/web"
 )

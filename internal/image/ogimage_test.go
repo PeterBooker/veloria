@@ -1,8 +1,8 @@
-package ogimage
+package image
 
 import (
 	"bytes"
-	"image"
+	stdimage "image"
 	"image/png"
 	"testing"
 
@@ -80,7 +80,7 @@ func TestRenderSearch_Dimensions(t *testing.T) {
 	data, err := gen.RenderSearch("test", 1, 1, "plugins")
 	require.NoError(t, err)
 
-	img, _, err := image.Decode(bytes.NewReader(data))
+	img, _, err := stdimage.Decode(bytes.NewReader(data))
 	require.NoError(t, err)
 
 	bounds := img.Bounds()
