@@ -76,7 +76,7 @@ func (s *APIService) Search(ctx context.Context, params SearchParams) (string, *
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := s.client.Do(req)
+	resp, err := s.client.Do(req) // #nosec G704 -- base URL validated in NewAPIService
 	if err != nil {
 		return "", nil, fmt.Errorf("search request failed: %w", err)
 	}
@@ -106,7 +106,7 @@ func (s *APIService) LoadSearch(ctx context.Context, searchID string) (*SearchRe
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	resp, err := s.client.Do(req)
+	resp, err := s.client.Do(req) // #nosec G704 -- base URL validated in NewAPIService
 	if err != nil {
 		return nil, fmt.Errorf("load search request failed: %w", err)
 	}
@@ -151,7 +151,7 @@ func (s *APIService) ListExtensions(ctx context.Context, params ListParams) (*Li
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := s.client.Do(req)
+	resp, err := s.client.Do(req) // #nosec G704 -- base URL validated in NewAPIService
 	if err != nil {
 		return nil, fmt.Errorf("list request failed: %w", err)
 	}
