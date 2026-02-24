@@ -23,18 +23,30 @@ const (
 // APIService implements SearchService by calling Veloria's REST API.
 // Used by the stdio MCP binary to communicate with a running Veloria instance.
 type APIService struct {
-	baseURL string
-	client  *http.Client
+	base   *url.URL
+	client *http.Client
 }
 
 // NewAPIService creates a new APIService pointed at the given Veloria base URL.
-func NewAPIService(baseURL string) *APIService {
+// The URL is validated at construction time to prevent SSRF via tainted input.
+func NewAPIService(baseURL string) (*APIService, error) {
+	u, err := url.Parse(strings.TrimRight(baseURL, "/"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid base URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("base URL must use http or https scheme, got %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return nil, fmt.Errorf("base URL must include a host")
+	}
+
 	return &APIService{
-		baseURL: strings.TrimRight(baseURL, "/"),
+		base: u,
 		client: &http.Client{
 			Timeout: apiTimeout,
 		},
-	}
+	}, nil
 }
 
 func (s *APIService) Search(ctx context.Context, params SearchParams) (string, *SearchResponse, error) {
@@ -58,7 +70,7 @@ func (s *APIService) Search(ctx context.Context, params SearchParams) (string, *
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		s.baseURL+"/api/v1/search", bytes.NewReader(jsonBody))
+		s.base.JoinPath("/api/v1/search").String(), bytes.NewReader(jsonBody))
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -89,7 +101,7 @@ func (s *APIService) Search(ctx context.Context, params SearchParams) (string, *
 
 func (s *APIService) LoadSearch(ctx context.Context, searchID string) (*SearchResponse, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		s.baseURL+"/api/v1/search/"+url.PathEscape(searchID), nil)
+		s.base.JoinPath("/api/v1/search", searchID).String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -123,10 +135,7 @@ func (s *APIService) ListExtensions(ctx context.Context, params ListParams) (*Li
 		endpoint = "/api/v1/plugins"
 	}
 
-	u, err := url.Parse(s.baseURL + endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse URL: %w", err)
-	}
+	u := s.base.JoinPath(endpoint)
 
 	q := u.Query()
 	q.Set("page", strconv.Itoa(params.Offset/max(params.Limit, 1)+1))

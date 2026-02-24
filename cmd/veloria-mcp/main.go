@@ -21,7 +21,11 @@ func main() {
 		baseURL = defaultURL
 	}
 
-	svc := veloriamc.NewAPIService(baseURL)
+	svc, err := veloriamc.NewAPIService(baseURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "veloria-mcp: %v\n", err)
+		os.Exit(1)
+	}
 	mcpServer := veloriamc.NewMCPServer("veloria", config.Version, svc)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

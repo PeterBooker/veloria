@@ -71,7 +71,7 @@ func (s *DirectService) Search(ctx context.Context, params SearchParams) (string
 		FileMatch:        params.FileMatch,
 		ExcludeFileMatch: params.ExcludeFileMatch,
 		CaseInsensitive:  !params.CaseSensitive,
-		LinesOfContext:   uint(params.ContextLines),
+		LinesOfContext:   uint(max(params.ContextLines, 0)), //nolint:gosec // clamped to 0-5 by caller
 	})
 	if err != nil {
 		return "", nil, fmt.Errorf("search failed: %w", err)
