@@ -4,65 +4,65 @@
 
 {{define "title"}}{{.RepoSummary.Title}} - Veloria{{end}}
 
+{{define "head"}}{{end}}
+
 {{define "content"}}
 <!-- Heading -->
-<div class="mb-6 lg:px-7 py-6 lg:py-0 lg:pt-5">
-    <nav class="text-sm text-gray-400 mb-3">
-        <a href="/repos" class="hover:text-brand-600 transition-colors">Repositories</a>
+<div class="mb-6 pt-8 lg:pt-10">
+    <nav class="text-sm text-[#4e5666] mb-3">
+        <a href="/data-sources" class="hover:text-neon-pink transition-colors">Data Sources</a>
         <span class="mx-2">/</span>
-        <span class="text-gray-700 font-medium">{{.RepoSummary.Title}}</span>
+        <span class="text-[#cdd5e0] font-medium">{{.RepoSummary.Title}}</span>
     </nav>
     <div class="flex items-center gap-4">
-        <div class="w-14 h-14 rounded-xl bg-white/60 border border-white/50 flex items-center justify-center">
+        <div class="w-14 h-14 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center">
             {{if eq .RepoSummary.Repo "plugins"}}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="#3b82f6">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#ff2d7b">
                 <path d="M10.5 4v4h3V4H15v4h1.5a1 1 0 011 1v4l-3 4v2a1 1 0 01-1 1h-3a1 1 0 01-1-1v-2l-3-4V9a1 1 0 011-1H9V4h1.5zm.5 12.5v2h2v-2l3-4v-3H8v3l3 4z"></path>
             </svg>
             {{else if eq .RepoSummary.Repo "themes"}}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="#3b82f6" fill-rule="evenodd" clip-rule="evenodd">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#b44dff" fill-rule="evenodd" clip-rule="evenodd">
                 <path d="M16.375 4.5H4.625a.125.125 0 0 0-.125.125v8.254l2.859-1.54a.75.75 0 0 1 .68-.016l2.384 1.142 2.89-2.074a.75.75 0 0 1 .874 0l2.313 1.66V4.625a.125.125 0 0 0-.125-.125Zm.125 9.398-2.75-1.975-2.813 2.02a.75.75 0 0 1-.76.067l-2.444-1.17L4.5 14.583v1.792c0 .069.056.125.125.125h11.75a.125.125 0 0 0 .125-.125v-2.477ZM4.625 3C3.728 3 3 3.728 3 4.625v11.75C3 17.273 3.728 18 4.625 18h11.75c.898 0 1.625-.727 1.625-1.625V4.625C18 3.728 17.273 3 16.375 3H4.625ZM20 8v11c0 .69-.31 1-.999 1H6v1.5h13.001c1.52 0 2.499-.982 2.499-2.5V8H20Z"></path>
             </svg>
             {{else}}
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="#3b82f6">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="#ffd700">
                 <path d="M12 4c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8Zm6.5 8c0 .6 0 1.2-.2 1.8h-2.7c0-.6.2-1.1.2-1.8s0-1.2-.2-1.8h2.7c.2.6.2 1.1.2 1.8Zm-.9-3.2h-2.4c-.3-.9-.7-1.8-1.1-2.4-.1-.2-.2-.4-.3-.5 1.6.5 3 1.6 3.8 3ZM12.8 17c-.3.5-.6 1-.8 1.3-.2-.3-.5-.8-.8-1.3-.3-.5-.6-1.1-.8-1.7h3.3c-.2.6-.5 1.2-.8 1.7Zm-2.9-3.2c-.1-.6-.2-1.1-.2-1.8s0-1.2.2-1.8H14c.1.6.2 1.1.2 1.8s0 1.2-.2 1.8H9.9ZM11.2 7c.3-.5.6-1 .8-1.3.2.3.5.8.8 1.3.3.5.6 1.1.8 1.7h-3.3c.2-.6.5-1.2.8-1.7Zm-1-1.2c-.1.2-.2.3-.3.5-.4.7-.8 1.5-1.1 2.4H6.4c.8-1.4 2.2-2.5 3.8-3Zm-1.8 8H5.7c-.2-.6-.2-1.1-.2-1.8s0-1.2.2-1.8h2.7c0 .6-.2 1.1-.2 1.8s0 1.2.2 1.8Zm-2 1.4h2.4c.3.9.7 1.8 1.1 2.4.1.2.2.4.3.5-1.6-.5-3-1.6-3.8-3Zm7.4 3c.1-.2.2-.3.3-.5.4-.7.8-1.5 1.1-2.4h2.4c-.8 1.4-2.2 2.5-3.8 3Z"></path>
             </svg>
             {{end}}
         </div>
         <div>
-            <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-gray-900">{{.RepoSummary.Title}}</h1>
-            <p class="text-sm text-gray-600">WordPress {{.RepoSummary.Repo}} repository</p>
+            <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-[#f4f6f9]">{{.RepoSummary.Title}}</h1>
+            <p class="text-sm text-[#cdd5e0]">WordPress {{.RepoSummary.Repo}} repository</p>
         </div>
     </div>
 </div>
 
-<!-- Outer Glass Container -->
-<div class="glass-outer p-5 lg:p-7 flex-1 flex flex-col min-h-0">
     <!-- Index Status -->
     <div class="glass-inner p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-gray-900">Index Status</h2>
-            <span class="text-sm text-gray-500">{{.RepoSummary.IndexedPercent}}% complete</span>
+            <h2 class="text-lg font-semibold text-[#f4f6f9]">Index Status</h2>
+            <span class="text-sm text-[#7a8394]">{{.RepoSummary.IndexedPercent}}% complete</span>
         </div>
         <div class="grid grid-cols-3 gap-6 mb-4">
             <div>
-                <p class="text-sm text-gray-500 mb-1">Total Items</p>
-                <p class="text-2xl font-bold text-gray-900">{{formatNumber .RepoSummary.Total}}</p>
+                <p class="text-sm text-[#7a8394] mb-1">Total Items</p>
+                <p class="text-2xl font-bold text-[#f4f6f9]">{{formatNumber .RepoSummary.Total}}</p>
             </div>
             <div>
-                <p class="text-sm text-gray-500 mb-1">Indexed</p>
-                <p class="text-2xl font-bold text-brand-600">{{formatNumber .RepoSummary.Indexed}} <span class="text-sm font-normal text-gray-400">({{.RepoSummary.IndexedPercent}}%)</span></p>
+                <p class="text-sm text-[#7a8394] mb-1">Indexed</p>
+                <p class="text-2xl font-bold text-brand-600">{{formatNumber .RepoSummary.Indexed}} <span class="text-sm font-normal text-[#4e5666]">({{.RepoSummary.IndexedPercent}}%)</span></p>
             </div>
             <div>
-                <p class="text-sm text-gray-500 mb-1">Not Indexed</p>
+                <p class="text-sm text-[#7a8394] mb-1">Not Indexed</p>
                 {{$notIndexed := sub .RepoSummary.Total .RepoSummary.Indexed}}
-                <p class="text-2xl font-bold text-gray-400">{{formatNumber $notIndexed}}</p>
+                <p class="text-2xl font-bold text-[#4e5666]">{{formatNumber $notIndexed}}</p>
             </div>
         </div>
-        <div class="h-2 bg-gray-200/70 rounded-full overflow-hidden">
+        <div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
             {{if gt .RepoSummary.Total 0}}
-            <div class="h-full rounded-full" style="width: {{.RepoSummary.IndexedPercent}}%; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+            <div class="h-full rounded-full" style="width: {{.RepoSummary.IndexedPercent}}%; background: linear-gradient(135deg, #ff2d7b, #b44dff);"></div>
             {{else}}
-            <div class="h-full bg-gray-300 rounded-full"></div>
+            <div class="h-full bg-[#4e5666] rounded-full"></div>
             {{end}}
         </div>
     </div>
@@ -73,8 +73,8 @@
         {{if .ActiveInstalls.JSON}}
         <div class="glass-inner p-6">
             <div class="flex items-center justify-between mb-2">
-                <h3 class="text-lg font-semibold text-gray-900">Active Installs</h3>
-                <span class="text-xs text-gray-400">Max {{formatCompact (int .ActiveInstalls.Max)}}</span>
+                <h3 class="text-lg font-semibold text-[#f4f6f9]">Active Installs</h3>
+                <span class="text-xs text-[#4e5666]">Max {{formatCompact (int .ActiveInstalls.Max)}}</span>
             </div>
             <div id="chart-active-installs" style="width:100%;height:200px;"></div>
         </div>
@@ -83,19 +83,20 @@
         {{if or .FileCount.JSON .FileSize.JSON}}
         <div class="glass-inner p-6">
             <div class="flex items-center justify-between mb-2">
-                <h3 class="text-lg font-semibold text-gray-900">File Stats</h3>
+                <h3 class="text-lg font-semibold text-[#f4f6f9]">File Stats</h3>
             </div>
             <div id="chart-file-stats" style="width:100%;height:200px;"></div>
         </div>
         {{end}}
     </div>
 
+    <script src="/static/js/echarts.min.js"></script>
     <script>
     (function() {
-        var brand500 = '#3b82f6';
-        var brand300 = '#93c5fd';
-        var brandArea = 'rgba(59,130,246,0.08)';
-        var brand300Area = 'rgba(147,197,253,0.08)';
+        var brand500 = '#ff2d7b';
+        var brand300 = '#b44dff';
+        var brandArea = 'rgba(255,45,123,0.08)';
+        var brand300Area = 'rgba(180,77,255,0.08)';
 
         function fmtBytes(b) {
             if (b >= 1073741824) return (b/1073741824).toFixed(1)+' GB';
@@ -117,7 +118,7 @@
             chart.setOption({
                 grid: { top: 10, right: 16, bottom: 24, left: 50 },
                 xAxis: { type: 'category', show: false, data: data.map(function(_,i){return i;}) },
-                yAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#9ca3af', formatter: function(v){return fmtCompact(v);} }, splitLine: { lineStyle: { color: 'rgba(0,0,0,0.04)' } } },
+                yAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
                 tooltip: { trigger: 'axis', formatter: function(p){ return 'Active installs: '+fmtCompact(p[0].value); } },
                 series: [{
                     type: 'line', data: data, showSymbol: false, smooth: true,
@@ -139,11 +140,11 @@
                 grid: { top: 10, right: 60, bottom: 24, left: 50 },
                 xAxis: { type: 'category', show: false, data: (sizeData.length ? sizeData : countData).map(function(_,i){return i;}) },
                 yAxis: [
-                    { type: 'value', position: 'left', axisLabel: { fontSize: 10, color: '#9ca3af', formatter: function(v){return fmtBytes(v);} }, splitLine: { lineStyle: { color: 'rgba(0,0,0,0.04)' } } },
-                    { type: 'value', position: 'right', axisLabel: { fontSize: 10, color: '#9ca3af', formatter: function(v){return fmtCompact(v);} }, splitLine: { show: false } }
+                    { type: 'value', position: 'left', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtBytes(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
+                    { type: 'value', position: 'right', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { show: false } }
                 ],
                 tooltip: { trigger: 'axis', formatter: function(p){ var s=''; for(var i=0;i<p.length;i++){s+=p[i].marker+' '+p[i].seriesName+': '+(p[i].seriesName==='Total size'?fmtBytes(p[i].value):fmtCompact(p[i].value))+'<br>';} return s; } },
-                legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#6b7280' } },
+                legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#7a8394' } },
                 series: [
                     {{if .FileSize.JSON}}
                     { name: 'Total size', type: 'line', data: sizeData, showSymbol: false, smooth: true, yAxisIndex: 0,
@@ -167,9 +168,9 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {{if .LargestBySize}}
         <div class="glass-inner overflow-hidden">
-            <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
-                <h2 class="text-base font-semibold text-gray-900">Largest by Size</h2>
-                <p class="text-sm text-gray-500">Top {{len .LargestBySize}} {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
+            <div class="px-6 py-4 border-b-medium">
+                <h2 class="text-base font-semibold text-[#f4f6f9]">Largest by Size</h2>
+                <p class="text-sm text-[#7a8394]">Top {{len .LargestBySize}} {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
             </div>
             <div class="p-6">
                 {{$maxSize := 0}}
@@ -179,14 +180,14 @@
                 <div class="space-y-3">
                     {{$repo := .RepoSummary.Repo}}
                     {{range .LargestBySize}}
-                    <a href="/repos/{{$repo}}/{{.Slug}}" class="group block">
+                    <a href="/data-sources/{{$repo}}/{{.Slug}}" class="group block">
                         <div class="flex items-center justify-between text-sm mb-1">
                             <span class="text-brand-600 font-medium truncate">{{.Name}}</span>
-                            <span class="text-gray-500 ml-2 flex-shrink-0">{{formatBytes .TotalSize}}</span>
+                            <span class="text-[#7a8394] ml-2 flex-shrink-0">{{formatBytes .TotalSize}}</span>
                         </div>
-                        <div class="h-1.5 bg-gray-200/70 rounded-full overflow-hidden">
+                        <div class="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                             <div class="h-full rounded-full transition-all duration-300 group-hover:opacity-80"
-                                 style="width: {{if gt $maxSize 0}}{{printf "%.1f" (divideFloat .TotalSize $maxSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #3b82f6, #2563eb);"></div>
+                                 style="width: {{if gt $maxSize 0}}{{printf "%.1f" (divideFloat .TotalSize $maxSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #ff2d7b, #b44dff);"></div>
                         </div>
                     </a>
                     {{end}}
@@ -197,9 +198,9 @@
 
         {{if .LargestByFileCount}}
         <div class="glass-inner overflow-hidden">
-            <div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
-                <h2 class="text-base font-semibold text-gray-900">Most Files</h2>
-                <p class="text-sm text-gray-500">Top {{len .LargestByFileCount}} {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
+            <div class="px-6 py-4 border-b-medium">
+                <h2 class="text-base font-semibold text-[#f4f6f9]">Most Files</h2>
+                <p class="text-sm text-[#7a8394]">Top {{len .LargestByFileCount}} {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
             </div>
             <div class="p-6">
                 {{$maxCount := 0}}
@@ -209,14 +210,14 @@
                 <div class="space-y-3">
                     {{$repo := .RepoSummary.Repo}}
                     {{range .LargestByFileCount}}
-                    <a href="/repos/{{$repo}}/{{.Slug}}" class="group block">
+                    <a href="/data-sources/{{$repo}}/{{.Slug}}" class="group block">
                         <div class="flex items-center justify-between text-sm mb-1">
                             <span class="text-brand-600 font-medium truncate">{{.Name}}</span>
-                            <span class="text-gray-500 ml-2 flex-shrink-0">{{formatNumber .FileCount}} files</span>
+                            <span class="text-[#7a8394] ml-2 flex-shrink-0">{{formatNumber .FileCount}} files</span>
                         </div>
-                        <div class="h-1.5 bg-gray-200/70 rounded-full overflow-hidden">
+                        <div class="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                             <div class="h-full rounded-full transition-all duration-300 group-hover:opacity-80"
-                                 style="width: {{if gt $maxCount 0}}{{printf "%.1f" (divideFloat (int64 .FileCount) (int64 $maxCount) | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #93c5fd, #3b82f6);"></div>
+                                 style="width: {{if gt $maxCount 0}}{{printf "%.1f" (divideFloat (int64 .FileCount) (int64 $maxCount) | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #b44dff, #00e5ff);"></div>
                         </div>
                     </a>
                     {{end}}
@@ -229,12 +230,12 @@
 
     <!-- Items List -->
     <div class="glass-inner overflow-hidden">
-        <div class="px-6 py-4 flex items-center justify-between gap-4" style="border-bottom: 1px solid rgba(255,255,255,0.5);">
-            <h2 class="text-lg font-semibold text-gray-900 flex-shrink-0">
+        <div class="px-6 py-4 flex items-center justify-between gap-4 border-b-medium">
+            <h2 class="text-lg font-semibold text-[#f4f6f9] flex-shrink-0">
                 {{if eq .RepoSummary.Repo "plugins"}}Plugins{{else if eq .RepoSummary.Repo "themes"}}Themes{{else}}Core Versions{{end}}
             </h2>
             <div class="relative w-full max-w-xs">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4e5666] pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
@@ -242,18 +243,18 @@
                     type="search"
                     name="search"
                     placeholder="Search by name or slug..."
-                    hx-get="/repos/{{.RepoSummary.Repo}}/items"
+                    hx-get="/data-sources/{{.RepoSummary.Repo}}/items"
                     hx-trigger="input changed delay:300ms, search"
                     hx-target="#repo-items"
                     hx-swap="innerHTML"
                     hx-include="this"
-                    class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/50 border border-white/60 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition"
+                    class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-[#cdd5e0] focus:outline-none focus:border-neon-cyan/40 focus:ring-2 focus:ring-neon-cyan/20 transition"
                 >
             </div>
         </div>
 
         <div id="repo-items"
-             hx-get="/repos/{{.RepoSummary.Repo}}/items"
+             hx-get="/data-sources/{{.RepoSummary.Repo}}/items"
              hx-trigger="load"
              hx-swap="innerHTML">
             <div class="px-6 py-12 flex items-center justify-center">
@@ -261,12 +262,8 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
-                <span class="ml-2 text-sm text-gray-500">Loading...</span>
+                <span class="ml-2 text-sm text-[#7a8394]">Loading...</span>
             </div>
         </div>
     </div>
-
-    <!-- Footer -->
-    {{template "footer" .}}
-</div>
 {{end}}

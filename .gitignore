@@ -38,6 +38,7 @@ go.work.sum
 
 # Build output
 /dist
+node_modules
 
 # AI files.
 ./claude

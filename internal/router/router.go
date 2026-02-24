@@ -1,6 +1,7 @@
 package router
 
 import (
+	"io/fs"
 	"net/http"
 	"strings"
 	"time"
@@ -112,6 +113,10 @@ func New(deps RouterDeps) *chi.Mux {
 		})
 	}
 
+	// Static assets (CSS, JS, fonts)
+	staticFS, _ := fs.Sub(assets.FS, "static")
+	r.Handle("/static/*", http.StripPrefix("/static/", cacheStatic(http.FileServerFS(staticFS))))
+
 	// Static OG default image
 	r.Get("/og-default.png", web.StaticImage(assets.FS, "og-default.png"))
 
@@ -119,14 +124,15 @@ func New(deps RouterDeps) *chi.Mux {
 	if deps.WebDeps != nil {
 		r.Get("/", web.HomePage(deps.WebDeps))
 		r.Get("/about", web.AboutPage(deps.WebDeps))
-		r.Get("/repos", web.ReposPage(deps.WebDeps))
-		r.Get("/repos/{type}", web.RepoPage(deps.WebDeps))
-		r.Get("/repos/plugins/items", web.RepoItemsPartial(deps.WebDeps, "plugins"))
-		r.Get("/repos/themes/items", web.RepoItemsPartial(deps.WebDeps, "themes"))
-		r.Get("/repos/cores/items", web.RepoItemsPartial(deps.WebDeps, "cores"))
-		r.Get("/repos/plugins/{slug}", plugin.ViewPage(deps.WebDeps))
-		r.Get("/repos/themes/{slug}", theme.ViewPage(deps.WebDeps))
-		r.Get("/repos/cores/{version}", core.ViewPage(deps.WebDeps))
+		r.Get("/docs", web.DocsPage(deps.WebDeps))
+		r.Get("/data-sources", web.ReposPage(deps.WebDeps))
+		r.Get("/data-sources/{type}", web.RepoPage(deps.WebDeps))
+		r.Get("/data-sources/plugins/items", web.RepoItemsPartial(deps.WebDeps, "plugins"))
+		r.Get("/data-sources/themes/items", web.RepoItemsPartial(deps.WebDeps, "themes"))
+		r.Get("/data-sources/cores/items", web.RepoItemsPartial(deps.WebDeps, "cores"))
+		r.Get("/data-sources/plugins/{slug}", plugin.ViewPage(deps.WebDeps))
+		r.Get("/data-sources/themes/{slug}", theme.ViewPage(deps.WebDeps))
+		r.Get("/data-sources/cores/{version}", core.ViewPage(deps.WebDeps))
 		r.Get("/searches", search.ListPage(deps.WebDeps))
 		r.Get("/search/{uuid}", search.ViewPage(deps.WebDeps))
 		r.Get("/search/{uuid}/context", search.ContextPage(deps.WebDeps))
@@ -230,6 +236,14 @@ func New(deps RouterDeps) *chi.Mux {
 	})
 
 	return r
+}
+
+// cacheStatic wraps a handler with long-lived cache headers for static assets.
+func cacheStatic(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=604800, immutable")
+		h.ServeHTTP(w, r)
+	})
 }
 
 // securityHeaders sets common security headers on every response.

@@ -5,178 +5,53 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="view-transition" content="same-origin">
+    <meta name="htmx-config" content='{"globalViewTransitions": true}'>
     <title>{{block "title" .}}Veloria - WordPress Code Search{{end}}</title>
 
     {{block "meta" .}}
-    <!-- Open Graph -->
     <meta property="og:title" content="{{.OG.Title}}">
     <meta property="og:description" content="{{.OG.Description}}">
     <meta property="og:url" content="{{.OG.URL}}">
     <meta property="og:image" content="{{.OG.Image}}">
     <meta property="og:type" content="{{.OG.Type}}">
     <meta property="og:site_name" content="Veloria">
-
-    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{{.OG.Title}}">
     <meta name="twitter:description" content="{{.OG.Description}}">
     <meta name="twitter:image" content="{{.OG.Image}}">
-
-    <!-- Standard meta -->
     <meta name="description" content="{{.OG.Description}}">
     {{if .OG.URL}}<link rel="canonical" href="{{.OG.URL}}">{{end}}
     {{end}}
 
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
-                            400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
-                        }
-                    },
-                    fontFamily: {
-                        mono: ["'SF Mono'", 'Menlo', 'Consolas', 'monospace'],
-                    }
-                }
-            }
-        }
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 18px; }
-
-        .app-bg {
-            background-color: #e0eef9;
-            background-image:
-                radial-gradient(ellipse 55% 50% at 10% 20%, rgba(135, 200, 245, 0.5) 0%, transparent 70%),
-                radial-gradient(ellipse 50% 55% at 85% 15%, rgba(170, 210, 245, 0.45) 0%, transparent 65%),
-                radial-gradient(ellipse 45% 40% at 50% 85%, rgba(160, 210, 250, 0.35) 0%, transparent 60%),
-                radial-gradient(ellipse 60% 50% at 75% 60%, rgba(185, 215, 248, 0.3) 0%, transparent 55%),
-                radial-gradient(ellipse 35% 30% at 20% 70%, rgba(145, 200, 240, 0.25) 0%, transparent 50%),
-                radial-gradient(ellipse 80% 60% at 50% 50%, rgba(220, 238, 252, 0.6) 0%, transparent 70%);
-        }
-
-        .glass-outer {
-            background: rgba(255, 255, 255, 0.38);
-            backdrop-filter: blur(28px) saturate(1.4);
-            -webkit-backdrop-filter: blur(28px) saturate(1.4);
-            border: 1px solid rgba(255, 255, 255, 0.55);
-            border-radius: 24px;
-            box-shadow:
-                0 0 0 0.5px rgba(255, 255, 255, 0.4),
-                0 1px 2px rgba(0, 0, 0, 0.02),
-                0 12px 48px rgba(100, 130, 200, 0.07);
-        }
-
-        .glass-inner {
-            background: rgba(255, 255, 255, 0.55);
-            backdrop-filter: blur(16px) saturate(1.3);
-            -webkit-backdrop-filter: blur(16px) saturate(1.3);
-            border: 1px solid rgba(255, 255, 255, 0.7);
-            border-radius: 18px;
-            box-shadow:
-                0 0 0 0.5px rgba(255, 255, 255, 0.5),
-                0 1px 3px rgba(0, 0, 0, 0.03),
-                0 6px 24px rgba(100, 130, 200, 0.05);
-        }
-
-        .glass-inset {
-            background: rgba(255, 255, 255, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            border-radius: 14px;
-            transition: all 0.2s ease;
-        }
-        .glass-inset:hover {
-            background: rgba(255, 255, 255, 0.7);
-            border-color: rgba(59, 130, 246, 0.2);
-            box-shadow: 0 2px 12px rgba(59, 130, 246, 0.07);
-        }
-
-        .search-wrapper {
-            background: rgba(255, 255, 255, 0.5);
-            border: 1.5px solid rgba(0, 0, 0, 0.15);
-            border-radius: 14px;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
-            transition: all 0.2s ease;
-        }
-        .search-wrapper:focus-within {
-            background: rgba(255, 255, 255, 0.72);
-            border-color: rgba(59, 130, 246, 0.45);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08), inset 0 1px 2px rgba(0, 0, 0, 0.02);
-        }
-
-        .control-pill {
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid rgba(0, 0, 0, 0.06);
-            background: rgba(255, 255, 255, 0.45);
-        }
-
-        .nav-active {
-            background: rgba(255, 255, 255, 0.55);
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-        }
-
-        .example-card {
-            background: rgba(255, 255, 255, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            border-radius: 14px;
-            transition: all 0.2s ease;
-        }
-        .example-card:hover {
-            background: rgba(255, 255, 255, 0.65);
-            border-color: rgba(59, 130, 246, 0.2);
-            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.08);
-        }
-
-        .badge-count {
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: white; font-size: 10px; font-weight: 700;
-            border-radius: 10px; padding: 2px 7px;
-            min-width: 20px; text-align: center; line-height: 1.4;
-        }
-
-        /* View Transitions API */
-        @view-transition { navigation: auto; }
-        ::view-transition-old(root) { animation: page-fade-out 150ms ease-out; }
-        ::view-transition-new(root) { animation: page-fade-in 200ms ease-in; }
-        @keyframes page-fade-out { from { opacity: 1; } to { opacity: 0; } }
-        @keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
-        @media (prefers-reduced-motion: reduce) {
-            ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 0.8s linear infinite; }
-        .htmx-indicator { display: none; }
-        .htmx-request .htmx-indicator { display: flex; }
-        .htmx-request.htmx-indicator { display: flex; }
-    </style>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="/static/js/htmx.min.js"></script>
+    {{block "head" .}}{{end}}
 </head>
-<body class="min-h-screen text-gray-700 overflow-x-hidden app-bg">
-    <!-- Skip to main content link -->
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-600 focus:text-white focus:rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-400">
+<body class="min-h-screen overflow-x-hidden flex flex-col" hx-boost="true">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[60] focus:px-4 focus:py-2 focus:bg-neon-pink focus:text-white focus:rounded-lg focus:outline-none">
         Skip to main content
     </a>
 
+    <div class="neon-grid" aria-hidden="true">
+        <div class="neon-blob-1"></div>
+        <div class="neon-blob-2"></div>
+        <div class="neon-blob-3"></div>
+        <div class="neon-blob-4"></div>
+        <div class="neon-scanlines"></div>
+    </div>
+
     <!-- Mobile Header -->
-    <header class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white/50 backdrop-blur-2xl border-b border-white/60 px-4 py-3">
-        <div class="flex items-center justify-between">
+    <header class="lg:hidden site-header">
+        <div class="flex items-center justify-between px-4 h-[56px]">
             <a href="/" class="flex items-center gap-2.5">
-                <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
-                    <path d="M30 2L12 24L30 46" stroke="#2563eb" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M36 18L54 40L36 62" stroke="#60a5fa" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                <svg width="28" height="28" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                    <path d="M30 2L12 24L30 46" stroke="#00e5ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M36 18L54 40L36 62" stroke="#ff2d7b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span class="text-lg font-bold tracking-tight text-gray-900">Veloria</span>
+                <span class="text-lg font-bold tracking-wide text-[#f4f6f9]">Veloria</span>
             </a>
-            <button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-xl hover:bg-white/40 transition" aria-label="Open menu" aria-expanded="false" id="mobile-menu-button">
-                <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-xl hover:bg-white/5 transition" aria-label="Open menu" aria-expanded="false" id="mobile-menu-button" hx-boost="false">
+                <svg class="w-6 h-6 text-[#7a8394]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
                     <line x1="3" y1="12" x2="21" y2="12"></line>
                     <line x1="3" y1="6" x2="21" y2="6"></line>
                     <line x1="3" y1="18" x2="21" y2="18"></line>
@@ -186,69 +61,72 @@
     </header>
 
     <!-- Mobile Menu Overlay -->
-    <div id="mobile-menu" class="lg:hidden fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-label="Navigation menu">
-        <div class="absolute inset-0 bg-black/25 backdrop-blur-sm" onclick="toggleMobileMenu()"></div>
-        <nav class="absolute inset-y-0 left-0 w-72 bg-white/85 backdrop-blur-2xl shadow-xl flex flex-col">
-            <!-- Mobile Menu Header -->
-            <div class="flex items-center justify-between p-4 border-b border-black/5">
+    <div id="mobile-menu" class="lg:hidden fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-label="Navigation menu" hx-boost="false">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="toggleMobileMenu()"></div>
+        <nav class="absolute inset-y-0 left-0 w-72 flex flex-col bg-[rgba(12,14,28,0.95)] backdrop-blur-[24px]">
+            <div class="flex items-center justify-between p-4 border-b-medium">
                 <a href="/" class="flex items-center gap-2.5" onclick="toggleMobileMenu()">
-                    <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
-                        <path d="M30 2L12 24L30 46" stroke="#2563eb" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M36 18L54 40L36 62" stroke="#60a5fa" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                    <svg width="28" height="28" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                        <path d="M30 2L12 24L30 46" stroke="#00e5ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M36 18L54 40L36 62" stroke="#ff2d7b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
-                    <span class="text-lg font-bold tracking-tight text-gray-900">Veloria</span>
+                    <span class="text-lg font-bold tracking-wide text-[#f4f6f9]">Veloria</span>
                 </a>
-                <button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-xl hover:bg-gray-100 transition" aria-label="Close menu">
-                    <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-xl hover:bg-white/5 transition" aria-label="Close menu">
+                    <svg class="w-6 h-6 text-[#7a8394]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 </button>
             </div>
 
-            <!-- Early Release Notice -->
-            <div class="mx-3 mt-3 px-3 py-2 rounded-xl bg-amber-50/80 border border-amber-200/60 text-xs text-amber-700 leading-snug">
+            <div class="mx-3 mt-3 px-3 py-2 rounded-xl text-xs leading-snug bg-[rgba(255,215,0,0.08)] border border-[rgba(255,215,0,0.15)] text-neon-gold">
                 Early test release — data may be wiped
             </div>
 
-            <!-- Mobile Navigation Links -->
             <div class="flex-1 overflow-y-auto p-3 space-y-1">
                 {{$currentPath := .CurrentPath}}
-                <a href="/" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if eq $currentPath "/"}}font-semibold text-brand-600 nav-active{{else}}text-gray-500 hover:bg-white/60{{end}}">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <a href="/" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if eq $currentPath "/"}}font-semibold text-[#eef1f6] nav-active{{else}}text-[#7a8394] hover:bg-white/5{{end}}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <path d="M3 10.5L12 3l9 7.5V21a1 1 0 01-1 1H4a1 1 0 01-1-1z"/><path d="M9 22V12h6v10"/>
                     </svg>
                     Home
                 </a>
-                <a href="/searches" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if hasPrefix $currentPath "/searches"}}font-semibold text-brand-600 nav-active{{else}}text-gray-500 hover:bg-white/60{{end}}">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M13 5c-3.3 0-6 2.7-6 6 0 1.4.5 2.7 1.3 3.7l-3.8 3.8 1.1 1.1 3.8-3.8c1 .8 2.3 1.3 3.7 1.3 3.3 0 6-2.7 6-6S16.3 5 13 5zm0 10.5c-2.5 0-4.5-2-4.5-4.5s2-4.5 4.5-4.5 4.5 2 4.5 4.5-2 4.5-4.5 4.5z"></path>
+                <a href="/searches" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if hasPrefix $currentPath "/searches"}}font-semibold text-[#eef1f6] nav-active{{else}}text-[#7a8394] hover:bg-white/5{{end}}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                     </svg>
                     Searches
                 </a>
-                <a href="/repos" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if hasPrefix $currentPath "/repos"}}font-semibold text-brand-600 nav-active{{else}}text-gray-500 hover:bg-white/60{{end}}">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd">
-                        <path d="M5 5.5h14a.5.5 0 01.5.5v1.5a.5.5 0 01-.5.5H5a.5.5 0 01-.5-.5V6a.5.5 0 01.5-.5zM4 9.232A2 2 0 013 7.5V6a2 2 0 012-2h14a2 2 0 012 2v1.5a2 2 0 01-1 1.732V18a2 2 0 01-2 2H6a2 2 0 01-2-2V9.232zm1.5.268V18a.5.5 0 00.5.5h12a.5.5 0 00.5-.5V9.5h-13z"></path>
+                <a href="/data-sources" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if hasPrefix $currentPath "/data-sources"}}font-semibold text-[#eef1f6] nav-active{{else}}text-[#7a8394] hover:bg-white/5{{end}}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>
                     </svg>
-                    Repositories
+                    Data Sources
                 </a>
-                <a href="/about" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if eq $currentPath "/about"}}font-semibold text-brand-600 nav-active{{else}}text-gray-500 hover:bg-white/60{{end}}">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <a href="/docs" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if eq $currentPath "/docs"}}font-semibold text-[#eef1f6] nav-active{{else}}text-[#7a8394] hover:bg-white/5{{end}}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+                    </svg>
+                    Docs
+                </a>
+                <a href="/about" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if eq $currentPath "/about"}}font-semibold text-[#eef1f6] nav-active{{else}}text-[#7a8394] hover:bg-white/5{{end}}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                     </svg>
                     About
                 </a>
                 {{if .User}}
-                <a href="/my-searches" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if eq $currentPath "/my-searches"}}font-semibold text-brand-600 nav-active{{else}}text-gray-500 hover:bg-white/60{{end}}">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <a href="/my-searches" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if eq $currentPath "/my-searches"}}font-semibold text-[#eef1f6] nav-active{{else}}text-[#7a8394] hover:bg-white/5{{end}}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                     </svg>
                     My Searches
                 </a>
                 {{end}}
                 {{if and .User .User.IsAdmin}}
-                <a href="/admin/reports" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if hasPrefix $currentPath "/admin/reports"}}font-semibold text-brand-600 nav-active{{else}}text-gray-500 hover:bg-white/60{{end}}">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <a href="/admin/reports" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition {{if hasPrefix $currentPath "/admin/reports"}}font-semibold text-[#eef1f6] nav-active{{else}}text-[#7a8394] hover:bg-white/5{{end}}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                     </svg>
                     Reports
@@ -256,28 +134,27 @@
                 {{end}}
             </div>
 
-            <!-- Mobile User Section -->
-            <div class="border-t border-black/5 p-4">
+            <div class="p-4 border-t border-white/[0.08]">
                 {{if .User}}
                 <div class="flex items-center gap-3 px-4 py-3">
                     {{if .User.AvatarURL}}
-                    <img src="{{.User.AvatarURL}}" alt="" class="w-8 h-8 rounded-full ring-2 ring-white">
+                    <img src="{{.User.AvatarURL}}" alt="" class="w-8 h-8 rounded-full ring-2 ring-white/10">
                     {{else}}
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center text-white text-sm font-medium">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium bg-gradient-to-br from-neon-pink to-neon-purple">
                         {{slice .User.Name 0 1}}
                     </div>
                     {{end}}
-                    <span class="text-sm text-gray-600">{{.User.Name}}</span>
+                    <span class="text-sm text-[#cdd5e0]">{{.User.Name}}</span>
                 </div>
-                <a href="/logout" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <a href="/logout" hx-boost="false" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-[#7a8394] hover:bg-white/5 transition">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
                     </svg>
                     Sign out
                 </a>
                 {{else}}
-                <a href="/login" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-500 hover:bg-gray-100 transition">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <a href="/login" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-[#7a8394] hover:bg-white/5 transition">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                         <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
                     </svg>
                     Log in
@@ -287,118 +164,68 @@
         </nav>
     </div>
 
-    <div class="flex min-h-screen">
-        <!-- Desktop Sidebar -->
-        <aside class="hidden lg:flex w-56 flex-shrink-0 flex-col h-screen sticky top-0 py-5 px-3">
-            <!-- Brand -->
-            <div class="flex items-center gap-2.5 px-3 pb-5">
-                <svg width="28" height="28" viewBox="0 0 64 64" fill="none" class="flex-shrink-0">
-                    <path d="M30 2L12 24L30 46" stroke="#2563eb" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M36 18L54 40L36 62" stroke="#60a5fa" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span class="text-lg font-bold tracking-tight text-gray-900">Veloria</span>
-            </div>
+    <!-- Desktop Header -->
+    <header class="hidden lg:block site-header">
+        <div class="max-w-[1280px] mx-auto px-8">
+            <div class="flex items-center justify-between h-[60px]">
+                <a href="/" class="flex items-center gap-2.5">
+                    <svg width="30" height="30" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                        <path d="M30 2L12 24L30 46" stroke="#00e5ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M36 18L54 40L36 62" stroke="#ff2d7b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span class="text-xl font-bold tracking-wide text-[#f4f6f9]">Veloria</span>
+                </a>
 
-            <!-- Early Release Notice -->
-            <div class="mx-1 mb-3 px-3 py-2 rounded-xl bg-amber-50/80 border border-amber-200/60 text-[11px] text-amber-700 leading-snug">
-                Early test release — data may be wiped
-            </div>
-
-            <!-- Navigation -->
-            <nav class="flex flex-col gap-0.5 flex-1">
-                {{$currentPath := .CurrentPath}}
-                <a href="/" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] transition {{if eq $currentPath "/"}}font-semibold text-brand-700 nav-active{{else}}text-gray-600 hover:bg-white/35 hover:text-gray-800{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M3 10.5L12 3l9 7.5V21a1 1 0 01-1 1H4a1 1 0 01-1-1z"/><path d="M9 22V12h6v10"/>
-                    </svg>
-                    Home
-                </a>
-                <a href="/searches" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] transition {{if hasPrefix $currentPath "/searches"}}font-semibold text-brand-700 nav-active{{else}}text-gray-600 hover:bg-white/35 hover:text-gray-800{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M13 5c-3.3 0-6 2.7-6 6 0 1.4.5 2.7 1.3 3.7l-3.8 3.8 1.1 1.1 3.8-3.8c1 .8 2.3 1.3 3.7 1.3 3.3 0 6-2.7 6-6S16.3 5 13 5zm0 10.5c-2.5 0-4.5-2-4.5-4.5s2-4.5 4.5-4.5 4.5 2 4.5 4.5-2 4.5-4.5 4.5z"></path>
-                    </svg>
-                    Searches
-                </a>
-                <a href="/repos" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] transition {{if hasPrefix $currentPath "/repos"}}font-semibold text-brand-700 nav-active{{else}}text-gray-600 hover:bg-white/35 hover:text-gray-800{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" fill-rule="evenodd" clip-rule="evenodd">
-                        <path d="M5 5.5h14a.5.5 0 01.5.5v1.5a.5.5 0 01-.5.5H5a.5.5 0 01-.5-.5V6a.5.5 0 01.5-.5zM4 9.232A2 2 0 013 7.5V6a2 2 0 012-2h14a2 2 0 012 2v1.5a2 2 0 01-1 1.732V18a2 2 0 01-2 2H6a2 2 0 01-2-2V9.232zm1.5.268V18a.5.5 0 00.5.5h12a.5.5 0 00.5-.5V9.5h-13z"></path>
-                    </svg>
-                    Repositories
-                </a>
-                <a href="/about" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] transition {{if eq $currentPath "/about"}}font-semibold text-brand-700 nav-active{{else}}text-gray-600 hover:bg-white/35 hover:text-gray-800{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-                    </svg>
-                    About
-                </a>
-                {{if .User}}
-                <a href="/my-searches" class="flex items-center justify-between px-3 py-2.5 rounded-xl text-[13px] transition {{if eq $currentPath "/my-searches"}}font-semibold text-brand-700 nav-active{{else}}text-gray-600 hover:bg-white/35 hover:text-gray-800{{end}}">
-                    <span class="flex items-center gap-2.5">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                        </svg>
-                        My Searches
-                    </span>
-                </a>
-                {{end}}
-                {{if and .User .User.IsAdmin}}
-                <a href="/admin/reports" class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] transition {{if hasPrefix $currentPath "/admin/reports"}}font-semibold text-brand-700 nav-active{{else}}text-gray-600 hover:bg-white/35 hover:text-gray-800{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                    Reports
-                </a>
-                {{end}}
-
-            </nav>
-
-            <!-- User/Login Section -->
-            <div class="pt-3 mt-3 border-t border-black/5">
-                {{if .User}}
-                <div class="flex items-center gap-2.5 px-3 py-2.5">
-                    {{if .User.AvatarURL}}
-                    <img src="{{.User.AvatarURL}}" alt="" class="w-8 h-8 rounded-full ring-2 ring-white/70 flex-shrink-0">
-                    {{else}}
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-                        {{slice .User.Name 0 1}}
-                    </div>
+                <nav class="flex items-center gap-1.5">
+                    {{$currentPath := .CurrentPath}}
+                    <a href="/searches" class="nav-link {{if hasPrefix $currentPath "/search"}}nav-link-active{{end}}">Searches</a>
+                    <a href="/data-sources" class="nav-link {{if hasPrefix $currentPath "/data-sources"}}nav-link-active{{end}}">Data Sources</a>
+                    <a href="/docs" class="nav-link {{if eq $currentPath "/docs"}}nav-link-active{{end}}">Docs</a>
+                    <a href="/about" class="nav-link {{if eq $currentPath "/about"}}nav-link-active{{end}}">About</a>
+                    {{if .User}}
+                    <a href="/my-searches" class="nav-link {{if eq $currentPath "/my-searches"}}nav-link-active{{end}}">My Searches</a>
                     {{end}}
-                    <div class="min-w-0 flex-1">
-                        <div class="text-[13px] font-medium text-gray-700 truncate">{{.User.Name}}</div>
-                    </div>
-                </div>
-                <a href="/logout" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] text-gray-500 hover:bg-white/35 hover:text-gray-700 transition mt-0.5">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-                    </svg>
-                    Sign out
-                </a>
-                {{else}}
-                <a href="/login" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] text-gray-500 hover:bg-white/35 hover:text-gray-700 transition">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
-                    </svg>
-                    Log in
-                </a>
-                {{end}}
-            </div>
-        </aside>
+                    {{if and .User .User.IsAdmin}}
+                    <a href="/admin/reports" class="nav-link {{if hasPrefix $currentPath "/admin/reports"}}nav-link-active{{end}}">Reports</a>
+                    {{end}}
 
-        <!-- Main Content Area -->
-        <main id="main-content" class="flex-1 flex flex-col min-w-0">
-            <div class="lg:min-h-screen lg:py-5 lg:pr-5 lg:pl-5 px-4 lg:px-0 flex flex-col pt-16 lg:pt-0">
-                {{block "content" .}}{{end}}
+                    <div class="w-px h-6 mx-2 bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
+
+                    {{if .User}}
+                    <div class="flex items-center gap-2.5 pl-2">
+                        {{if .User.AvatarURL}}
+                        <img src="{{.User.AvatarURL}}" alt="" class="w-7 h-7 rounded-full ring-2 ring-white/10">
+                        {{else}}
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium bg-gradient-to-br from-neon-pink to-neon-purple">
+                            {{slice .User.Name 0 1}}
+                        </div>
+                        {{end}}
+                        <span class="text-sm text-[#cdd5e0]">{{.User.Name}}</span>
+                        <a href="/logout" hx-boost="false" class="nav-link text-[#4e5666] hover:text-[#7a8394] text-[13px]">Sign out</a>
+                    </div>
+                    {{else}}
+                    <a href="/login" class="nav-link">Login</a>
+                    {{end}}
+                </nav>
             </div>
-        </main>
-    </div>
+        </div>
+    </header>
+
+    <main id="main-content" class="relative z-[1] flex-1">
+        <div class="max-w-[1280px] mx-auto px-4 lg:px-8">
+            {{block "content" .}}{{end}}
+        </div>
+    </main>
+
+    {{template "footer" .}}
+
+    <div id="context-modal"></div>
 
     <script>
-        // Mobile menu toggle
         function toggleMobileMenu() {
-            const menu = document.getElementById('mobile-menu');
-            const button = document.getElementById('mobile-menu-button');
-            const isHidden = menu.classList.contains('hidden');
-
+            var menu = document.getElementById('mobile-menu');
+            var button = document.getElementById('mobile-menu-button');
+            var isHidden = menu.classList.contains('hidden');
             if (isHidden) {
                 menu.classList.remove('hidden');
                 button.setAttribute('aria-expanded', 'true');
@@ -409,14 +236,10 @@
                 document.body.style.overflow = '';
             }
         }
-
-        // Close mobile menu on escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                const menu = document.getElementById('mobile-menu');
-                if (!menu.classList.contains('hidden')) {
-                    toggleMobileMenu();
-                }
+                var menu = document.getElementById('mobile-menu');
+                if (!menu.classList.contains('hidden')) toggleMobileMenu();
             }
         });
     </script>

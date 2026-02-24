@@ -2,32 +2,32 @@
 {{$searchID := .SearchID}}
 {{$searchRepo := .SearchRepo}}
 {{$result := .Result}}
-<div class="p-3 lg:p-4 flex flex-col gap-3">
+<div class="p-4 lg:p-5 flex flex-col gap-4">
     {{range $file := $result.Matches}}
     <!-- File Group -->
-    <div class="rounded-lg border border-gray-200 overflow-hidden">
+    <div class="rounded-xl border border-white/[0.08] overflow-hidden">
         <!-- File Header -->
-        <div class="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="flex items-center gap-2.5 px-4 py-2.5 bg-white/[0.04] border-b border-white/[0.08]">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ff2d7b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
             </svg>
-            <span class="text-brand-600 text-xs font-mono truncate flex-1" title="{{$file.Filename}}">{{$file.Filename}}</span>
-            <span class="text-gray-400 text-xs">{{len $file.Matches}} match{{if gt (len $file.Matches) 1}}es{{end}}</span>
+            <span class="text-neon-cyan text-sm font-mono truncate flex-1" title="{{$file.Filename}}">{{$file.Filename}}</span>
+            <span class="text-[#7a8394] text-xs font-medium">{{len $file.Matches}} match{{if gt (len $file.Matches) 1}}es{{end}}</span>
         </div>
         <!-- Matches for this file -->
         <div class="flex flex-col">
             {{range $match := $file.Matches}}
-            <div class="flex items-center gap-2 bg-brand-50 hover:bg-brand-100/70 transition-colors border-b border-gray-100 last:border-b-0">
-                <div class="px-2 lg:px-3 py-2 text-gray-400 text-xs text-right select-none whitespace-nowrap border-r-2 border-brand-400 bg-brand-100/50 font-mono" style="min-width: 3rem;">{{$match.LineNumber}}</div>
-                <div class="flex-1 min-w-0 py-2 overflow-x-auto">
-                    <div class="text-gray-700 text-xs font-mono whitespace-pre">{{$match.Line}}</div>
+            <div class="flex items-stretch border-b border-white/[0.06] last:border-b-0 group hover:bg-white/[0.02] transition-colors">
+                <div class="px-3 lg:px-4 py-2.5 text-[#7a8394] text-xs text-right select-none whitespace-nowrap border-r-2 border-neon-pink/40 bg-brand-50 font-mono flex items-center justify-end" style="min-width: 3.5rem;">{{$match.LineNumber}}</div>
+                <div class="flex-1 min-w-0 py-2.5 px-4 overflow-x-auto">
+                    <code class="text-[#e0e6f0] text-sm font-mono whitespace-pre leading-relaxed">{{$match.Line}}</code>
                 </div>
-                <div class="px-2 lg:px-3 py-2 flex-shrink-0">
+                <div class="px-3 lg:px-4 py-2.5 flex-shrink-0 flex items-center">
                     <button type="button"
                             hx-get="/search/{{$searchID}}/context?repo={{$searchRepo}}&slug={{$result.Slug}}&file={{$file.Filename}}&line={{$match.LineNumber}}"
                             hx-target="#context-modal"
                             hx-swap="innerHTML"
-                            class="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-brand-600 bg-brand-100 hover:bg-brand-200 border border-brand-200 rounded transition-all"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-neon-cyan bg-[rgba(0,229,255,0.06)] hover:bg-[rgba(0,229,255,0.12)] border border-[rgba(0,229,255,0.20)] rounded-md transition-all"
                             title="Show context">
                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M19.5 4.5h-7V6h4.44l-5.97 5.97 1.06 1.06L18 7.06v4.44h1.5v-7Zm-13 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3H17v3a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h3V5.5h-3Z"></path>
