@@ -1,0 +1,177 @@
+name: MCP npm Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'npm version (e.g. 0.2.0). Defaults to release tag without v prefix.'
+        required: false
+      dry-run:
+        description: 'Build only — skip npm publish'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-npm
+  cancel-in-progress: true
+
+jobs:
+  publish-mcp:
+    runs-on: ubuntu-latest
+    env:
+      GOEXPERIMENT: jsonv2,greenteagc
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '~1.25.6'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Set version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+            echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-dev.$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build binaries with GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          args: build --clean --config .goreleaser-mcp.yml --snapshot
+        env:
+          GORELEASER_CURRENT_TAG: v${{ steps.version.outputs.version }}
+
+      - name: Package npm platform packages
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Map GoReleaser output names to npm platform conventions
+          declare -A PLATFORM_MAP=(
+            ["darwin_arm64"]="darwin-arm64"
+            ["darwin_amd64"]="darwin-x64"
+            ["linux_arm64"]="linux-arm64"
+            ["linux_amd64"]="linux-x64"
+            ["windows_amd64"]="win32-x64"
+          )
+
+          declare -A NPM_OS=(
+            ["darwin-arm64"]="darwin"
+            ["darwin-x64"]="darwin"
+            ["linux-arm64"]="linux"
+            ["linux-x64"]="linux"
+            ["win32-x64"]="win32"
+          )
+
+          declare -A NPM_CPU=(
+            ["darwin-arm64"]="arm64"
+            ["darwin-x64"]="x64"
+            ["linux-arm64"]="arm64"
+            ["linux-x64"]="x64"
+            ["win32-x64"]="x64"
+          )
+
+          for gr_name in "${!PLATFORM_MAP[@]}"; do
+            npm_platform="${PLATFORM_MAP[$gr_name]}"
+            os_val="${NPM_OS[$npm_platform]}"
+            cpu_val="${NPM_CPU[$npm_platform]}"
+            pkg_dir="dist/mcp-${npm_platform}"
+            mkdir -p "$pkg_dir"
+
+            # Find the binary from GoReleaser output
+            binary=$(find "dist/veloria-mcp_${gr_name}" -name 'veloria-mcp*' -type f | head -1)
+            cp "$binary" "$pkg_dir/"
+
+            ext=""
+            [[ "$gr_name" == windows_* ]] && ext=".exe"
+
+            cat > "$pkg_dir/package.json" <<EOF
+          {
+            "name": "@veloria/mcp-${npm_platform}",
+            "version": "${VERSION}",
+            "description": "veloria-mcp binary for ${os_val}/${cpu_val}",
+            "license": "MIT",
+            "os": ["${os_val}"],
+            "cpu": ["${cpu_val}"],
+            "bin": {
+              "veloria-mcp": "./veloria-mcp${ext}"
+            },
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/${{ github.repository }}"
+            }
+          }
+          EOF
+
+            size=$(du -h "$pkg_dir/veloria-mcp${ext}" | cut -f1)
+            echo "Packaged @veloria/mcp-${npm_platform}: ${size}"
+          done
+
+      - name: Prepare main package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          main_dir="dist/mcp"
+          mkdir -p "$main_dir/bin"
+          cp mcp/bin/veloria-mcp "$main_dir/bin/"
+          cp mcp/README.md "$main_dir/"
+
+          jq --arg v "$VERSION" '
+            .version = $v |
+            .optionalDependencies |= with_entries(.value = $v)
+          ' mcp/package.json > "$main_dir/package.json"
+
+          echo "Main package.json:"
+          cat "$main_dir/package.json"
+
+      - name: Publish platform packages to npm
+        if: ${{ github.event_name == 'release' || !inputs.dry-run }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for pkg_dir in dist/mcp-*/; do
+            name=$(jq -r .name "$pkg_dir/package.json")
+            echo "Publishing ${name}..."
+            (cd "$pkg_dir" && npm publish --access public --provenance)
+          done
+
+      - name: Publish main package to npm
+        if: ${{ github.event_name == 'release' || !inputs.dry-run }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "Publishing @veloria/mcp..."
+          (cd dist/mcp && npm publish --access public --provenance)
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "## MCP Release v${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Package | Size |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|------|" >> "$GITHUB_STEP_SUMMARY"
+          for pkg_dir in dist/mcp-*/; do
+            platform=$(basename "$pkg_dir" | sed 's/^mcp-//')
+            size=$(du -h "$pkg_dir"/veloria-mcp* | cut -f1)
+            echo "| \`@veloria/mcp-${platform}\` | ${size} |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Install: \`npx @veloria/mcp@${VERSION}\`" >> "$GITHUB_STEP_SUMMARY"

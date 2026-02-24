@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"veloria/internal/config"
 	"veloria/internal/logger"
 	"veloria/internal/manager"
+	veloriamc "veloria/internal/mcp"
 	"veloria/internal/ogimage"
 	"veloria/internal/repo"
 	"veloria/internal/router"
@@ -163,6 +165,15 @@ func New(ctx context.Context) (*App, error) {
 		}
 	}
 
+	// Initialize MCP server
+	var mcpHandler http.Handler
+	if c.MCPEnabled && a.Manager != nil && a.DB != nil && a.S3 != nil {
+		mcpSvc := veloriamc.NewDirectService(a.Manager, a.DB, a.S3)
+		mcpServer := veloriamc.NewMCPServer(c.Name, config.Version, mcpSvc)
+		mcpHandler = veloriamc.NewHTTPHandler(mcpServer)
+		l.Info().Msg("MCP server enabled at /mcp")
+	}
+
 	r := router.New(router.RouterDeps{
 		Logger:  l,
 		DB:      a.DB,
@@ -173,6 +184,7 @@ func New(ctx context.Context) (*App, error) {
 		Session: a.SessionStore,
 		Auth:    a.AuthHandler,
 		OGGen:   ogGen,
+		MCP:     mcpHandler,
 		Options: router.Options{
 			HandlerTimeout:   c.HTTPHandlerTimeout,
 			SearchEnabled:    searchEnabled,

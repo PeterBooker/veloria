@@ -51,6 +51,7 @@ type RouterDeps struct {
 	Session *auth.SessionStore
 	Auth    *auth.Handler
 	OGGen   *ogimage.Generator                     // OG image generator; or nil
+	MCP     http.Handler                             // MCP streamable HTTP handler; or nil
 	Options Options
 }
 
@@ -168,6 +169,15 @@ func New(deps RouterDeps) *chi.Mux {
 			return deps.Stats[repoType]
 		}
 		return nil
+	}
+
+	// MCP (Model Context Protocol) endpoint
+	if deps.MCP != nil {
+		if opts.RateLimitEnabled {
+			r.With(httprate.LimitByIP(100, time.Minute)).Mount("/mcp", deps.MCP)
+		} else {
+			r.Mount("/mcp", deps.MCP)
+		}
 	}
 
 	db := deps.DB

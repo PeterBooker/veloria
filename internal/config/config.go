@@ -76,6 +76,9 @@ type Config struct {
 	// AspireCloud API
 	AspireCloudAPIKey string `env:"ASPIRE_CLOUD_API_KEY" envDefault:""`
 
+	// MCP: enable the remote MCP server endpoint
+	MCPEnabled bool `env:"MCP_ENABLED" envDefault:"true"`
+
 	// Debug mode: controls informational (non-error/warning) log output
 	AppDebug bool `env:"APP_DEBUG" envDefault:"false"`
 
