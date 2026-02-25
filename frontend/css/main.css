@@ -46,6 +46,14 @@ body {
 input::placeholder { color: #4e5666; }
 select { color-scheme: dark; }
 
+/* ── Clickable elements ── */
+a[href], button, select, label, [onclick],
+.btn-search, .example-card, .recent-search-card,
+.data-source-card, .glass-inset, .source-toggle label,
+input[type="checkbox"], input[type="radio"] {
+    cursor: pointer;
+}
+
 /* ── Neon grid background ── */
 .neon-grid {
     position: fixed; inset: 0; z-index: 0;
