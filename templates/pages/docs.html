@@ -11,10 +11,11 @@
     <p class="text-sm text-[#cdd5e0]">Everything you need to search WordPress source code with Veloria</p>
 </div>
 
-    <div class="max-w-3xl space-y-10">
+<div class="lg:flex lg:items-start lg:gap-10">
+    <div class="max-w-3xl space-y-10 flex-1 min-w-0">
 
-        <!-- Table of Contents -->
-        <nav aria-label="Table of contents">
+        <!-- Mobile Table of Contents -->
+        <nav aria-label="Table of contents" class="lg:hidden">
             <ul class="flex flex-wrap gap-x-5 gap-y-2 text-sm">
                 <li><a href="#search" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">Search Guide</a></li>
                 <li><a href="#regex" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">Regex Reference</a></li>
@@ -319,4 +320,40 @@
         </section>
 
     </div>
+
+    <!-- Desktop sidebar TOC -->
+    <aside class="hidden lg:block shrink-0 w-44">
+        <nav class="sticky top-24" aria-label="Table of contents">
+            <ul class="docs-toc flex flex-col gap-1 text-[13px]">
+                <li><a href="#search" class="docs-toc-link" data-section="search">Search Guide</a></li>
+                <li><a href="#regex" class="docs-toc-link" data-section="regex">Regex Reference</a></li>
+                <li><a href="#examples" class="docs-toc-link" data-section="examples">Example Patterns</a></li>
+                <li><a href="#options" class="docs-toc-link" data-section="options">Search Options</a></li>
+                <li><a href="#mcp" class="docs-toc-link" data-section="mcp">MCP Integration</a></li>
+            </ul>
+        </nav>
+    </aside>
+</div>
+
+<script>
+(function() {
+    var links = document.querySelectorAll('.docs-toc-link');
+    var sections = Array.from(links).map(function(l) {
+        return document.getElementById(l.dataset.section);
+    }).filter(Boolean);
+    if (!sections.length) return;
+
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+            if (e.isIntersecting) {
+                links.forEach(function(l) { l.classList.remove('active'); });
+                var active = document.querySelector('.docs-toc-link[data-section="' + e.target.id + '"]');
+                if (active) active.classList.add('active');
+            }
+        });
+    }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+
+    sections.forEach(function(s) { observer.observe(s); });
+})();
+</script>
 {{end}}

@@ -299,6 +299,20 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 
 /* ── Docs page styling ── */
 .docs-section { scroll-margin-top: 80px; }
+.docs-toc-link {
+    display: block;
+    padding: 6px 12px;
+    color: #7a8394;
+    border-left: 2px solid transparent;
+    border-radius: 0 6px 6px 0;
+    transition: all 0.15s ease;
+}
+.docs-toc-link:hover { color: #cdd5e0; background: rgba(255,255,255,0.04); }
+.docs-toc-link.active {
+    color: #00e5ff;
+    border-left-color: #00e5ff;
+    background: rgba(0,229,255,0.06);
+}
 .docs-code {
     background: rgba(0,0,0,0.4);
     border: 1px solid rgba(255,255,255,0.08);
