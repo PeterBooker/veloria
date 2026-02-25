@@ -120,6 +120,10 @@ func New(deps RouterDeps) *chi.Mux {
 	// Static OG default image
 	r.Get("/og-default.png", web.StaticImage(assets.FS, "og-default.png"))
 
+	// Favicons (served at root to satisfy automatic browser requests)
+	r.Get("/favicon.ico", web.StaticImage(assets.FS, "static/favicon.ico"))
+	r.Get("/favicon.svg", web.StaticImage(assets.FS, "static/favicon.svg"))
+
 	// Web UI routes
 	if deps.WebDeps != nil {
 		r.Get("/", web.HomePage(deps.WebDeps))

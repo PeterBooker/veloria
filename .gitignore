@@ -40,6 +40,10 @@ go.work.sum
 /dist
 node_modules
 
+# Generated frontend assets (built via go generate)
+assets/static/css/
+assets/static/js/
+
 # AI files.
 ./claude
 ./codex

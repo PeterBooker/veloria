@@ -182,11 +182,11 @@
                     {{range .LargestBySize}}
                     <a href="/data-sources/{{$repo}}/{{.Slug}}" class="group block">
                         <div class="flex items-center justify-between text-sm mb-1">
-                            <span class="text-brand-600 font-medium truncate">{{.Name}}</span>
+                            <span class="text-[#cdd5e0] group-hover:text-brand-600 font-medium truncate transition-colors duration-200">{{.Name}}</span>
                             <span class="text-[#7a8394] ml-2 flex-shrink-0">{{formatBytes .TotalSize}}</span>
                         </div>
-                        <div class="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                            <div class="h-full rounded-full transition-all duration-300 group-hover:opacity-80"
+                        <div class="h-1 bg-white/[0.04] rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-300 opacity-50 group-hover:opacity-80"
                                  style="width: {{if gt $maxSize 0}}{{printf "%.1f" (divideFloat .TotalSize $maxSize | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #ff2d7b, #b44dff);"></div>
                         </div>
                     </a>
@@ -212,11 +212,11 @@
                     {{range .LargestByFileCount}}
                     <a href="/data-sources/{{$repo}}/{{.Slug}}" class="group block">
                         <div class="flex items-center justify-between text-sm mb-1">
-                            <span class="text-brand-600 font-medium truncate">{{.Name}}</span>
+                            <span class="text-[#cdd5e0] group-hover:text-brand-600 font-medium truncate transition-colors duration-200">{{.Name}}</span>
                             <span class="text-[#7a8394] ml-2 flex-shrink-0">{{formatNumber .FileCount}} files</span>
                         </div>
-                        <div class="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-                            <div class="h-full rounded-full transition-all duration-300 group-hover:opacity-80"
+                        <div class="h-1 bg-white/[0.04] rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-300 opacity-50 group-hover:opacity-80"
                                  style="width: {{if gt $maxCount 0}}{{printf "%.1f" (divideFloat (int64 .FileCount) (int64 $maxCount) | mulFloat 100)}}%{{else}}0%{{end}}; background: linear-gradient(135deg, #b44dff, #00e5ff);"></div>
                         </div>
                     </a>
