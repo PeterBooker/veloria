@@ -204,38 +204,6 @@
             </div>
         </section>
 
-        {{if .SearchEnabled}}
-        <section class="mb-10">
-            <div class="flex items-center gap-2.5 mb-4">
-                <div class="neon-dot-cyan"></div>
-                <span class="text-[13px] text-[#7a8394] font-semibold uppercase tracking-wider">Example patterns</span>
-                <div class="neon-divider bg-gradient-to-r from-neon-cyan/30 via-neon-cyan/10 to-transparent"></div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <button type="button"
-                        onclick="document.getElementById('regex-search').value = '\\$wpdb->(?:query|prepare)'"
-                        class="example-card p-4 text-left group focus:outline-none focus:ring-2 focus:ring-neon-cyan/30"
-                        aria-label="Use example pattern: SQL Queries">
-                    <span class="text-[11px] text-[#7a8394] group-hover:text-neon-cyan transition font-semibold uppercase tracking-wide">SQL Queries</span>
-                    <code class="block mt-2 text-xs text-[#cdd5e0] font-mono truncate">\$wpdb->(?:query|prepare)</code>
-                </button>
-                <button type="button"
-                        onclick="document.getElementById('regex-search').value = 'do_action\\(.*\\)'"
-                        class="example-card p-4 text-left group focus:outline-none focus:ring-2 focus:ring-neon-cyan/30"
-                        aria-label="Use example pattern: Hooks">
-                    <span class="text-[11px] text-[#7a8394] group-hover:text-neon-cyan transition font-semibold uppercase tracking-wide">Hooks</span>
-                    <code class="block mt-2 text-xs text-[#cdd5e0] font-mono truncate">do_action\(.*\)</code>
-                </button>
-                <button type="button"
-                        onclick="document.getElementById('regex-search').value = 'sanitize_[a-z_]+\\('"
-                        class="example-card p-4 text-left group focus:outline-none focus:ring-2 focus:ring-neon-cyan/30"
-                        aria-label="Use example pattern: Sanitization">
-                    <span class="text-[11px] text-[#7a8394] group-hover:text-neon-cyan transition font-semibold uppercase tracking-wide">Sanitization</span>
-                    <code class="block mt-2 text-xs text-[#cdd5e0] font-mono truncate">sanitize_[a-z_]+\(</code>
-                </button>
-            </div>
-        </section>
-        {{end}}
     </div>
 
 

@@ -48,7 +48,7 @@ select { color-scheme: dark; }
 
 /* ── Clickable elements ── */
 a[href], button, select, label, [onclick],
-.btn-search, .example-card, .recent-search-card,
+.btn-search, .recent-search-card,
 .data-source-card, .glass-inset, .source-toggle label,
 input[type="checkbox"], input[type="radio"] {
     cursor: pointer;
@@ -159,18 +159,6 @@ input[type="checkbox"], input[type="radio"] {
     -webkit-backdrop-filter: blur(24px) saturate(1.5);
     background: rgba(8,10,20,0.82);
     border-top: 1px solid rgba(255,255,255,0.10);
-}
-
-/* ── Example cards ── */
-.example-card {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.10);
-    border-radius: 14px;
-    transition: all 0.2s ease;
-}
-.example-card:hover {
-    background: rgba(255,255,255,0.09);
-    border-color: rgba(255,255,255,0.16);
 }
 
 /* ── Badge count ── */
