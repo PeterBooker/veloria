@@ -213,7 +213,7 @@ input[type="checkbox"].neon-check:checked::after {
     border: solid #00e5ff;
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
-    margin: 1px auto 0;
+    margin: 2px auto 0;
 }
 
 /* ── Radio neon indicator bar ── */
