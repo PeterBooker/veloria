@@ -201,7 +201,7 @@
                         </div>
                         {{end}}
                         <span class="text-sm text-[#cdd5e0]">{{.User.Name}}</span>
-                        <a href="/logout" hx-boost="false" class="nav-link text-[#4e5666] hover:text-[#7a8394] text-[13px]">Sign out</a>
+                        <a href="/logout" hx-boost="false" class="nav-link text-[#4e5666] hover:text-[#7a8394] text-[18px]">Sign out</a>
                     </div>
                     {{else}}
                     <a href="/login" class="nav-link">Login</a>
@@ -211,7 +211,7 @@
         </div>
     </header>
 
-    <main id="main-content" class="relative z-[1] flex-1">
+    <main id="main-content" class="relative z-[1] flex-1 pb-12 lg:pb-16">
         <div class="max-w-[1280px] mx-auto px-4 lg:px-8">
             {{block "content" .}}{{end}}
         </div>

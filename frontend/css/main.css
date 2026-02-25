@@ -18,6 +18,14 @@
     --color-neon-purple: #b44dff;
 
     --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+    /* ── Minimum 18px font size ── */
+    --text-xs: 1.125rem;
+    --text-xs--line-height: 1.5rem;
+    --text-sm: 1.125rem;
+    --text-sm--line-height: 1.5rem;
+    --text-base: 1.125rem;
+    --text-base--line-height: 1.5rem;
 }
 
 /* ── Self-hosted Inter font ── */
@@ -45,6 +53,14 @@ body {
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
 input::placeholder { color: #4e5666; }
 select { color-scheme: dark; }
+
+/* ── Clickable elements ── */
+a[href], button, select, label, [onclick],
+.btn-search, .recent-search-card,
+.data-source-card, .glass-inset, .source-toggle label,
+input[type="checkbox"], input[type="radio"] {
+    cursor: pointer;
+}
 
 /* ── Neon grid background ── */
 .neon-grid {
@@ -116,7 +132,7 @@ select { color-scheme: dark; }
 .nav-active { background: rgba(255,255,255,0.06); }
 
 .nav-link {
-    font-size: 14px; font-weight: 400; cursor: pointer;
+    font-size: 18px; font-weight: 400; cursor: pointer;
     padding: 6px 12px; border-radius: 8px;
     color: #7a8394; background: transparent;
     position: relative; transition: color 0.15s;
@@ -153,22 +169,10 @@ select { color-scheme: dark; }
     border-top: 1px solid rgba(255,255,255,0.10);
 }
 
-/* ── Example cards ── */
-.example-card {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.10);
-    border-radius: 14px;
-    transition: all 0.2s ease;
-}
-.example-card:hover {
-    background: rgba(255,255,255,0.09);
-    border-color: rgba(255,255,255,0.16);
-}
-
 /* ── Badge count ── */
 .badge-count {
     background: linear-gradient(135deg, #ff2d7b, #b44dff);
-    color: white; font-size: 10px; font-weight: 700;
+    color: white; font-size: 18px; font-weight: 700;
     border-radius: 10px; padding: 2px 7px;
     min-width: 20px; text-align: center; line-height: 1.4;
 }
@@ -205,7 +209,7 @@ input[type="checkbox"].neon-check:checked::after {
     border: solid #00e5ff;
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
-    margin: 1px auto 0;
+    margin: 2px auto 0;
 }
 
 /* ── Radio neon indicator bar ── */
@@ -303,6 +307,20 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 
 /* ── Docs page styling ── */
 .docs-section { scroll-margin-top: 80px; }
+.docs-toc-link {
+    display: block;
+    padding: 6px 12px;
+    color: #7a8394;
+    border-left: 2px solid transparent;
+    border-radius: 0 6px 6px 0;
+    transition: all 0.15s ease;
+}
+.docs-toc-link:hover { color: #cdd5e0; background: rgba(255,255,255,0.04); }
+.docs-toc-link.active {
+    color: #00e5ff;
+    border-left-color: #00e5ff;
+    background: rgba(0,229,255,0.06);
+}
 .docs-code {
     background: rgba(0,0,0,0.4);
     border: 1px solid rgba(255,255,255,0.08);
@@ -312,7 +330,7 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 .docs-code code {
     display: block;
     padding: 16px 20px;
-    font-size: 13px;
+    font-size: 18px;
     line-height: 1.65;
     color: #cdd5e0;
     white-space: pre;
@@ -324,7 +342,7 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 .docs-table th {
     text-align: left;
     padding: 10px 16px;
-    font-size: 13px;
+    font-size: 18px;
     font-weight: 600;
     color: #7a8394;
     text-transform: uppercase;
@@ -333,7 +351,7 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 }
 .docs-table td {
     padding: 10px 16px;
-    font-size: 14px;
+    font-size: 18px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .docs-table tr:last-child td { border-bottom: none; }

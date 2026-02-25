@@ -23,7 +23,7 @@
                 <path d="M36 18L54 40L36 62" stroke="#ff2d7b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         </div>
-        <h1 class="text-3xl lg:text-[42px] font-extrabold tracking-tight text-[#f4f6f9] mb-3.5 leading-tight">Search WordPress Source Code</h1>
+        <h1 class="text-4xl lg:text-[48px] font-extrabold tracking-tight text-[#f4f6f9] mb-3.5 leading-tight">Search WordPress Source Code</h1>
         <p class="text-base lg:text-lg text-[#7a8394] leading-relaxed max-w-[520px] mx-auto">
             Regex search across every plugin, theme and core version.
         </p>
@@ -42,7 +42,6 @@
                        class="flex-1 bg-transparent border-none outline-none text-[#f4f6f9] text-lg lg:text-xl font-medium font-mono py-3.5 caret-neon-cyan"
                        aria-label="Enter regex pattern"
                        aria-describedby="search-tip">
-                <span class="text-[13px] text-[#4e5666] px-2.5 py-1 rounded-md shrink-0 select-none hidden sm:inline-block border border-white/10 bg-white/5">&#8984;K</span>
                 <button type="submit"
                         class="btn-search px-6 lg:px-8 py-3.5 rounded-xl border-none text-white text-base font-bold cursor-pointer shrink-0 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-neon-cyan/40"
                         {{if not .SearchEnabled}}disabled{{end}}>
@@ -59,21 +58,21 @@
                     <div class="flex gap-1.5" role="radiogroup" aria-label="Source type">
                         <div>
                             <input type="radio" name="repo" value="plugins" id="repo-plugins" checked class="sr-only peer" {{if not .SearchEnabled}}disabled{{end}}>
-                            <label for="repo-plugins" class="block px-5 py-2 rounded-lg text-[15px] font-medium cursor-pointer text-[#7a8394] hover:text-[#cdd5e0] peer-checked:text-[#eef1f6] peer-checked:font-semibold peer-checked:bg-white/[0.07] transition relative">
+                            <label for="repo-plugins" class="block px-5 py-2 rounded-lg text-[18px] font-medium cursor-pointer text-[#7a8394] hover:text-[#cdd5e0] peer-checked:text-[#eef1f6] peer-checked:font-semibold peer-checked:bg-white/[0.07] transition relative">
                                 Plugins
                                 <span class="hidden neon-indicator absolute bottom-0 left-[15%] right-[15%] h-0.5 rounded-sm bg-neon-pink shadow-[0_0_8px_rgba(255,45,123,0.35)]"></span>
                             </label>
                         </div>
                         <div>
                             <input type="radio" name="repo" value="themes" id="repo-themes" class="sr-only peer" {{if not .SearchEnabled}}disabled{{end}}>
-                            <label for="repo-themes" class="block px-5 py-2 rounded-lg text-[15px] font-medium cursor-pointer text-[#7a8394] hover:text-[#cdd5e0] peer-checked:text-[#eef1f6] peer-checked:font-semibold peer-checked:bg-white/[0.07] transition relative">
+                            <label for="repo-themes" class="block px-5 py-2 rounded-lg text-[18px] font-medium cursor-pointer text-[#7a8394] hover:text-[#cdd5e0] peer-checked:text-[#eef1f6] peer-checked:font-semibold peer-checked:bg-white/[0.07] transition relative">
                                 Themes
                                 <span class="hidden neon-indicator absolute bottom-0 left-[15%] right-[15%] h-0.5 rounded-sm bg-neon-purple shadow-[0_0_8px_rgba(180,77,255,0.35)]"></span>
                             </label>
                         </div>
                         <div>
                             <input type="radio" name="repo" value="cores" id="repo-cores" class="sr-only peer" {{if not .SearchEnabled}}disabled{{end}}>
-                            <label for="repo-cores" class="block px-5 py-2 rounded-lg text-[15px] font-medium cursor-pointer text-[#7a8394] hover:text-[#cdd5e0] peer-checked:text-[#eef1f6] peer-checked:font-semibold peer-checked:bg-white/[0.07] transition relative">
+                            <label for="repo-cores" class="block px-5 py-2 rounded-lg text-[18px] font-medium cursor-pointer text-[#7a8394] hover:text-[#cdd5e0] peer-checked:text-[#eef1f6] peer-checked:font-semibold peer-checked:bg-white/[0.07] transition relative">
                                 Core
                                 <span class="hidden neon-indicator absolute bottom-0 left-[15%] right-[15%] h-0.5 rounded-sm bg-neon-gold shadow-[0_0_8px_rgba(255,215,0,0.35)]"></span>
                             </label>
@@ -140,7 +139,7 @@
                     <span class="text-sm text-[#7a8394] group-hover:text-[#cdd5e0] transition whitespace-nowrap">Exclude minified</span>
                 </label>
 
-                <span id="search-tip" class="text-[11px] text-[#4e5666] hidden sm:block ml-auto">Regex patterns supported</span>
+                <span id="search-tip" class="text-[18px] text-[#4e5666] hidden sm:block ml-auto">Regex patterns supported</span>
             </div>
         </form>
     </div>
@@ -153,7 +152,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4e5666" stroke-width="2" stroke-linecap="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
-                <span class="text-[13px] text-[#7a8394] font-semibold uppercase tracking-wider">Recent searches</span>
+                <span class="text-[18px] text-[#7a8394] font-semibold uppercase tracking-wider">Recent searches</span>
                 <div class="neon-divider bg-gradient-to-r from-neon-gold/30 via-neon-gold/10 to-transparent"></div>
             </div>
             <div class="flex flex-col gap-2">
@@ -163,7 +162,7 @@
                         <div class="neon-dot-cyan shrink-0"></div>
                         <span class="flex-1 text-base font-mono text-[#eef1f6] font-medium truncate">{{.Search.Term}}</span>
                         {{if .MatchesKnown}}
-                        <span class="text-[13px] font-medium shrink-0 px-2.5 py-0.5 rounded-md text-[#7a8394] bg-brand-100 border-l-2 border-neon-pink">{{formatNumber .MatchCount}}</span>
+                        <span class="text-[18px] font-medium shrink-0 px-2.5 py-0.5 rounded-md text-[#7a8394] bg-brand-100 border-l-2 border-neon-pink">{{formatNumber .MatchCount}}</span>
                         {{end}}
                         <span class="text-sm text-[#4e5666] shrink-0">{{timeAgo .Search.CreatedAt}}</span>
                     </div>
@@ -177,66 +176,34 @@
         <section class="mb-10">
             <div class="flex items-center gap-2.5 mb-4">
                 <div class="neon-dot-purple"></div>
-                <span class="text-[13px] text-[#7a8394] font-semibold uppercase tracking-wider">Data Sources</span>
+                <span class="text-[18px] text-[#7a8394] font-semibold uppercase tracking-wider">Data Sources</span>
                 <div class="neon-divider bg-gradient-to-r from-neon-purple/30 via-neon-purple/10 to-transparent"></div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <a href="/data-sources/plugins" class="flex flex-col rounded-xl overflow-hidden data-source-card">
                     <div class="neon-strip-pink"></div>
                     <div class="p-5 flex flex-col gap-3 flex-1">
-                        <h3 class="text-[17px] font-semibold text-[#eef1f6] mb-0.5">Plugins</h3>
-                        <p class="text-[13px] text-[#7a8394] leading-snug">WordPress.org plugin repository</p>
+                        <h3 class="text-xl font-semibold text-[#eef1f6] mb-0.5">Plugins</h3>
+                        <p class="text-[18px] text-[#7a8394] leading-snug">WordPress.org plugin repository</p>
                     </div>
                 </a>
                 <a href="/data-sources/themes" class="flex flex-col rounded-xl overflow-hidden data-source-card">
                     <div class="neon-strip-purple"></div>
                     <div class="p-5 flex flex-col gap-3 flex-1">
-                        <h3 class="text-[17px] font-semibold text-[#eef1f6] mb-0.5">Themes</h3>
-                        <p class="text-[13px] text-[#7a8394] leading-snug">WordPress.org theme directory</p>
+                        <h3 class="text-xl font-semibold text-[#eef1f6] mb-0.5">Themes</h3>
+                        <p class="text-[18px] text-[#7a8394] leading-snug">WordPress.org theme directory</p>
                     </div>
                 </a>
                 <a href="/data-sources/cores" class="flex flex-col rounded-xl overflow-hidden data-source-card">
                     <div class="neon-strip-gold"></div>
                     <div class="p-5 flex flex-col gap-3 flex-1">
-                        <h3 class="text-[17px] font-semibold text-[#eef1f6] mb-0.5">Core</h3>
-                        <p class="text-[13px] text-[#7a8394] leading-snug">WordPress core versions</p>
+                        <h3 class="text-xl font-semibold text-[#eef1f6] mb-0.5">Core</h3>
+                        <p class="text-[18px] text-[#7a8394] leading-snug">WordPress core versions</p>
                     </div>
                 </a>
             </div>
         </section>
 
-        {{if .SearchEnabled}}
-        <section class="mb-10">
-            <div class="flex items-center gap-2.5 mb-4">
-                <div class="neon-dot-cyan"></div>
-                <span class="text-[13px] text-[#7a8394] font-semibold uppercase tracking-wider">Example patterns</span>
-                <div class="neon-divider bg-gradient-to-r from-neon-cyan/30 via-neon-cyan/10 to-transparent"></div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <button type="button"
-                        onclick="document.getElementById('regex-search').value = '\\$wpdb->(?:query|prepare)'"
-                        class="example-card p-4 text-left group focus:outline-none focus:ring-2 focus:ring-neon-cyan/30"
-                        aria-label="Use example pattern: SQL Queries">
-                    <span class="text-[11px] text-[#7a8394] group-hover:text-neon-cyan transition font-semibold uppercase tracking-wide">SQL Queries</span>
-                    <code class="block mt-2 text-xs text-[#cdd5e0] font-mono truncate">\$wpdb->(?:query|prepare)</code>
-                </button>
-                <button type="button"
-                        onclick="document.getElementById('regex-search').value = 'do_action\\(.*\\)'"
-                        class="example-card p-4 text-left group focus:outline-none focus:ring-2 focus:ring-neon-cyan/30"
-                        aria-label="Use example pattern: Hooks">
-                    <span class="text-[11px] text-[#7a8394] group-hover:text-neon-cyan transition font-semibold uppercase tracking-wide">Hooks</span>
-                    <code class="block mt-2 text-xs text-[#cdd5e0] font-mono truncate">do_action\(.*\)</code>
-                </button>
-                <button type="button"
-                        onclick="document.getElementById('regex-search').value = 'sanitize_[a-z_]+\\('"
-                        class="example-card p-4 text-left group focus:outline-none focus:ring-2 focus:ring-neon-cyan/30"
-                        aria-label="Use example pattern: Sanitization">
-                    <span class="text-[11px] text-[#7a8394] group-hover:text-neon-cyan transition font-semibold uppercase tracking-wide">Sanitization</span>
-                    <code class="block mt-2 text-xs text-[#cdd5e0] font-mono truncate">sanitize_[a-z_]+\(</code>
-                </button>
-            </div>
-        </section>
-        {{end}}
     </div>
 
 
