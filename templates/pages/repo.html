@@ -31,7 +31,7 @@
             {{end}}
         </div>
         <div>
-            <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-[#f4f6f9]">{{.RepoSummary.Title}}</h1>
+            <h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-[#f4f6f9]">{{.RepoSummary.Title}}</h1>
             <p class="text-sm text-[#cdd5e0]">WordPress {{.RepoSummary.Repo}} repository</p>
         </div>
     </div>
@@ -40,7 +40,7 @@
     <!-- Index Status -->
     <div class="glass-inner p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-[#f4f6f9]">Index Status</h2>
+            <h2 class="text-xl font-semibold text-[#f4f6f9]">Index Status</h2>
             <span class="text-sm text-[#7a8394]">{{.RepoSummary.IndexedPercent}}% complete</span>
         </div>
         <div class="grid grid-cols-3 gap-6 mb-4">
@@ -73,7 +73,7 @@
         {{if .ActiveInstalls.JSON}}
         <div class="glass-inner p-6">
             <div class="flex items-center justify-between mb-2">
-                <h3 class="text-lg font-semibold text-[#f4f6f9]">Active Installs</h3>
+                <h3 class="text-xl font-semibold text-[#f4f6f9]">Active Installs</h3>
                 <span class="text-xs text-[#4e5666]">Max {{formatCompact (int .ActiveInstalls.Max)}}</span>
             </div>
             <div id="chart-active-installs" style="width:100%;height:200px;"></div>
@@ -83,7 +83,7 @@
         {{if or .FileCount.JSON .FileSize.JSON}}
         <div class="glass-inner p-6">
             <div class="flex items-center justify-between mb-2">
-                <h3 class="text-lg font-semibold text-[#f4f6f9]">File Stats</h3>
+                <h3 class="text-xl font-semibold text-[#f4f6f9]">File Stats</h3>
             </div>
             <div id="chart-file-stats" style="width:100%;height:200px;"></div>
         </div>
@@ -169,7 +169,7 @@
         {{if .LargestBySize}}
         <div class="glass-inner overflow-hidden">
             <div class="px-6 py-4 border-b-medium">
-                <h2 class="text-base font-semibold text-[#f4f6f9]">Largest by Size</h2>
+                <h2 class="text-xl font-semibold text-[#f4f6f9]">Largest by Size</h2>
                 <p class="text-sm text-[#7a8394]">Top {{len .LargestBySize}} {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
             </div>
             <div class="p-6">
@@ -199,7 +199,7 @@
         {{if .LargestByFileCount}}
         <div class="glass-inner overflow-hidden">
             <div class="px-6 py-4 border-b-medium">
-                <h2 class="text-base font-semibold text-[#f4f6f9]">Most Files</h2>
+                <h2 class="text-xl font-semibold text-[#f4f6f9]">Most Files</h2>
                 <p class="text-sm text-[#7a8394]">Top {{len .LargestByFileCount}} {{if eq .RepoSummary.Repo "plugins"}}plugins{{else if eq .RepoSummary.Repo "themes"}}themes{{else}}core versions{{end}}</p>
             </div>
             <div class="p-6">
@@ -231,7 +231,7 @@
     <!-- Items List -->
     <div class="glass-inner overflow-hidden">
         <div class="px-6 py-4 flex items-center justify-between gap-4 border-b-medium">
-            <h2 class="text-lg font-semibold text-[#f4f6f9] flex-shrink-0">
+            <h2 class="text-xl font-semibold text-[#f4f6f9] flex-shrink-0">
                 {{if eq .RepoSummary.Repo "plugins"}}Plugins{{else if eq .RepoSummary.Repo "themes"}}Themes{{else}}Core Versions{{end}}
             </h2>
             <div class="relative w-full max-w-xs">

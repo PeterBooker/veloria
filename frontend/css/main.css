@@ -18,6 +18,14 @@
     --color-neon-purple: #b44dff;
 
     --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+    /* ── Minimum 18px font size ── */
+    --text-xs: 1.125rem;
+    --text-xs--line-height: 1.5rem;
+    --text-sm: 1.125rem;
+    --text-sm--line-height: 1.5rem;
+    --text-base: 1.125rem;
+    --text-base--line-height: 1.5rem;
 }
 
 /* ── Self-hosted Inter font ── */
@@ -124,7 +132,7 @@ input[type="checkbox"], input[type="radio"] {
 .nav-active { background: rgba(255,255,255,0.06); }
 
 .nav-link {
-    font-size: 14px; font-weight: 400; cursor: pointer;
+    font-size: 18px; font-weight: 400; cursor: pointer;
     padding: 6px 12px; border-radius: 8px;
     color: #7a8394; background: transparent;
     position: relative; transition: color 0.15s;
@@ -164,7 +172,7 @@ input[type="checkbox"], input[type="radio"] {
 /* ── Badge count ── */
 .badge-count {
     background: linear-gradient(135deg, #ff2d7b, #b44dff);
-    color: white; font-size: 10px; font-weight: 700;
+    color: white; font-size: 18px; font-weight: 700;
     border-radius: 10px; padding: 2px 7px;
     min-width: 20px; text-align: center; line-height: 1.4;
 }
@@ -322,7 +330,7 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 .docs-code code {
     display: block;
     padding: 16px 20px;
-    font-size: 13px;
+    font-size: 18px;
     line-height: 1.65;
     color: #cdd5e0;
     white-space: pre;
@@ -334,7 +342,7 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 .docs-table th {
     text-align: left;
     padding: 10px 16px;
-    font-size: 13px;
+    font-size: 18px;
     font-weight: 600;
     color: #7a8394;
     text-transform: uppercase;
@@ -343,7 +351,7 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 }
 .docs-table td {
     padding: 10px 16px;
-    font-size: 14px;
+    font-size: 18px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .docs-table tr:last-child td { border-bottom: none; }
