@@ -37,8 +37,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Build frontend assets
-        run: npm --prefix frontend install && npm --prefix frontend run build
+      - name: Generate assets
+        run: go generate ./assets
 
       - name: Set version
         id: version

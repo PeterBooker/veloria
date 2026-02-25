@@ -22,6 +22,16 @@ jobs:
           go-version: '~1.26.0'
           cache: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Generate assets
+        run: go generate ./assets
+
       - name: Build
         run: go build -v ./...
 
