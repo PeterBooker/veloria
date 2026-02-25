@@ -367,6 +367,70 @@ DB_CONN_MAX_LIFETIME=1h
 
 ---
 
+## Frontend Assets (Tailwind CSS)
+
+### Overview
+
+The Web UI uses **Tailwind CSS v4** with htmx and ECharts. All frontend assets are compiled into the Go binary via `go:embed`. The build is triggered by `go generate`.
+
+### Asset Pipeline
+
+```
+frontend/css/main.css          ─── Tailwind input (theme + custom CSS)
+        │
+        ▼  (tailwindcss CLI, scans templates/ for class usage)
+assets/static/css/styles.css   ─── Minified output (embedded)
+assets/static/js/htmx.min.js   ─── Copied from node_modules (embedded)
+assets/static/js/echarts.min.js ─── Copied from node_modules (embedded)
+```
+
+The `//go:generate` directive in `assets/embed.go` runs `npm install` + `npm run build` in the `frontend/` directory. The `postbuild` npm script copies JS vendor files into `assets/static/js/`.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `frontend/css/main.css` | Tailwind input — theme tokens, custom CSS, `@source` directive |
+| `frontend/package.json` | Build scripts (`build`, `postbuild`, `watch`) and dependencies |
+| `assets/embed.go` | `go:generate` directive + `go:embed` for all static assets |
+| `assets/static/css/styles.css` | Generated output — **do not edit directly** |
+| `assets/static/js/` | Vendor JS — **do not edit directly** (copied by postbuild) |
+| `templates/` | HTML templates — Tailwind scans these for class usage via `@source` |
+
+### Building Assets
+
+```bash
+# Full build (install deps + compile CSS + copy JS)
+go generate ./assets/...
+
+# Or manually from frontend/:
+cd frontend && npm run build
+
+# Watch mode for development (recompiles CSS on template/CSS changes):
+cd frontend && npm run watch
+```
+
+**You must run `go generate ./assets/...` before `go build`** whenever CSS classes or frontend dependencies change. The generated files in `assets/static/` are committed to the repo, so `go build` works without Node.js if the assets are up to date.
+
+### Tailwind v4 Configuration
+
+There is **no `tailwind.config.js`** — Tailwind v4 uses CSS-native configuration:
+
+- **`@import "tailwindcss"`** — loads the framework
+- **`@source "../../templates"`** — tells Tailwind to scan `templates/` for class usage
+- **`@theme { ... }`** — defines custom design tokens (colors, fonts, sizes) inline
+
+When adding new Tailwind classes in templates, they are automatically picked up by the `@source` directive. No config file changes needed.
+
+### When Working on the UI
+
+1. **Adding/changing Tailwind classes in templates**: Run `go generate ./assets/...` (or use `npm run watch` during development) to regenerate `styles.css`
+2. **Adding custom CSS**: Edit `frontend/css/main.css`, then rebuild
+3. **Updating JS vendor libraries**: Update versions in `frontend/package.json`, then run `go generate ./assets/...`
+4. **Testing changes**: After rebuilding assets, run `go run ./cmd/veloria` — assets are embedded at compile time
+
+---
+
 ## Common Commands
 
 ### Development Environment
@@ -374,6 +438,9 @@ DB_CONN_MAX_LIFETIME=1h
 ```bash
 # Start dependencies
 docker compose up -d
+
+# Build frontend assets (required after CSS/template changes)
+go generate ./assets/...
 
 # Run the server
 go run ./cmd/veloria
@@ -391,6 +458,9 @@ go run ./cmd/veloria-migrate up
 ### Building
 
 ```bash
+# Build frontend assets first (if CSS/JS changed)
+go generate ./assets/...
+
 # Build all binaries
 go build ./cmd/veloria
 go build ./cmd/veloria-indexer

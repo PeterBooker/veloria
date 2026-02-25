@@ -15,6 +15,7 @@ A code search engine for the WordPress ecosystem. Veloria downloads, indexes, an
 ### Prerequisites
 
 - Go 1.24+
+- Node.js 18+ and npm (for building frontend assets)
 - PostgreSQL 14+
 - Docker (optional)
 
@@ -24,6 +25,9 @@ A code search engine for the WordPress ecosystem. Veloria downloads, indexes, an
 # Clone the repository
 git clone https://github.com/your-org/veloria.git
 cd veloria
+
+# Build frontend assets (Tailwind CSS, htmx, ECharts)
+go generate ./assets/...
 
 # Build the binaries
 go build -o veloria ./cmd/veloria
@@ -77,16 +81,21 @@ The core component exposes a REST API, which is used by the frontend.
 ```
 veloria/
 ├── cmd/
-│   ├── veloria/       # Main API server
+│   ├── veloria/            # Main API server
 │   └── veloria-indexer/    # Indexing utility
 ├── internal/
-│   ├── api/              # HTTP handlers
-│   ├── config/           # Configuration
-│   ├── index/            # Trigram indexing
-│   ├── manager/          # Repository orchestration
-│   ├── repo/             # Data repositories (generic)
-│   └── router/           # HTTP routing
-└── docs/                 # Documentation
+│   ├── api/               # HTTP handlers
+│   ├── config/            # Configuration
+│   ├── index/             # Trigram indexing
+│   ├── manager/           # Repository orchestration
+│   ├── repo/              # Data repositories (generic)
+│   └── router/            # HTTP routing
+├── assets/                # Embedded static assets (go:embed)
+│   └── static/            # CSS, JS, fonts (generated — do not edit)
+├── frontend/              # Frontend build (Tailwind v4, npm)
+│   └── css/main.css       # Tailwind input + theme tokens
+├── templates/             # HTML templates (Go html/template)
+└── docs/                  # Documentation
 ```
 
 ## How It Works
@@ -102,6 +111,12 @@ See [Architecture](docs/architecture.md) for detailed diagrams and explanations.
 ## Development
 
 ```bash
+# Build frontend assets (after CSS or template changes)
+go generate ./assets/...
+
+# Watch mode (auto-rebuilds CSS on changes)
+cd frontend && npm run watch
+
 # Run tests
 go test ./...
 
