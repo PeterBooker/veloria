@@ -17,7 +17,6 @@ import (
 
 // SearchService abstracts data access for MCP tools.
 // DirectService implements it using the Manager directly (for the remote server).
-// APIService implements it using Veloria's REST API (for the stdio binary).
 type SearchService interface {
 	// Search executes a new code search and persists results.
 	// Returns the search ID alongside the response so callers can paginate later.

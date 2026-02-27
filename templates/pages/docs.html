@@ -321,30 +321,10 @@
 }</code></div>
             </div>
 
-            <!-- Stdio alternative -->
-            <div class="mb-6">
-                <h3 class="text-xl font-semibold text-neon-purple mb-3">Stdio Alternative (npx)</h3>
-                <p class="text-sm text-[#cdd5e0] leading-relaxed mb-3">
-                    If your client doesn't support remote HTTP servers, you can run the MCP server locally via <code class="text-neon-cyan font-mono text-xs">npx</code>. This requires Node.js to be installed.
-                </p>
-                <div class="docs-code mb-3"><code>npx -y @veloria/mcp</code></div>
-                <p class="text-sm text-[#7a8394] leading-relaxed mb-3">
-                    Example configuration using stdio transport:
-                </p>
-                <div class="docs-code"><code>{
-  "mcpServers": {
-    "veloria": {
-      "command": "npx",
-      "args": ["-y", "@veloria/mcp"]
-    }
-  }
-}</code></div>
-            </div>
-
             <!-- Note -->
             <div class="glass-inner rounded-xl p-4">
                 <p class="text-sm text-[#7a8394] leading-relaxed">
-                    <strong class="text-neon-gold font-semibold">Note:</strong> Both the remote server and the npx package connect to <code class="text-neon-cyan font-mono text-xs">https://veloria.dev</code>. No API keys or additional configuration are needed.
+                    <strong class="text-neon-gold font-semibold">Note:</strong> The remote server at <code class="text-neon-cyan font-mono text-xs">https://veloria.dev/mcp</code> requires no API keys or additional configuration.
                 </p>
             </div>
         </section>

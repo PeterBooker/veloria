@@ -184,6 +184,6 @@ func (s *AtlassianSession) Authorize(provider goth.Provider, params goth.Params)
 
 // Marshal returns a JSON string of the session.
 func (s *AtlassianSession) Marshal() string {
-	b, _ := json.Marshal(s)
+	b, _ := json.Marshal(s) // #nosec G117 -- required by goth.Session interface; token fields must be serialized for session persistence
 	return string(b)
 }
