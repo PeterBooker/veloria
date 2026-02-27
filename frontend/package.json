@@ -7,10 +7,10 @@
     "watch": "tailwindcss -i css/main.css -o ../assets/static/css/styles.css --watch"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4"
+    "@tailwindcss/cli": "~4.2.1"
   },
   "dependencies": {
-    "htmx.org": "^2.0.4",
-    "echarts": "^5"
+    "htmx.org": "~2.0.8",
+    "echarts": "~5.6.0"
   }
 }
