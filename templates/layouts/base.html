@@ -25,8 +25,8 @@
 
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="/favicon.ico" sizes="32x32">
-    <link rel="stylesheet" href="/static/css/styles.css">
-    <script src="/static/js/htmx.min.js"></script>
+    <link rel="stylesheet" href="/static/css/styles.css?v={{.Version}}">
+    <script src="/static/js/htmx.min.js?v={{.Version}}"></script>
     {{block "head" .}}{{end}}
 </head>
 <body class="min-h-screen overflow-x-hidden flex flex-col" hx-boost="true">
