@@ -128,6 +128,8 @@ func New(deps RouterDeps) *chi.Mux {
 	if deps.WebDeps != nil {
 		r.Get("/", web.HomePage(deps.WebDeps))
 		r.Get("/about", web.AboutPage(deps.WebDeps))
+		r.Get("/privacy", web.PrivacyPage(deps.WebDeps))
+		r.Get("/terms", web.TermsPage(deps.WebDeps))
 		r.Get("/docs", web.DocsPage(deps.WebDeps))
 		r.Get("/data-sources", web.ReposPage(deps.WebDeps))
 		r.Get("/data-sources/{type}", web.RepoPage(deps.WebDeps))
