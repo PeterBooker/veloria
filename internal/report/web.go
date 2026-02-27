@@ -48,6 +48,7 @@ func SubmitReport(d *web.Deps) http.HandlerFunc {
 
 		reason := ""
 		if r.Method == http.MethodPost {
+			r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 			if err := r.ParseForm(); err == nil {
 				reason = strings.TrimSpace(r.FormValue("reason"))
 			}

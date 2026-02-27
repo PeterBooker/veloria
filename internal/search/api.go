@@ -160,7 +160,7 @@ func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) h
 
 		// Persist results to S3 and update DB in the background so the
 		// client gets its response without waiting for the network upload.
-		go persistSearchResults(db, s3, s.ID, results, now, totalMatches, results.Total)
+		go persistSearchResults(db, s3, s.ID, results, now, totalMatches, results.Total) // #nosec G118 -- goroutine intentionally outlives request; S3 upload runs in background
 
 		api.WriteSuccessJSON(w, http.StatusCreated, s)
 	})

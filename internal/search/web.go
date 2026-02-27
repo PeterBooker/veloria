@@ -277,6 +277,7 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			renderSearchError(d, w, reason)
 			return
 		}
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 		if err := r.ParseForm(); err != nil {
 			renderSearchError(d, w, "Failed to parse form")
 			return
@@ -325,7 +326,7 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			return
 		}
 
-		go runSearchAsync(d, s.ID, repo, term, fileMatch, excludeMatch, !caseSensitive)
+		go runSearchAsync(d, s.ID, repo, term, fileMatch, excludeMatch, !caseSensitive) // #nosec G118 -- goroutine intentionally outlives request; search runs in background
 
 		w.Header().Set("HX-Redirect", "/search/"+s.ID.String())
 		w.WriteHeader(http.StatusOK)
