@@ -59,3 +59,54 @@ type ExtensionSummary struct {
 	Version string `json:"version"`
 	Indexed bool   `json:"indexed"`
 }
+
+// ExtensionDetails holds full metadata for a single extension.
+type ExtensionDetails struct {
+	Slug             string `json:"slug"`
+	Name             string `json:"name"`
+	Version          string `json:"version"`
+	Source           string `json:"source"`
+	ShortDescription string `json:"short_description"`
+	Requires         string `json:"requires"`
+	Tested           string `json:"tested"`
+	RequiresPHP      string `json:"requires_php"`
+	Rating           int    `json:"rating"`
+	ActiveInstalls   int    `json:"active_installs"`
+	Downloaded       int    `json:"downloaded"`
+	DownloadLink     string `json:"download_link"`
+	Indexed          bool   `json:"indexed"`
+	FileCount        int    `json:"file_count"`
+	TotalSize        int64  `json:"total_size"`
+}
+
+// RepoStats holds index statistics for a single repository type.
+type RepoStats struct {
+	Repo    string `json:"repo"`
+	Total   int    `json:"total"`
+	Indexed int    `json:"indexed"`
+}
+
+// FileEntry represents a single file in an extension's source tree.
+type FileEntry struct {
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+}
+
+// ListFilesResponse holds the file listing for an extension.
+type ListFilesResponse struct {
+	Slug  string      `json:"slug"`
+	Repo  string      `json:"repo"`
+	Total int         `json:"total"`
+	Files []FileEntry `json:"files"`
+}
+
+// ReadFileResponse holds the contents of a file from an extension.
+type ReadFileResponse struct {
+	Slug       string `json:"slug"`
+	Repo       string `json:"repo"`
+	Path       string `json:"path"`
+	TotalLines int    `json:"total_lines"`
+	StartLine  int    `json:"start_line"`
+	EndLine    int    `json:"end_line"`
+	Content    string `json:"content"`
+}

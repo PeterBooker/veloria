@@ -169,6 +169,201 @@ func TestFormatExtensionList_Empty(t *testing.T) {
 	}
 }
 
+func TestFormatExtensionDetails(t *testing.T) {
+	d := &ExtensionDetails{
+		Slug:             "woocommerce",
+		Name:             "WooCommerce",
+		Version:          "8.5.0",
+		Source:           "wordpress.org",
+		ShortDescription: "An eCommerce toolkit.",
+		Requires:         "6.4",
+		Tested:           "6.7",
+		RequiresPHP:      "7.4",
+		Rating:           88,
+		ActiveInstalls:   5000000,
+		Downloaded:       300000000,
+		Indexed:          true,
+		FileCount:        1234,
+		TotalSize:        5242880,
+	}
+
+	text := FormatExtensionDetails(d)
+
+	checks := []string{
+		"WooCommerce (woocommerce) v8.5.0",
+		"An eCommerce toolkit.",
+		"Source:          wordpress.org",
+		"Active installs: 5,000,000",
+		"Downloads:       300,000,000",
+		"Rating:          88/100",
+		"Requires WP:     6.4",
+		"Tested up to:    6.7",
+		"Requires PHP:    7.4",
+		"Index status:    indexed",
+		"Files:           1,234",
+		"Total size:      5.0 MB",
+	}
+	for _, want := range checks {
+		if !strings.Contains(text, want) {
+			t.Errorf("should contain %q, got:\n%s", want, text)
+		}
+	}
+}
+
+func TestFormatExtensionDetails_Minimal(t *testing.T) {
+	d := &ExtensionDetails{
+		Slug:    "6.7.1",
+		Name:    "WordPress 6.7.1",
+		Version: "6.7.1",
+		Source:  "wordpress.org",
+		Indexed: false,
+	}
+
+	text := FormatExtensionDetails(d)
+
+	if !strings.Contains(text, "Index status:    not indexed") {
+		t.Errorf("should show not indexed, got:\n%s", text)
+	}
+	// Should not show fields that are zero/empty
+	if strings.Contains(text, "Active installs") {
+		t.Errorf("should not show zero active installs, got:\n%s", text)
+	}
+	if strings.Contains(text, "Files:") {
+		t.Errorf("should not show file count when not indexed, got:\n%s", text)
+	}
+}
+
+func TestFormatRepoStats(t *testing.T) {
+	stats := []RepoStats{
+		{Repo: "plugins", Total: 60000, Indexed: 54000},
+		{Repo: "themes", Total: 12000, Indexed: 10800},
+		{Repo: "cores", Total: 80, Indexed: 80},
+	}
+
+	text := FormatRepoStats(stats)
+
+	if !strings.Contains(text, "Repository Statistics") {
+		t.Errorf("should have header, got:\n%s", text)
+	}
+	if !strings.Contains(text, "plugins") {
+		t.Errorf("should list plugins, got:\n%s", text)
+	}
+	if !strings.Contains(text, "60,000 total") {
+		t.Errorf("should format totals, got:\n%s", text)
+	}
+	if !strings.Contains(text, "90.0%") {
+		t.Errorf("should show percentage, got:\n%s", text)
+	}
+	if !strings.Contains(text, "100.0%") {
+		t.Errorf("should show 100%% for cores, got:\n%s", text)
+	}
+}
+
+func TestFormatFileList(t *testing.T) {
+	resp := &ListFilesResponse{
+		Slug:  "woocommerce",
+		Repo:  "plugins",
+		Total: 3,
+		Files: []FileEntry{
+			{Path: "woocommerce.php", Size: 12345},
+			{Path: "includes/class-wc.php", Size: 67890},
+			{Path: "readme.txt", Size: 500},
+		},
+	}
+
+	text := FormatFileList(resp)
+
+	if !strings.Contains(text, "plugins/woocommerce: 3 files") {
+		t.Errorf("should show slug and count, got:\n%s", text)
+	}
+	if !strings.Contains(text, "woocommerce.php") {
+		t.Errorf("should list files, got:\n%s", text)
+	}
+	if !strings.Contains(text, "12.1 KB") {
+		t.Errorf("should format sizes, got:\n%s", text)
+	}
+}
+
+func TestFormatFileList_Empty(t *testing.T) {
+	resp := &ListFilesResponse{
+		Slug: "empty", Repo: "plugins", Total: 0,
+	}
+
+	text := FormatFileList(resp)
+	if !strings.Contains(text, "0 files") {
+		t.Errorf("should show 0 files, got:\n%s", text)
+	}
+}
+
+func TestFormatReadFile(t *testing.T) {
+	resp := &ReadFileResponse{
+		Slug:       "woocommerce",
+		Repo:       "plugins",
+		Path:       "woocommerce.php",
+		TotalLines: 100,
+		StartLine:  1,
+		EndLine:    3,
+		Content:    " 1  <?php\n 2  // WooCommerce\n 3  defined('ABSPATH') || exit;\n",
+	}
+
+	text := FormatReadFile(resp)
+
+	if !strings.Contains(text, "plugins/woocommerce") {
+		t.Errorf("should show repo/slug, got:\n%s", text)
+	}
+	if !strings.Contains(text, "woocommerce.php (100 lines total)") {
+		t.Errorf("should show total lines, got:\n%s", text)
+	}
+	if !strings.Contains(text, "Showing lines 1–3") {
+		t.Errorf("should show line range, got:\n%s", text)
+	}
+	if !strings.Contains(text, "<?php") {
+		t.Errorf("should contain file content, got:\n%s", text)
+	}
+	if !strings.Contains(text, "start_line=4") {
+		t.Errorf("should show pagination hint, got:\n%s", text)
+	}
+}
+
+func TestFormatReadFile_Complete(t *testing.T) {
+	resp := &ReadFileResponse{
+		Slug:       "tiny",
+		Repo:       "plugins",
+		Path:       "tiny.php",
+		TotalLines: 2,
+		StartLine:  1,
+		EndLine:    2,
+		Content:    "1  <?php\n2  echo 'hi';\n",
+	}
+
+	text := FormatReadFile(resp)
+
+	if strings.Contains(text, "More lines available") {
+		t.Errorf("should not show pagination hint when complete, got:\n%s", text)
+	}
+}
+
+func TestFormatBytes(t *testing.T) {
+	tests := []struct {
+		input    int64
+		expected string
+	}{
+		{0, "0 B"},
+		{500, "500 B"},
+		{1024, "1.0 KB"},
+		{1536, "1.5 KB"},
+		{1048576, "1.0 MB"},
+		{5242880, "5.0 MB"},
+	}
+
+	for _, tt := range tests {
+		got := formatBytes(tt.input)
+		if got != tt.expected {
+			t.Errorf("formatBytes(%d) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
 func TestFormatNumber(t *testing.T) {
 	tests := []struct {
 		input    int

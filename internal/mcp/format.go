@@ -125,6 +125,121 @@ func FormatExtensionList(resp *ListResponse, repo string, offset int) string {
 	return b.String()
 }
 
+// FormatExtensionDetails formats extension metadata as text.
+func FormatExtensionDetails(d *ExtensionDetails) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "%s (%s) v%s\n", d.Name, d.Slug, d.Version)
+
+	if d.ShortDescription != "" {
+		fmt.Fprintf(&b, "%s\n", d.ShortDescription)
+	}
+
+	b.WriteString("\n")
+
+	if d.Source != "" {
+		fmt.Fprintf(&b, "Source:          %s\n", d.Source)
+	}
+	if d.ActiveInstalls > 0 {
+		fmt.Fprintf(&b, "Active installs: %s\n", formatNumber(d.ActiveInstalls))
+	}
+	if d.Downloaded > 0 {
+		fmt.Fprintf(&b, "Downloads:       %s\n", formatNumber(d.Downloaded))
+	}
+	if d.Rating > 0 {
+		fmt.Fprintf(&b, "Rating:          %d/100\n", d.Rating)
+	}
+	if d.Requires != "" {
+		fmt.Fprintf(&b, "Requires WP:     %s\n", d.Requires)
+	}
+	if d.Tested != "" {
+		fmt.Fprintf(&b, "Tested up to:    %s\n", d.Tested)
+	}
+	if d.RequiresPHP != "" {
+		fmt.Fprintf(&b, "Requires PHP:    %s\n", d.RequiresPHP)
+	}
+
+	status := "indexed"
+	if !d.Indexed {
+		status = "not indexed"
+	}
+	fmt.Fprintf(&b, "Index status:    %s\n", status)
+
+	if d.Indexed && d.FileCount > 0 {
+		fmt.Fprintf(&b, "Files:           %s\n", formatNumber(d.FileCount))
+		fmt.Fprintf(&b, "Total size:      %s\n", formatBytes(d.TotalSize))
+	}
+
+	return b.String()
+}
+
+// FormatRepoStats formats repository statistics as text.
+func FormatRepoStats(stats []RepoStats) string {
+	var b strings.Builder
+
+	b.WriteString("Repository Statistics\n\n")
+
+	for _, s := range stats {
+		pct := 0.0
+		if s.Total > 0 {
+			pct = float64(s.Indexed) / float64(s.Total) * 100
+		}
+		fmt.Fprintf(&b, "  %-8s  %s total, %s indexed (%.1f%%)\n",
+			s.Repo, formatNumber(s.Total), formatNumber(s.Indexed), pct)
+	}
+
+	return b.String()
+}
+
+// FormatFileList formats an extension's file listing as text.
+func FormatFileList(resp *ListFilesResponse) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "%s/%s: %d files\n\n", resp.Repo, resp.Slug, resp.Total)
+
+	for _, f := range resp.Files {
+		fmt.Fprintf(&b, "  %-8s %s\n", formatBytes(f.Size), f.Path)
+	}
+
+	return b.String()
+}
+
+// FormatReadFile formats file contents with metadata header.
+func FormatReadFile(resp *ReadFileResponse) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "%s/%s — %s (%d lines total)\n", resp.Repo, resp.Slug, resp.Path, resp.TotalLines)
+
+	if resp.TotalLines > 0 {
+		fmt.Fprintf(&b, "Showing lines %d–%d\n", resp.StartLine, resp.EndLine)
+	}
+
+	b.WriteString("\n")
+	b.WriteString(resp.Content)
+
+	if resp.EndLine < resp.TotalLines {
+		fmt.Fprintf(&b, "\nMore lines available. Use start_line=%d to continue reading.", resp.EndLine+1)
+	}
+
+	return b.String()
+}
+
+// formatBytes formats a byte count as a human-readable string.
+func formatBytes(b int64) string {
+	const (
+		kb = 1024
+		mb = 1024 * kb
+	)
+	switch {
+	case b >= mb:
+		return fmt.Sprintf("%.1f MB", float64(b)/float64(mb))
+	case b >= kb:
+		return fmt.Sprintf("%.1f KB", float64(b)/float64(kb))
+	default:
+		return fmt.Sprintf("%d B", b)
+	}
+}
+
 // formatNumber formats an integer with comma separators.
 func formatNumber(n int) string {
 	if n < 1000 {
