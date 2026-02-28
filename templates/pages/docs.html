@@ -264,6 +264,38 @@
                             Browse available extensions by repository type (plugins, themes, cores). Supports search filtering and pagination.
                         </p>
                     </div>
+                    <div class="glass-inner rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <code class="text-neon-cyan font-mono text-sm font-semibold">get_extension_details</code>
+                        </div>
+                        <p class="text-sm text-[#cdd5e0] leading-relaxed">
+                            Get detailed metadata for a specific plugin, theme, or core release. Returns version, description, WP/PHP requirements, ratings, install counts, and index status.
+                        </p>
+                    </div>
+                    <div class="glass-inner rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <code class="text-neon-cyan font-mono text-sm font-semibold">get_repo_stats</code>
+                        </div>
+                        <p class="text-sm text-[#cdd5e0] leading-relaxed">
+                            Get index statistics for one or all repository types. Shows total extensions, indexed count, and coverage percentage.
+                        </p>
+                    </div>
+                    <div class="glass-inner rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <code class="text-neon-cyan font-mono text-sm font-semibold">list_files</code>
+                        </div>
+                        <p class="text-sm text-[#cdd5e0] leading-relaxed">
+                            List all files in an indexed extension's source tree. Supports an optional glob pattern to filter by filename (e.g. <code class="text-neon-cyan font-mono text-xs">*.php</code>).
+                        </p>
+                    </div>
+                    <div class="glass-inner rounded-xl p-4">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <code class="text-neon-cyan font-mono text-sm font-semibold">read_file</code>
+                        </div>
+                        <p class="text-sm text-[#cdd5e0] leading-relaxed">
+                            Read the contents of a file from an indexed extension's source tree. Returns numbered lines with support for <code class="text-neon-cyan font-mono text-xs">start_line</code> and <code class="text-neon-cyan font-mono text-xs">max_lines</code> parameters for reading sections of large files.
+                        </p>
+                    </div>
                 </div>
             </div>
 
