@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -83,7 +83,7 @@ type ThemeStore struct {
 }
 
 // NewThemeStore creates a new theme store.
-func NewThemeStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zerolog.Logger, ch cache.Cache, api *APIClient) *ThemeStore {
+func NewThemeStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Logger, ch cache.Cache, api *APIClient) *ThemeStore {
 	repo := NewExtensionStore[*Theme](StoreConfig[*Theme]{
 		Ctx:           ctx,
 		DB:            db,
@@ -127,7 +127,7 @@ func (tr *ThemeStore) Load() error {
 func (tr *ThemeStore) PrepareUpdates() []IndexTask {
 	fetchFn := func() ([]*Theme, error) {
 		if tr.lastFullScan.IsZero() || time.Since(tr.lastFullScan) >= FullScanInterval {
-			tr.l.Info().Msg("Running full theme discovery scan...")
+			tr.l.Info("Running full theme discovery scan...")
 			themes, err := tr.discoverNewThemes()
 			if err != nil {
 				return nil, err
@@ -157,7 +157,7 @@ func (tr *ThemeStore) PrepareUpdates() []IndexTask {
 		if err := db.Where("slug = ? AND source = ?", t.Slug, t.Source).First(&existing).Error; err == nil {
 			t.ID = existing.ID
 			if existing.ClosedAt != nil {
-				tr.l.Info().Msgf("Theme %s is now available again", t.Slug)
+				tr.l.Info("Theme is now available again", zap.String("slug", t.Slug))
 			}
 			return db.Save(t).Error
 		} else if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -178,7 +178,7 @@ func (tr *ThemeStore) discoverNewThemes() ([]*Theme, error) {
 		return nil, err
 	}
 
-	tr.l.Info().Int("known", len(known)).Msg("Starting full theme discovery via API")
+	tr.l.Info("Starting full theme discovery via API", zap.Int("known", len(known)))
 
 	var result []*Theme
 	var skipped int
@@ -217,12 +217,7 @@ func (tr *ThemeStore) discoverNewThemes() ([]*Theme, error) {
 		}
 
 		if page%10 == 0 {
-			tr.l.Info().
-				Int("page", page).
-				Int("totalPages", info.Pages).
-				Int("new", len(result)).
-				Int("skipped", skipped).
-				Msg("Theme discovery progress")
+			tr.l.Info("Theme discovery progress", zap.Int("page", page), zap.Int("totalPages", info.Pages), zap.Int("new", len(result)), zap.Int("skipped", skipped))
 		}
 
 		if page >= info.Pages {
@@ -230,11 +225,7 @@ func (tr *ThemeStore) discoverNewThemes() ([]*Theme, error) {
 		}
 	}
 
-	tr.l.Info().
-		Int("known", len(known)).
-		Int("new", len(result)).
-		Int("skipped", skipped).
-		Msg("Full theme discovery scan complete")
+	tr.l.Info("Full theme discovery scan complete", zap.Int("known", len(known)), zap.Int("new", len(result)), zap.Int("skipped", skipped))
 
 	return result, nil
 }
@@ -344,7 +335,7 @@ func fillWordPressDownloadLink(t *Theme) {
 }
 
 // FetchThemeUpdates fetches theme updates based on environment.
-func FetchThemeUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zerolog.Logger) ([]Theme, error) {
+func FetchThemeUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zap.Logger) ([]Theme, error) {
 	if c.Env == "production" || c.Env == "staging" {
 		return FetchThemesUpdatedWithinLastHour(ctx, api, l)
 	}
@@ -353,7 +344,7 @@ func FetchThemeUpdates(ctx context.Context, c *config.Config, api *APIClient, l 
 
 // FetchThemesUpdatedWithinLastHour fetches pages of themes sorted by
 // update time and collects those updated within the last hour.
-func FetchThemesUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *zerolog.Logger) ([]Theme, error) {
+func FetchThemesUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *zap.Logger) ([]Theme, error) {
 	threshold := time.Now().UTC().Add(-1 * time.Hour)
 
 	var all []Theme
@@ -367,7 +358,7 @@ func FetchThemesUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *ze
 		}
 
 		if len(themes) == 0 {
-			l.Warn().Msgf("Theme updates page %d returned 0 themes", page)
+			l.Warn("Theme updates page returned 0 themes", zap.Int("page", page))
 			break
 		}
 
@@ -383,17 +374,13 @@ func FetchThemesUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *ze
 			}
 			if err != nil {
 				parseFailures++
-				l.Warn().
-					Str("slug", t.Slug).
-					Str("lastUpdatedRaw", s).
-					Err(err).
-					Msg("Failed to parse theme last_updated time, skipping")
+				l.Warn("Failed to parse theme last_updated time, skipping", zap.String("slug", t.Slug), zap.String("lastUpdatedRaw", s), zap.Error(err))
 				continue
 			}
 			t.LastUpdated = ts.UTC()
 			if t.LastUpdated.Before(threshold) {
 				if parseFailures > 0 {
-					l.Warn().Int("count", parseFailures).Msg("Total theme time parse failures during update check")
+					l.Warn("Total theme time parse failures during update check", zap.Int("count", parseFailures))
 				}
 				return all, nil
 			}
@@ -406,7 +393,7 @@ func FetchThemesUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *ze
 	}
 
 	if parseFailures > 0 {
-		l.Warn().Int("count", parseFailures).Msg("Total theme time parse failures during update check")
+		l.Warn("Total theme time parse failures during update check", zap.Int("count", parseFailures))
 	}
 	return all, nil
 }

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/testcontainers/testcontainers-go/modules/minio"
+	"go.uber.org/zap"
 
 	"veloria/internal/config"
 	"veloria/internal/storage"
@@ -40,7 +40,7 @@ func NewTestS3(t *testing.T) storage.ResultStorage {
 		t.Fatalf("failed to get minio connection string: %v", err)
 	}
 
-	logger := zerolog.Nop()
+	logger := zap.NewNop()
 	cfg := &config.Config{
 		S3Endpoint:     endpoint,
 		S3AccessKey:    "minioadmin",
@@ -51,7 +51,7 @@ func NewTestS3(t *testing.T) storage.ResultStorage {
 		S3EnsureBucket: true,
 	}
 
-	s3Client, err := storage.NewS3Client(cfg, &logger)
+	s3Client, err := storage.NewS3Client(cfg, logger)
 	if err != nil {
 		t.Fatalf("failed to create S3 client: %v", err)
 	}

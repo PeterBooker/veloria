@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 
 	"veloria/internal/index"
 	"veloria/internal/repo"
@@ -20,7 +20,7 @@ type Manager struct {
 
 // NewManager creates a new Manager, initializes all data sources, and starts
 // a single shared updater loop that pulls work from all sources.
-func NewManager(ctx context.Context, l *zerolog.Logger, sources []repo.DataSource, concurrency int) (*Manager, error) {
+func NewManager(ctx context.Context, l *zap.Logger, sources []repo.DataSource, concurrency int) (*Manager, error) {
 	var (
 		wg       sync.WaitGroup
 		errMu    sync.Mutex
@@ -62,7 +62,7 @@ func NewManager(ctx context.Context, l *zerolog.Logger, sources []repo.DataSourc
 
 // NewTestManager creates a Manager for testing without loading data or starting
 // the updater goroutine. It is intentionally minimal so unit tests stay fast.
-func NewTestManager(l *zerolog.Logger, sources []repo.DataSource) (*Manager, error) {
+func NewTestManager(l *zap.Logger, sources []repo.DataSource) (*Manager, error) {
 	srcMap := make(map[repo.ExtensionType]repo.DataSource, len(sources))
 	for _, ds := range sources {
 		srcMap[ds.Type()] = ds
@@ -78,7 +78,7 @@ func (m *Manager) GetSource(t repo.ExtensionType) repo.DataSource {
 // startUpdater runs a single background loop that collects pending work from
 // all sources and executes it through a shared worker pool, giving you one
 // place to control total concurrency via INDEXER_CONCURRENCY.
-func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurrency int) {
+func (m *Manager) startUpdater(ctx context.Context, l *zap.Logger, concurrency int) {
 	if concurrency < 1 {
 		concurrency = 1
 	}
@@ -92,7 +92,7 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 			resumeTasks = append(resumeTasks, ds.ResumeUnindexed()...)
 		}
 		if len(resumeTasks) > 0 {
-			l.Info().Msgf("Resuming %d unindexed extensions", len(resumeTasks))
+			l.Info("Resuming unindexed extensions", zap.Int("count", len(resumeTasks)))
 			var wg sync.WaitGroup
 			for _, task := range resumeTasks {
 				wg.Add(1)
@@ -109,7 +109,7 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 		for {
 			select {
 			case <-ctx.Done():
-				l.Info().Msg("Stopping indexer updater")
+				l.Info("Stopping indexer updater")
 				return
 			default:
 			}
@@ -121,7 +121,7 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 			}
 
 			if len(tasks) > 0 {
-				l.Info().Msgf("Processing %d index tasks with concurrency %d", len(tasks), concurrency)
+				l.Info("Processing index tasks", zap.Int("count", len(tasks)), zap.Int("concurrency", concurrency))
 
 				var wg sync.WaitGroup
 				for _, task := range tasks {
@@ -137,7 +137,7 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 				}
 				wg.Wait()
 			} else {
-				l.Info().Msg("No pending updates")
+				l.Info("No pending updates")
 			}
 
 			// Drain any ad-hoc re-index requests queued while processing the batch.
@@ -146,14 +146,14 @@ func (m *Manager) startUpdater(ctx context.Context, l *zerolog.Logger, concurren
 			select {
 			case <-time.After(repo.UpdateInterval):
 			case task := <-m.adhocCh:
-				l.Info().Msgf("Ad-hoc re-index request for %s: %s", task.ExtensionType, task.Slug)
+				l.Info("Ad-hoc re-index request", zap.String("type", string(task.ExtensionType)), zap.String("slug", task.Slug))
 				sem <- struct{}{}
 				go func(t repo.IndexTask) {
 					defer func() { <-sem }()
 					t.Run()
 				}(task)
 			case <-ctx.Done():
-				l.Info().Msg("Stopping indexer updater")
+				l.Info("Stopping indexer updater")
 				return
 			}
 		}

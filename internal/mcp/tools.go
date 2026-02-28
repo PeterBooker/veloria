@@ -3,9 +3,14 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"go.opentelemetry.io/otel/attribute"
+	otelmetric "go.opentelemetry.io/otel/metric"
+
+	"veloria/internal/telemetry"
 )
 
 const (
@@ -81,7 +86,7 @@ func searchCodeTool(svc SearchService) server.ServerTool {
 
 	return server.ServerTool{
 		Tool:    tool,
-		Handler: handleSearchCode(svc),
+		Handler: instrumentedHandler("search_code", handleSearchCode(svc)),
 	}
 }
 
@@ -165,7 +170,7 @@ func listExtensionsTool(svc SearchService) server.ServerTool {
 
 	return server.ServerTool{
 		Tool:    tool,
-		Handler: handleListExtensions(svc),
+		Handler: instrumentedHandler("list_extensions", handleListExtensions(svc)),
 	}
 }
 
@@ -213,7 +218,7 @@ func getExtensionDetailsTool(svc SearchService) server.ServerTool {
 
 	return server.ServerTool{
 		Tool: tool,
-		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		Handler: instrumentedHandler("get_extension_details", func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			repo := request.GetString("repo", "")
 			slug := request.GetString("slug", "")
 			if repo == "" || slug == "" {
@@ -226,7 +231,7 @@ func getExtensionDetailsTool(svc SearchService) server.ServerTool {
 			}
 
 			return mcp.NewToolResultText(FormatExtensionDetails(details)), nil
-		},
+		}),
 	}
 }
 
@@ -243,7 +248,7 @@ func getRepoStatsTool(svc SearchService) server.ServerTool {
 
 	return server.ServerTool{
 		Tool: tool,
-		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		Handler: instrumentedHandler("get_repo_stats", func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			repo := request.GetString("repo", "")
 
 			stats, err := svc.GetRepoStats(ctx, repo)
@@ -252,7 +257,7 @@ func getRepoStatsTool(svc SearchService) server.ServerTool {
 			}
 
 			return mcp.NewToolResultText(FormatRepoStats(stats)), nil
-		},
+		}),
 	}
 }
 
@@ -276,7 +281,7 @@ func listFilesTool(svc SearchService) server.ServerTool {
 
 	return server.ServerTool{
 		Tool: tool,
-		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		Handler: instrumentedHandler("list_files", func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			repo := request.GetString("repo", "")
 			slug := request.GetString("slug", "")
 			if repo == "" || slug == "" {
@@ -291,7 +296,7 @@ func listFilesTool(svc SearchService) server.ServerTool {
 			}
 
 			return mcp.NewToolResultText(FormatFileList(resp)), nil
-		},
+		}),
 	}
 }
 
@@ -328,7 +333,7 @@ func readFileTool(svc SearchService) server.ServerTool {
 
 	return server.ServerTool{
 		Tool: tool,
-		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		Handler: instrumentedHandler("read_file", func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			repo := request.GetString("repo", "")
 			slug := request.GetString("slug", "")
 			path := request.GetString("path", "")
@@ -345,7 +350,22 @@ func readFileTool(svc SearchService) server.ServerTool {
 			}
 
 			return mcp.NewToolResultText(FormatReadFile(resp)), nil
-		},
+		}),
+	}
+}
+
+// instrumentedHandler wraps a tool handler to record MCP tool use count and duration.
+func instrumentedHandler(toolName string, h server.ToolHandlerFunc) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		start := time.Now()
+		result, err := h(ctx, request)
+		elapsed := time.Since(start).Seconds()
+
+		attrs := otelmetric.WithAttributes(attribute.String("tool", toolName))
+		telemetry.MCPToolUseCount.Add(ctx, 1, attrs)
+		telemetry.MCPToolUseDuration.Record(ctx, elapsed, attrs)
+
+		return result, err
 	}
 }
 

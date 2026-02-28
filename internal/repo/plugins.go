@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -88,7 +88,7 @@ type PluginStore struct {
 }
 
 // NewPluginStore creates a new plugin store.
-func NewPluginStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zerolog.Logger, ch cache.Cache, api *APIClient) *PluginStore {
+func NewPluginStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Logger, ch cache.Cache, api *APIClient) *PluginStore {
 	repo := NewExtensionStore[*Plugin](StoreConfig[*Plugin]{
 		Ctx:           ctx,
 		DB:            db,
@@ -132,7 +132,7 @@ func (pr *PluginStore) Load() error {
 func (pr *PluginStore) PrepareUpdates() []IndexTask {
 	fetchFn := func() ([]*Plugin, error) {
 		if pr.lastFullScan.IsZero() || time.Since(pr.lastFullScan) >= FullScanInterval {
-			pr.l.Info().Msg("Running full plugin discovery scan...")
+			pr.l.Info("Running full plugin discovery scan...")
 			plugins, err := pr.discoverNewPlugins()
 			if err != nil {
 				return nil, err
@@ -162,7 +162,7 @@ func (pr *PluginStore) PrepareUpdates() []IndexTask {
 		if err := db.Where("slug = ? AND source = ?", p.Slug, p.Source).First(&existing).Error; err == nil {
 			p.ID = existing.ID
 			if existing.ClosedAt != nil {
-				pr.l.Info().Msgf("Plugin %s is now available again", p.Slug)
+				pr.l.Info("Plugin is now available again", zap.String("slug", p.Slug))
 			}
 			return db.Save(p).Error
 		} else if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -183,7 +183,7 @@ func (pr *PluginStore) discoverNewPlugins() ([]*Plugin, error) {
 		return nil, err
 	}
 
-	pr.l.Info().Int("known", len(known)).Msg("Starting full plugin discovery via API")
+	pr.l.Info("Starting full plugin discovery via API", zap.Int("known", len(known)))
 
 	var result []*Plugin
 	var skipped int
@@ -221,12 +221,7 @@ func (pr *PluginStore) discoverNewPlugins() ([]*Plugin, error) {
 		}
 
 		if page%10 == 0 {
-			pr.l.Info().
-				Int("page", page).
-				Int("totalPages", info.Pages).
-				Int("new", len(result)).
-				Int("skipped", skipped).
-				Msg("Plugin discovery progress")
+			pr.l.Info("Plugin discovery progress", zap.Int("page", page), zap.Int("totalPages", info.Pages), zap.Int("new", len(result)), zap.Int("skipped", skipped))
 		}
 
 		if page >= info.Pages {
@@ -234,11 +229,7 @@ func (pr *PluginStore) discoverNewPlugins() ([]*Plugin, error) {
 		}
 	}
 
-	pr.l.Info().
-		Int("known", len(known)).
-		Int("new", len(result)).
-		Int("skipped", skipped).
-		Msg("Full plugin discovery scan complete")
+	pr.l.Info("Full plugin discovery scan complete", zap.Int("known", len(known)), zap.Int("new", len(result)), zap.Int("skipped", skipped))
 
 	return result, nil
 }
@@ -325,7 +316,7 @@ func (p *Plugin) UnmarshalJSON(data []byte) error {
 }
 
 // FetchPluginUpdates fetches plugin updates based on environment.
-func FetchPluginUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zerolog.Logger) ([]Plugin, error) {
+func FetchPluginUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zap.Logger) ([]Plugin, error) {
 	if c.Env == "production" || c.Env == "staging" {
 		return FetchPluginsUpdatedWithinLastHour(ctx, api, l)
 	}
@@ -334,7 +325,7 @@ func FetchPluginUpdates(ctx context.Context, c *config.Config, api *APIClient, l
 
 // FetchPluginsUpdatedWithinLastHour fetches pages of plugins sorted by
 // update time and collects those updated within the last hour.
-func FetchPluginsUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *zerolog.Logger) ([]Plugin, error) {
+func FetchPluginsUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *zap.Logger) ([]Plugin, error) {
 	threshold := time.Now().UTC().Add(-1 * time.Hour)
 
 	var all []Plugin
@@ -348,7 +339,7 @@ func FetchPluginsUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *z
 		}
 
 		if len(plugins) == 0 {
-			l.Warn().Msgf("Plugin updates page %d returned 0 plugins", page)
+			l.Warn("Plugin updates page returned 0 plugins", zap.Int("page", page))
 			break
 		}
 
@@ -363,17 +354,13 @@ func FetchPluginsUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *z
 			}
 			if err != nil {
 				parseFailures++
-				l.Warn().
-					Str("slug", p.Slug).
-					Str("lastUpdatedRaw", s).
-					Err(err).
-					Msg("Failed to parse plugin last_updated time, skipping")
+				l.Warn("Failed to parse plugin last_updated time, skipping", zap.String("slug", p.Slug), zap.String("lastUpdatedRaw", s), zap.Error(err))
 				continue
 			}
 			p.LastUpdated = ts.UTC()
 			if p.LastUpdated.Before(threshold) {
 				if parseFailures > 0 {
-					l.Warn().Int("count", parseFailures).Msg("Total plugin time parse failures during update check")
+					l.Warn("Total plugin time parse failures during update check", zap.Int("count", parseFailures))
 				}
 				return all, nil
 			}
@@ -386,7 +373,7 @@ func FetchPluginsUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *z
 	}
 
 	if parseFailures > 0 {
-		l.Warn().Int("count", parseFailures).Msg("Total plugin time parse failures during update check")
+		l.Warn("Total plugin time parse failures during update check", zap.Int("count", parseFailures))
 	}
 	return all, nil
 }

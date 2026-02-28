@@ -12,7 +12,7 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -23,14 +23,14 @@ import (
 type S3Client struct {
 	client       *minio.Client
 	bucket       string
-	l            *zerolog.Logger
+	l            *zap.Logger
 	ensureBucket bool
 	zstdEncPool  sync.Pool
 	zstdDecPool  sync.Pool
 }
 
 // NewS3Client creates a new S3 client from configuration.
-func NewS3Client(c *config.Config, l *zerolog.Logger) (*S3Client, error) {
+func NewS3Client(c *config.Config, l *zap.Logger) (*S3Client, error) {
 	client, err := minio.New(c.S3Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(c.S3AccessKey, c.S3SecretKey, ""),
 		Secure: c.S3UseSSL,
@@ -87,7 +87,7 @@ func (s *S3Client) EnsureBucket(ctx context.Context) error {
 		if err := s.client.MakeBucket(ctx, s.bucket, minio.MakeBucketOptions{}); err != nil {
 			return fmt.Errorf("failed to create bucket: %w", err)
 		}
-		s.l.Info().Str("bucket", s.bucket).Msg("Created S3 bucket")
+		s.l.Info("Created S3 bucket", zap.String("bucket", s.bucket))
 	}
 	return nil
 }
@@ -135,7 +135,7 @@ func (s *S3Client) UploadResult(ctx context.Context, searchID string, result pro
 		return 0, fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
-	s.l.Debug().Str("key", key).Int64("size", compressedSize).Msg("Uploaded search result to S3")
+	s.l.Debug("Uploaded search result to S3", zap.String("key", key), zap.Int64("size", compressedSize))
 	return compressedSize, nil
 }
 

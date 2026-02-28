@@ -14,7 +14,8 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/cloudflare"
-	"github.com/rs/zerolog"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.uber.org/zap"
 )
 
 // Server manages the HTTP server lifecycle including optional TLS via certmagic.
@@ -22,17 +23,20 @@ type Server struct {
 	main     *http.Server
 	redirect *http.Server
 	tlsLn    net.Listener
-	logger   *zerolog.Logger
+	logger   *zap.Logger
 }
 
 // New creates a server configured based on the environment.
 // In production with APP_URL set: HTTPS on :443 with certmagic + HTTP redirect on :80.
 // Otherwise: plain HTTP on the configured port.
-func New(handler http.Handler, c *config.Config, l *zerolog.Logger) (*Server, error) {
+func New(handler http.Handler, c *config.Config, l *zap.Logger) (*Server, error) {
+	// Wrap the root handler with OTel HTTP instrumentation.
+	instrumentedHandler := otelhttp.NewHandler(handler, "veloria")
+
 	s := &Server{
 		logger: l,
 		main: &http.Server{
-			Handler:           handler,
+			Handler:           instrumentedHandler,
 			ReadTimeout:       c.HTTPReadTimeout,
 			ReadHeaderTimeout: c.HTTPReadHeaderTimeout,
 			WriteTimeout:      c.HTTPWriteTimeout,
@@ -71,7 +75,7 @@ func New(handler http.Handler, c *config.Config, l *zerolog.Logger) (*Server, er
 		tlsCfg := cfg.TLSConfig()
 		tlsCfg.NextProtos = append([]string{"h2", "http/1.1"}, tlsCfg.NextProtos...)
 		s.main.TLSConfig = tlsCfg
-		s.main.Handler = hstsHandler(handler)
+		s.main.Handler = hstsHandler(instrumentedHandler)
 
 		s.tlsLn, err = tls.Listen("tcp", ":443", tlsCfg) // #nosec G102 -- intentional bind to all interfaces for public server
 		if err != nil {
@@ -90,10 +94,10 @@ func New(handler http.Handler, c *config.Config, l *zerolog.Logger) (*Server, er
 			IdleTimeout:       5 * time.Second,
 		}
 
-		l.Info().Msgf("Managing TLS certificates for %v", domains)
+		l.Info("Managing TLS certificates", zap.Any("domains", domains))
 	} else {
 		if c.Env != "development" && c.AppURL == "" {
-			l.Warn().Msg("APP_URL not set; running without TLS")
+			l.Warn("APP_URL not set; running without TLS")
 		}
 		s.main.Addr = fmt.Sprintf(":%d", c.Port)
 	}
@@ -106,20 +110,20 @@ func New(handler http.Handler, c *config.Config, l *zerolog.Logger) (*Server, er
 func (s *Server) Start() error {
 	if s.redirect != nil {
 		go func() {
-			s.logger.Info().Msg("Starting HTTP redirect server on :80")
+			s.logger.Info("Starting HTTP redirect server on :80")
 			if err := s.redirect.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				s.logger.Error().Err(err).Msg("HTTP redirect server failure")
+				s.logger.Error("HTTP redirect server failure", zap.Error(err))
 			}
 		}()
 	}
 
 	if s.tlsLn != nil {
-		s.logger.Info().Msgf("Starting HTTPS server on :443")
+		s.logger.Info("Starting HTTPS server on :443")
 		if err := s.main.Serve(s.tlsLn); err != nil && err != http.ErrServerClosed {
 			return err
 		}
 	} else {
-		s.logger.Info().Msgf("Starting server %v", s.main.Addr)
+		s.logger.Info("Starting server", zap.String("addr", s.main.Addr))
 		if err := s.main.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			return err
 		}
@@ -141,12 +145,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	var firstErr error
 	if s.redirect != nil {
 		if err := s.redirect.Shutdown(ctx); err != nil {
-			s.logger.Error().Err(err).Msg("HTTP redirect server shutdown failure")
+			s.logger.Error("HTTP redirect server shutdown failure", zap.Error(err))
 			firstErr = err
 		}
 	}
 	if err := s.main.Shutdown(ctx); err != nil {
-		s.logger.Error().Err(err).Msg("Server shutdown failure")
+		s.logger.Error("Server shutdown failure", zap.Error(err))
 		if firstErr == nil {
 			firstErr = err
 		}

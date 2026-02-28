@@ -8,12 +8,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"gorm.io/gorm"
 
 	api "veloria/internal/api"
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/storage"
+	"veloria/internal/telemetry"
 	typespb "veloria/internal/types"
 	"veloria/internal/web"
 )
@@ -134,14 +137,20 @@ func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) h
 		db.Model(&s).Update("status", searchmodel.StatusProcessing)
 		s.Status = searchmodel.StatusProcessing
 
+		searchStart := time.Now()
 		results, err := m.Search(req.Repo, req.Term, &manager.SearchParams{
 			FileMatch:        req.FileMatch,
 			ExcludeFileMatch: req.ExcludeFileMatch,
 			CaseInsensitive:  !req.CaseSensitive,
 		})
+		searchElapsed := time.Since(searchStart).Seconds()
 
 		// Search done — free the slot immediately so the next search can start.
 		releaseSearchSlot()
+
+		repoAttr := attribute.String("repo", req.Repo)
+		telemetry.SearchCount.Add(r.Context(), 1, metric.WithAttributes(repoAttr))
+		telemetry.SearchDuration.Record(r.Context(), searchElapsed, metric.WithAttributes(repoAttr))
 
 		if err != nil {
 			db.Model(&s).Update("status", searchmodel.StatusFailed)
