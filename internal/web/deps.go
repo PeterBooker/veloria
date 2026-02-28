@@ -2,7 +2,9 @@ package web
 
 import (
 	"net/http"
+	"time"
 
+	"github.com/a-h/templ"
 	"gorm.io/gorm"
 
 	"veloria/internal/auth"
@@ -15,7 +17,6 @@ import (
 // Manager capabilities are exposed through narrow interfaces (SearchService,
 // ReindexService, SourceResolver, StatsProvider) defined in interfaces.go.
 type Deps struct {
-	Templates            *Templates
 	DB                   *gorm.DB
 	Search               SearchService
 	Reindex              ReindexService
@@ -32,9 +33,8 @@ type Deps struct {
 // NewDeps creates a new shared dependency container for web handlers.
 // All four interface parameters (search, reindex, sources, stats) may be nil
 // when the manager is unavailable (e.g. no database).
-func NewDeps(templates *Templates, db *gorm.DB, search SearchService, reindex ReindexService, sources SourceResolver, stats StatsProvider, s3 storage.ResultStorage, ch cache.Cache, cfg *config.Config, searchEnabled bool, searchDisabledReason string) *Deps {
+func NewDeps(db *gorm.DB, search SearchService, reindex ReindexService, sources SourceResolver, stats StatsProvider, s3 storage.ResultStorage, ch cache.Cache, cfg *config.Config, searchEnabled bool, searchDisabledReason string) *Deps {
 	return &Deps{
-		Templates:            templates,
 		DB:                   db,
 		Search:               search,
 		Reindex:              reindex,
@@ -60,6 +60,7 @@ func (d *Deps) PageData(r *http.Request) PageData {
 		SearchDisabledReason: d.SearchDisabledReason,
 		CurrentPath:          r.URL.Path,
 		Version:              config.Version,
+		RequestStart:         time.Now(),
 		OG: OGMeta{
 			Title:       "Veloria - WordPress Code Search",
 			Description: "Search through every WordPress plugin, theme, and core version with powerful regex patterns.",
@@ -67,6 +68,14 @@ func (d *Deps) PageData(r *http.Request) PageData {
 			Image:       appURL + "/og-default.png",
 			Type:        "website",
 		},
+	}
+}
+
+// RenderComponent renders a templ component, setting the Content-Type header.
+func (d *Deps) RenderComponent(w http.ResponseWriter, r *http.Request, c templ.Component) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := c.Render(r.Context(), w); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 

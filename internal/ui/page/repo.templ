@@ -1,0 +1,304 @@
+package page
+
+import (
+	"fmt"
+	"strconv"
+
+	"veloria/internal/ui"
+	"veloria/internal/ui/icon"
+	"veloria/internal/ui/layout"
+)
+
+func repoTypeLabel(repo string) string {
+	switch repo {
+	case "plugins":
+		return "Plugins"
+	case "themes":
+		return "Themes"
+	case "cores":
+		return "Core Versions"
+	default:
+		return repo
+	}
+}
+
+func barWidth(value, maxValue int64) string {
+	if maxValue <= 0 {
+		return "0%"
+	}
+	return fmt.Sprintf("%.1f%%", float64(value)/float64(maxValue)*100)
+}
+
+func barWidthInt(value, maxValue int) string {
+	return barWidth(int64(value), int64(maxValue))
+}
+
+templ Repo(data ui.RepoData) {
+	@layout.Base(data.PageData) {
+		<!-- Heading -->
+		<div class="mb-6 pt-8 lg:pt-10">
+			<nav class="text-sm text-text-subtle mb-3">
+				<a href="/data-sources" class="hover:text-neon-pink transition-colors">Data Sources</a>
+				<span class="mx-2">/</span>
+				<span class="text-text-body font-medium">{ data.RepoSummary.Title }</span>
+			</nav>
+			<div class="flex items-center gap-4">
+				<div class="w-14 h-14 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-neon-pink">
+					@icon.Repo(data.RepoSummary.Repo, 28)
+				</div>
+				<div>
+					<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright">{ data.RepoSummary.Title }</h1>
+					<p class="text-sm text-text-body">{ "WordPress " + data.RepoSummary.Repo + " repository" }</p>
+				</div>
+			</div>
+		</div>
+		<!-- Index Status -->
+		<div class="glass-inner p-6 mb-6">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-xl font-semibold text-text-bright">Index Status</h2>
+				<span class="text-sm text-text-muted">{ strconv.Itoa(data.RepoSummary.IndexedPercent) + "% complete" }</span>
+			</div>
+			<div class="grid grid-cols-3 gap-6 mb-4">
+				<div>
+					<p class="text-sm text-text-muted mb-1">Total Items</p>
+					<p class="text-2xl font-bold text-text-bright">{ ui.FormatNumber(data.RepoSummary.Total) }</p>
+				</div>
+				<div>
+					<p class="text-sm text-text-muted mb-1">Indexed</p>
+					<p class="text-2xl font-bold text-text-bright">
+						{ ui.FormatNumber(data.RepoSummary.Indexed) }
+						<span class="text-sm font-normal text-text-subtle">{ "(" + strconv.Itoa(data.RepoSummary.IndexedPercent) + "%)" }</span>
+					</p>
+				</div>
+				<div>
+					<p class="text-sm text-text-muted mb-1">Not Indexed</p>
+					<p class="text-2xl font-bold text-text-subtle">{ ui.FormatNumber(data.RepoSummary.Total - data.RepoSummary.Indexed) }</p>
+				</div>
+			</div>
+			<div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+				if data.RepoSummary.Total > 0 {
+					<div class="h-full rounded-full" style={ "width: " + strconv.Itoa(data.RepoSummary.IndexedPercent) + "%; background: linear-gradient(135deg, #ff2d7b, #b44dff);" }></div>
+				} else {
+					<div class="h-full bg-text-subtle rounded-full"></div>
+				}
+			</div>
+		</div>
+		<!-- Charts Section -->
+		if data.ActiveInstalls.JSON != "" || data.FileCount.JSON != "" || data.FileSize.JSON != "" {
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+				if data.ActiveInstalls.JSON != "" {
+					<div class="glass-inner p-6">
+						<div class="flex items-center justify-between mb-2">
+							<h3 class="text-xl font-semibold text-text-bright">Active Installs</h3>
+							<span class="text-xs text-text-subtle">{ "Max " + ui.FormatCompact(int(data.ActiveInstalls.Max)) }</span>
+						</div>
+						<div id="chart-active-installs" style="width:100%;height:200px;" data-chart={ data.ActiveInstalls.JSON }></div>
+					</div>
+				}
+				if data.FileCount.JSON != "" || data.FileSize.JSON != "" {
+					<div class="glass-inner p-6">
+						<div class="flex items-center justify-between mb-2">
+							<h3 class="text-xl font-semibold text-text-bright">File Stats</h3>
+						</div>
+						<div id="chart-file-stats" style="width:100%;height:200px;" data-size-chart={ data.FileSize.JSON } data-count-chart={ data.FileCount.JSON }></div>
+					</div>
+				}
+			</div>
+			<script src={ "/static/js/echarts.min.js?v=" + data.Version }></script>
+			@repoChartsInit()
+		}
+		<!-- Largest Extensions -->
+		if len(data.LargestBySize) > 0 || len(data.LargestByFileCount) > 0 {
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+				if len(data.LargestBySize) > 0 {
+					@largestBySize(data.RepoSummary.Repo, data.LargestBySize)
+				}
+				if len(data.LargestByFileCount) > 0 {
+					@largestByFileCount(data.RepoSummary.Repo, data.LargestByFileCount)
+				}
+			</div>
+		}
+		<!-- Items List -->
+		<div class="glass-inner overflow-hidden">
+			<div class="px-6 py-4 flex items-center justify-between gap-4 border-b-medium">
+				<h2 class="text-xl font-semibold text-text-bright flex-shrink-0">
+					{ repoTypeLabel(data.RepoSummary.Repo) }
+				</h2>
+				<div class="relative w-full max-w-xs">
+					<div class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-subtle pointer-events-none">
+						@icon.Search(16)
+					</div>
+					<input
+						type="search"
+						name="search"
+						placeholder="Search by name or slug..."
+						hx-get={ "/data-sources/" + data.RepoSummary.Repo + "/items" }
+						hx-trigger="input changed delay:300ms, search"
+						hx-target="#repo-items"
+						hx-swap="innerHTML"
+						hx-include="this"
+						class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-text-body focus:outline-none focus:border-neon-cyan/40 focus:ring-2 focus:ring-neon-cyan/20 transition"
+					/>
+				</div>
+			</div>
+			<div
+				id="repo-items"
+				hx-get={ "/data-sources/" + data.RepoSummary.Repo + "/items" }
+				hx-trigger="load"
+				hx-swap="innerHTML"
+			>
+				<div class="px-6 py-12 flex items-center justify-center">
+					<span class="text-brand-500">
+						@icon.Spinner(20)
+					</span>
+					<span class="ml-2 text-sm text-text-muted">Loading...</span>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ largestBySize(repo string, extensions []ui.LargestExtension) {
+	<div class="glass-inner overflow-hidden">
+		<div class="px-6 py-4 border-b-medium">
+			<h2 class="text-xl font-semibold text-text-bright">Largest by Size</h2>
+			<p class="text-sm text-text-muted">{ "Top " + strconv.Itoa(len(extensions)) + " " + repoTypeLabel(repo) }</p>
+		</div>
+		<div class="p-6">
+			<div class="space-y-3">
+				for _, ext := range extensions {
+					<a href={ templ.SafeURL("/data-sources/" + repo + "/" + ext.Slug) } class="group block">
+						<div class="flex items-center justify-between text-sm mb-1">
+							<span class="text-text-body group-hover:text-brand-600 font-medium truncate transition-colors duration-200">{ ext.Name }</span>
+							<span class="text-text-muted ml-2 flex-shrink-0">{ ui.FormatBytes(ext.TotalSize) }</span>
+						</div>
+						<div class="h-1 bg-white/[0.04] rounded-full overflow-hidden">
+							<div
+								class="h-full rounded-full transition-all duration-300 opacity-50 group-hover:opacity-80"
+								style={ "width: " + barWidth(ext.TotalSize, maxTotalSize(extensions)) + "; background: linear-gradient(135deg, #ff2d7b, #b44dff);" }
+							></div>
+						</div>
+					</a>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+templ largestByFileCount(repo string, extensions []ui.LargestExtension) {
+	<div class="glass-inner overflow-hidden">
+		<div class="px-6 py-4 border-b-medium">
+			<h2 class="text-xl font-semibold text-text-bright">Most Files</h2>
+			<p class="text-sm text-text-muted">{ "Top " + strconv.Itoa(len(extensions)) + " " + repoTypeLabel(repo) }</p>
+		</div>
+		<div class="p-6">
+			<div class="space-y-3">
+				for _, ext := range extensions {
+					<a href={ templ.SafeURL("/data-sources/" + repo + "/" + ext.Slug) } class="group block">
+						<div class="flex items-center justify-between text-sm mb-1">
+							<span class="text-text-body group-hover:text-brand-600 font-medium truncate transition-colors duration-200">{ ext.Name }</span>
+							<span class="text-text-muted ml-2 flex-shrink-0">{ ui.FormatNumber(ext.FileCount) + " files" }</span>
+						</div>
+						<div class="h-1 bg-white/[0.04] rounded-full overflow-hidden">
+							<div
+								class="h-full rounded-full transition-all duration-300 opacity-50 group-hover:opacity-80"
+								style={ "width: " + barWidthInt(ext.FileCount, maxFileCount(extensions)) + "; background: linear-gradient(135deg, #b44dff, #00e5ff);" }
+							></div>
+						</div>
+					</a>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+func maxTotalSize(extensions []ui.LargestExtension) int64 {
+	var m int64
+	for _, ext := range extensions {
+		if ext.TotalSize > m {
+			m = ext.TotalSize
+		}
+	}
+	return m
+}
+
+func maxFileCount(extensions []ui.LargestExtension) int {
+	var m int
+	for _, ext := range extensions {
+		if ext.FileCount > m {
+			m = ext.FileCount
+		}
+	}
+	return m
+}
+
+templ repoChartsInit() {
+	<script>
+	(function() {
+		var brand500 = '#ff2d7b';
+		var brand300 = '#b44dff';
+
+		function fmtBytes(b) {
+			if (b >= 1073741824) return (b/1073741824).toFixed(1)+' GB';
+			if (b >= 1048576) return (b/1048576).toFixed(1)+' MB';
+			if (b >= 1024) return (b/1024).toFixed(1)+' KB';
+			return b+' B';
+		}
+		function fmtCompact(n) {
+			if (n >= 1e9) return (n/1e9).toFixed(0)+'B';
+			if (n >= 1e6) return (n/1e6).toFixed(0)+'M';
+			if (n >= 1e3) return (n/1e3).toFixed(0)+'K';
+			return n.toString();
+		}
+
+		var aiEl = document.getElementById('chart-active-installs');
+		if (aiEl && aiEl.dataset.chart) {
+			var data = JSON.parse(aiEl.dataset.chart);
+			var chart = echarts.init(aiEl);
+			chart.setOption({
+				grid: { top: 10, right: 16, bottom: 24, left: 50 },
+				xAxis: { type: 'category', show: false, data: data.map(function(_,i){return i;}) },
+				yAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
+				tooltip: { trigger: 'axis', formatter: function(p){ return 'Active installs: '+fmtCompact(p[0].value); } },
+				series: [{
+					type: 'line', data: data, showSymbol: false, smooth: true,
+					lineStyle: { color: brand500, width: 2 },
+					areaStyle: { color: 'rgba(255,45,123,0.08)' },
+					itemStyle: { color: brand500 }
+				}]
+			});
+			window.addEventListener('resize', function(){ chart.resize(); });
+		}
+
+		var fsEl = document.getElementById('chart-file-stats');
+		if (fsEl) {
+			var sizeData = fsEl.dataset.sizeChart ? JSON.parse(fsEl.dataset.sizeChart) : [];
+			var countData = fsEl.dataset.countChart ? JSON.parse(fsEl.dataset.countChart) : [];
+			if (sizeData.length || countData.length) {
+				var chart = echarts.init(fsEl);
+				var series = [];
+				if (sizeData.length) {
+					series.push({ name: 'Total size', type: 'line', data: sizeData, showSymbol: false, smooth: true, yAxisIndex: 0,
+						lineStyle: { color: brand500, width: 2 }, itemStyle: { color: brand500 } });
+				}
+				if (countData.length) {
+					series.push({ name: 'File count', type: 'line', data: countData, showSymbol: false, smooth: true, yAxisIndex: 1,
+						lineStyle: { color: brand300, width: 2 }, itemStyle: { color: brand300 } });
+				}
+				chart.setOption({
+					grid: { top: 10, right: 60, bottom: 24, left: 50 },
+					xAxis: { type: 'category', show: false, data: (sizeData.length ? sizeData : countData).map(function(_,i){return i;}) },
+					yAxis: [
+						{ type: 'value', position: 'left', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtBytes(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
+						{ type: 'value', position: 'right', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { show: false } }
+					],
+					tooltip: { trigger: 'axis', formatter: function(p){ var s=''; for(var i=0;i<p.length;i++){s+=p[i].marker+' '+p[i].seriesName+': '+(p[i].seriesName==='Total size'?fmtBytes(p[i].value):fmtCompact(p[i].value))+'<br>';} return s; } },
+					legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#7a8394' } },
+					series: series
+				});
+				window.addEventListener('resize', function(){ chart.resize(); });
+			}
+		}
+	})();
+	</script>
+}

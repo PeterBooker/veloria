@@ -1,0 +1,55 @@
+package page
+
+import (
+	"veloria/internal/ui"
+	"veloria/internal/ui/layout"
+)
+
+templ About(pd ui.PageData) {
+	@layout.Base(pd) {
+		<!-- Heading -->
+		<div class="mb-6 pt-8 lg:pt-10">
+			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">About Veloria</h1>
+			<p class="text-sm text-text-body">WordPress code search, reimagined</p>
+		</div>
+		<div class="max-w-3xl space-y-10">
+			<!-- About -->
+			<section>
+				<p class="text-lg text-text-body leading-relaxed">
+					Veloria is a fast, full-text code search engine for the WordPress ecosystem. It indexes the source code of every plugin, theme and core version published on wordpress.org, letting developers search across the entire directory in seconds. Veloria is the successor to <a href="https://wpdirectory.net/" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">wpdirectory.net</a>, rebuilt from the ground up with a modern stack and a focus on reliability.
+				</p>
+			</section>
+			<!-- Technology -->
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">Technology</h2>
+				<p class="text-lg text-text-body leading-relaxed mb-3">
+					Under the hood, Veloria relies on Google's <a href="https://github.com/google/codesearch" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">codesearch</a> library, which uses trigram indexing to perform regular-expression searches over large codebases at speeds, by only searching files that can potentially contain a match (using the trigram indexing).
+				</p>
+				<p class="text-lg text-text-body leading-relaxed">
+					Plugin and theme metadata is sourced from <a href="https://github.com/fairpm/aspirecloud" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">AspireCloud</a>, FAIR's community-driven mirror of the wordpress.org API. AspireCloud provides a reliable, independent gateway to the WordPress directory data that Veloria depends on.
+				</p>
+			</section>
+			<!-- Sponsorship -->
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">Sponsorship</h2>
+				<p class="text-lg text-text-body leading-relaxed">
+					Veloria is an open-source project maintained in spare time. If you find it useful and would like to help cover hosting and development costs, sponsorship is welcome via <a href="https://github.com/PeterBooker/veloria" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">GitHub Sponsors</a>. Every contribution, no matter how small, helps keep the service running.
+				</p>
+			</section>
+			<!-- Licenses -->
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">Licenses</h2>
+				<p class="text-lg text-text-body leading-relaxed">
+					The Veloria source code is released under the <a href="https://github.com/PeterBooker/veloria/blob/main/LICENSE" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">MIT License</a>. Third-party libraries used by the project retain their own respective licenses. WordPress plugin and theme source code displayed in search results remains subject to the license chosen by each individual author.
+				</p>
+			</section>
+			<!-- Privacy & Terms -->
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">Privacy & Terms</h2>
+				<p class="text-lg text-text-body leading-relaxed">
+					Veloria collects the minimum data necessary to operate. No analytics trackers or advertising scripts are loaded. For full details, see our <a href="/privacy" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">Privacy Policy</a> and <a href="/terms" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">Terms of Service</a>.
+				</p>
+			</section>
+		</div>
+	}
+}

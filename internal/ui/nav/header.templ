@@ -1,0 +1,44 @@
+package nav
+
+import (
+	"veloria/internal/ui/icon"
+	"veloria/internal/user"
+)
+
+templ DesktopHeader(currentPath string, u *user.User) {
+	<header class="hidden lg:block site-header">
+		<div class="max-w-[1280px] mx-auto px-8">
+			<div class="flex items-center justify-between h-[60px]">
+				<a href="/" class="flex items-center gap-2.5">
+					@icon.Logo(30)
+					<span class="text-xl font-bold tracking-wide text-text-bright">Veloria</span>
+				</a>
+				<nav class="flex items-center gap-1.5">
+					for _, item := range BuildNavItems(currentPath, u != nil, u != nil && u.IsAdmin) {
+						@DesktopNavLink(item)
+					}
+					<div class="w-px h-6 mx-2 bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
+					if u != nil {
+						@userSection(u)
+					} else {
+						<a href="/login" class="nav-link">Login</a>
+					}
+				</nav>
+			</div>
+		</div>
+	</header>
+}
+
+templ userSection(u *user.User) {
+	<div class="flex items-center gap-2.5 pl-2">
+		if u.AvatarURL != nil && *u.AvatarURL != "" {
+			<img src={ *u.AvatarURL } alt="" class="w-7 h-7 rounded-full ring-2 ring-white/10"/>
+		} else {
+			<div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-medium bg-gradient-to-br from-neon-pink to-neon-purple">
+				{ string(u.Name[0:1]) }
+			</div>
+		}
+		<span class="text-sm text-text-body">{ u.Name }</span>
+		<a href="/logout" hx-boost="false" class="nav-link text-text-subtle hover:text-text-muted text-[18px]">Sign out</a>
+	</div>
+}

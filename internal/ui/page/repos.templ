@@ -1,0 +1,75 @@
+package page
+
+import (
+	"strconv"
+
+	"veloria/internal/ui"
+	"veloria/internal/ui/icon"
+	"veloria/internal/ui/layout"
+)
+
+templ repoIcon(repo string, size int) {
+	switch repo {
+		case "plugins":
+			@icon.Plugin(size)
+		case "themes":
+			@icon.Theme(size)
+		default:
+			@icon.Core(size)
+	}
+}
+
+templ Repos(data ui.ReposData) {
+	@layout.Base(data.PageData) {
+		<!-- Heading -->
+		<div class="mb-6 pt-8 lg:pt-10">
+			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Data Sources</h1>
+			<p class="text-sm text-text-body">Browse indexed WordPress data sources</p>
+		</div>
+		<!-- Repository Cards -->
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+			for _, repo := range data.RepoSummaries {
+				<a href={ templ.SafeURL("/data-sources/" + repo.Repo) } class="glass-inner group block p-6 hover:shadow-lg hover:border-brand-300 transition-all duration-300">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="w-12 h-12 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center group-hover:border-brand-200 transition-colors">
+							<span class={ repoIconColor(repo.Repo) }>
+								@repoIcon(repo.Repo, 24)
+							</span>
+						</div>
+						<div>
+							<h3 class="text-xl font-semibold text-text-bright group-hover:text-brand-600 transition-colors">{ repo.Title }</h3>
+							<p class="text-sm text-text-subtle capitalize">{ repo.Repo } repository</p>
+						</div>
+					</div>
+					<div class="flex items-center justify-between text-sm text-text-muted mb-3">
+						<span>
+							<span class="text-text-bright font-semibold">{ ui.FormatNumber(repo.Total) }</span> total
+						</span>
+						<span>
+							<span class="text-text-bright font-semibold">{ ui.FormatNumber(repo.Indexed) }</span> indexed
+						</span>
+					</div>
+					<div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+						if repo.Total > 0 {
+							<div class="h-full rounded-full transition-all duration-300" style={ "width: " + strconv.Itoa(repo.IndexedPercent) + "%; background: linear-gradient(135deg, #ff2d7b, #b44dff)" }></div>
+						} else {
+							<div class="h-full bg-text-subtle rounded-full"></div>
+						}
+					</div>
+					<p class="mt-3 text-xs text-text-subtle text-right">{ strconv.Itoa(repo.IndexedPercent) }% indexed</p>
+				</a>
+			}
+		</div>
+	}
+}
+
+func repoIconColor(repo string) string {
+	switch repo {
+	case "plugins":
+		return "text-neon-pink"
+	case "themes":
+		return "text-neon-purple"
+	default:
+		return "text-neon-gold"
+	}
+}

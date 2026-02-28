@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"veloria/internal/ui/page"
 	"veloria/internal/web"
 )
 
@@ -83,9 +84,6 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			LargestFiles:     web.ParseLargestFiles(row.LargestFiles, 25),
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "extension.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, page.Extension(data))
 	}
 }

@@ -1,0 +1,13 @@
+package badge
+
+templ Indexed(indexed bool) {
+	if indexed {
+		<span class="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full bg-green-500/10 text-green-400 border border-green-500/30">
+			Indexed
+		</span>
+	} else {
+		<span class="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium rounded-full bg-white/5 text-text-muted border border-white/10">
+			Pending
+		</span>
+	}
+}

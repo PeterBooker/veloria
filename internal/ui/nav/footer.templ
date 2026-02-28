@@ -1,0 +1,32 @@
+package nav
+
+import (
+	"time"
+
+	"veloria/internal/ui"
+	"veloria/internal/ui/icon"
+)
+
+templ Footer(version string, requestStart time.Time) {
+	<footer class="site-footer">
+		<div class="max-w-[1280px] mx-auto px-4 lg:px-8">
+			<nav class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-3" aria-label="Footer links">
+				<a href="https://github.com/PeterBooker/veloria" target="_blank" rel="noopener noreferrer" class="text-[18px] text-text-subtle hover:text-text-muted transition inline-flex items-center gap-1.5">
+					@icon.GitHub(14)
+					GitHub
+				</a>
+				if version == "dev" {
+					<span class="text-[18px] text-text-subtle">Version: dev</span>
+				} else {
+					<a href={ templ.SafeURL("https://github.com/PeterBooker/veloria/releases/tag/" + version) } target="_blank" rel="noopener noreferrer" class="text-[18px] text-text-subtle hover:text-text-muted transition">Version: { version }</a>
+				}
+				<a href="/privacy" class="text-[18px] text-text-subtle hover:text-text-muted transition">Privacy</a>
+				<a href="/terms" class="text-[18px] text-text-subtle hover:text-text-muted transition">Terms</a>
+				<span class="text-[18px] text-text-subtle">&copy; 2026 Veloria</span>
+				if !requestStart.IsZero() {
+					<span class="text-[18px] text-text-subtle">Request: { ui.Elapsed(requestStart) }</span>
+				}
+			</nav>
+		</div>
+	</footer>
+}

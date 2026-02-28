@@ -7,6 +7,7 @@ import (
 
 	api "veloria/internal/api"
 	searchmodel "veloria/internal/search/model"
+	"veloria/internal/ui/partial"
 	"veloria/internal/web"
 )
 
@@ -40,9 +41,6 @@ func ToggleVisibility(d *web.Deps) http.HandlerFunc {
 			Private:  newPrivate,
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "admin_visibility_toggle.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, partial.AdminVisibilityToggle(data))
 	}
 }

@@ -1,6 +1,10 @@
 package web
 
-import "net/http"
+import (
+	"net/http"
+
+	"veloria/internal/ui/page"
+)
 
 // AboutPage renders the about page.
 func AboutPage(d *Deps) http.HandlerFunc {
@@ -9,13 +13,6 @@ func AboutPage(d *Deps) http.HandlerFunc {
 		pd.OG.Title = "About - Veloria"
 		pd.OG.Description = "Learn about Veloria, the open-source WordPress code search engine."
 
-		data := struct{ PageData }{
-			PageData: pd,
-		}
-
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "about.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, page.About(pd))
 	}
 }
