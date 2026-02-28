@@ -4,22 +4,22 @@ import "veloria/internal/ui/icon"
 
 templ Status(status string) {
 	if status == "completed" {
-		<span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-green-500/10 text-green-400 border border-green-500/30">
+		<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-green-500/10 text-green-400 border-l-2 border-green-400">
 			@icon.Check(12)
 			{ status }
 		</span>
 	} else if status == "processing" || status == "queued" {
-		<span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+		<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-amber-500/10 text-amber-400 border-l-2 border-amber-400">
 			@icon.Spinner(12)
 			{ status }
 		</span>
 	} else if status == "failed" {
-		<span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-red-500/10 text-red-400 border border-red-500/30">
+		<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-red-500/10 text-red-400 border-l-2 border-red-400">
 			@icon.Close(12)
 			{ status }
 		</span>
 	} else {
-		<span class="inline-flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 text-xs font-medium rounded-full bg-white/5 text-text-muted border border-white/10">
+		<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-white/5 text-text-muted border-l-2 border-white/20">
 			{ status }
 		</span>
 	}
