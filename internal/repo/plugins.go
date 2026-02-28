@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"math"
 	"net/url"
 	"strconv"
@@ -66,7 +67,7 @@ type Plugin struct {
 // Implement Extension interface
 func (p *Plugin) GetSlug() string         { return p.Slug }
 func (p *Plugin) GetSource() string       { return p.Source }
-func (p *Plugin) GetName() string         { return p.Name }
+func (p *Plugin) GetName() string         { return html.UnescapeString(p.Name) }
 func (p *Plugin) GetVersion() string      { return p.Version }
 func (p *Plugin) GetDownloadLink() string { return p.DownloadLink }
 func (p *Plugin) GetActiveInstalls() int  { return p.ActiveInstalls }

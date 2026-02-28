@@ -1,6 +1,7 @@
 package model
 
 import (
+	"html"
 	"math"
 	"veloria/internal/index"
 	"veloria/internal/manager"
@@ -84,7 +85,7 @@ func searchResultToProto(result *manager.SearchResult) *typespb.SearchResult {
 func searchResultFromProto(result *typespb.SearchResult) *manager.SearchResult {
 	out := &manager.SearchResult{
 		Slug:           result.GetSlug(),
-		Name:           result.GetName(),
+		Name:           html.UnescapeString(result.GetName()),
 		Version:        result.GetVersion(),
 		ActiveInstalls: int(result.GetActiveInstalls()),
 		Downloaded:     int(result.GetDownloaded()),

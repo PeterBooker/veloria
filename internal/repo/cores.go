@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,7 +39,7 @@ type Core struct {
 // Note: Core uses Version as its identifier instead of Slug
 func (c *Core) GetSlug() string         { return c.Version }
 func (c *Core) GetSource() string       { return SourceWordPress }
-func (c *Core) GetName() string         { return c.Name }
+func (c *Core) GetName() string         { return html.UnescapeString(c.Name) }
 func (c *Core) GetVersion() string      { return c.Version }
 func (c *Core) GetDownloadLink() string { return c.ZipURL }
 func (c *Core) GetActiveInstalls() int  { return 0 } // Cores don't have install counts

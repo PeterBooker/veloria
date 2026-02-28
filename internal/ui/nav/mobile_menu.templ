@@ -96,7 +96,7 @@ templ mobileUserSection(u *user.User) {
 		}
 		<span class="text-sm text-text-body">{ u.Name }</span>
 	</div>
-	<a href="/logout" hx-boost="false" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-text-muted hover:bg-white/5 transition">
+	<a href="/logout" hx-boost="false" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-text-muted hover:bg-white/5 hover:underline hover:underline-offset-2 transition">
 		@icon.Logout(20)
 		Sign out
 	</a>

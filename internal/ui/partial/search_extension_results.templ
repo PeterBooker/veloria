@@ -34,7 +34,7 @@ templ SearchExtensionResults(data ui.ExtensionResultsData) {
 				<div class="flex flex-col">
 					for _, match := range file.Matches {
 						<div class="flex items-stretch border-b border-white/[0.06] last:border-b-0 group hover:bg-white/[0.02] transition-colors">
-							<div class="px-3 lg:px-4 py-2.5 text-text-muted text-xs text-right select-none whitespace-nowrap border-r-2 border-neon-pink/40 bg-brand-50 font-mono flex items-center justify-end" style="min-width: 3.5rem;">{ strconv.Itoa(match.LineNumber) }</div>
+							<div class="px-3 lg:px-4 py-2.5 text-text-muted text-xs text-right select-none whitespace-nowrap border-r-2 border-neon-pink/40 bg-brand-50 font-mono flex items-center justify-end" style="width: 3.5rem; min-width: 3.5rem;">{ strconv.Itoa(match.LineNumber) }</div>
 							<div class="flex-1 min-w-0 py-2.5 px-4 overflow-x-auto">
 								<code class="text-text-body text-sm font-mono whitespace-pre leading-relaxed">{ match.Line }</code>
 							</div>

@@ -145,14 +145,13 @@ templ Home(data ui.HomeData) {
 							/>
 							<span class="text-sm text-text-muted group-hover:text-text-body transition whitespace-nowrap">Exclude minified</span>
 						</label>
-						<span id="search-tip" class="text-lg text-text-subtle hidden sm:block ml-auto">Regex patterns supported</span>
 					</div>
 				</form>
 			</div>
 			<!-- Pre-search content -->
 			<div class="animate-fade-up">
 				if len(data.RecentSearches) > 0 {
-					<section class="mb-9 max-w-[700px] mx-auto">
+					<section class="mb-9 max-w-[900px] mx-auto">
 						<div class="flex items-center gap-2.5 mb-4">
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4e5666" stroke-width="2" stroke-linecap="round" aria-hidden="true">
 								<circle cx="12" cy="12" r="10"></circle>
@@ -180,7 +179,9 @@ templ Home(data ui.HomeData) {
 				<!-- Data Sources -->
 				<section class="mb-10">
 					<div class="flex items-center gap-2.5 mb-4">
-						<div class="neon-dot-purple"></div>
+						<span class="text-text-subtle">
+							@icon.Database(16)
+						</span>
 						<span class="text-lg text-text-muted font-semibold uppercase tracking-wider">Data Sources</span>
 						<div class="neon-divider bg-gradient-to-r from-neon-purple/30 via-neon-purple/10 to-transparent"></div>
 					</div>

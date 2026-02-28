@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"html"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -56,7 +57,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		pd := d.PageData(r)
-		pd.OG.Title = row.Name + " - Veloria"
+		pd.OG.Title = html.UnescapeString(row.Name) + " - Veloria"
 		if row.ShortDescription != "" {
 			pd.OG.Description = row.ShortDescription
 		}
@@ -64,7 +65,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		data := web.ExtensionData{
 			PageData:         pd,
 			RepoType:         "plugins",
-			Name:             row.Name,
+			Name:             html.UnescapeString(row.Name),
 			Slug:             row.Slug,
 			Source:           row.Source,
 			Version:          row.Version,

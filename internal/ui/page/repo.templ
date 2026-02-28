@@ -38,7 +38,7 @@ templ Repo(data ui.RepoData) {
 		<!-- Heading -->
 		<div class="mb-6 pt-8 lg:pt-10">
 			<nav class="text-sm text-text-subtle mb-3">
-				<a href="/data-sources" class="hover:text-neon-pink transition-colors">Data Sources</a>
+				<a href="/data-sources" class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors">Data Sources</a>
 				<span class="mx-2">/</span>
 				<span class="text-text-body font-medium">{ data.RepoSummary.Title }</span>
 			</nav>
@@ -132,6 +132,7 @@ templ Repo(data ui.RepoData) {
 						type="search"
 						name="search"
 						placeholder="Search by name or slug..."
+						aria-label="Search by name or slug"
 						hx-get={ "/data-sources/" + data.RepoSummary.Repo + "/items" }
 						hx-trigger="input changed delay:300ms, search"
 						hx-target="#repo-items"
@@ -169,7 +170,7 @@ templ largestBySize(repo string, extensions []ui.LargestExtension) {
 				for _, ext := range extensions {
 					<a href={ templ.SafeURL("/data-sources/" + repo + "/" + ext.Slug) } class="group block">
 						<div class="flex items-center justify-between text-sm mb-1">
-							<span class="text-text-body group-hover:text-brand-600 font-medium truncate transition-colors duration-200">{ ext.Name }</span>
+							<span class="text-text-body group-hover:text-brand-600 group-hover:underline font-medium truncate transition-colors duration-200">{ ext.Name }</span>
 							<span class="text-text-muted ml-2 flex-shrink-0">{ ui.FormatBytes(ext.TotalSize) }</span>
 						</div>
 						<div class="h-1 bg-white/[0.04] rounded-full overflow-hidden">
@@ -196,7 +197,7 @@ templ largestByFileCount(repo string, extensions []ui.LargestExtension) {
 				for _, ext := range extensions {
 					<a href={ templ.SafeURL("/data-sources/" + repo + "/" + ext.Slug) } class="group block">
 						<div class="flex items-center justify-between text-sm mb-1">
-							<span class="text-text-body group-hover:text-brand-600 font-medium truncate transition-colors duration-200">{ ext.Name }</span>
+							<span class="text-text-body group-hover:text-brand-600 group-hover:underline font-medium truncate transition-colors duration-200">{ ext.Name }</span>
 							<span class="text-text-muted ml-2 flex-shrink-0">{ ui.FormatNumber(ext.FileCount) + " files" }</span>
 						</div>
 						<div class="h-1 bg-white/[0.04] rounded-full overflow-hidden">
@@ -235,69 +236,78 @@ func maxFileCount(extensions []ui.LargestExtension) int {
 templ repoChartsInit() {
 	<script>
 	(function() {
-		var brand500 = '#ff2d7b';
-		var brand300 = '#b44dff';
+		function init() {
+			var brand500 = '#ff2d7b';
+			var brand300 = '#b44dff';
 
-		function fmtBytes(b) {
-			if (b >= 1073741824) return (b/1073741824).toFixed(1)+' GB';
-			if (b >= 1048576) return (b/1048576).toFixed(1)+' MB';
-			if (b >= 1024) return (b/1024).toFixed(1)+' KB';
-			return b+' B';
-		}
-		function fmtCompact(n) {
-			if (n >= 1e9) return (n/1e9).toFixed(0)+'B';
-			if (n >= 1e6) return (n/1e6).toFixed(0)+'M';
-			if (n >= 1e3) return (n/1e3).toFixed(0)+'K';
-			return n.toString();
-		}
+			function fmtBytes(b) {
+				if (b >= 1073741824) return (b/1073741824).toFixed(1)+' GB';
+				if (b >= 1048576) return (b/1048576).toFixed(1)+' MB';
+				if (b >= 1024) return (b/1024).toFixed(1)+' KB';
+				return b+' B';
+			}
+			function fmtCompact(n) {
+				if (n >= 1e9) return (n/1e9).toFixed(0)+'B';
+				if (n >= 1e6) return (n/1e6).toFixed(0)+'M';
+				if (n >= 1e3) return (n/1e3).toFixed(0)+'K';
+				return n.toString();
+			}
 
-		var aiEl = document.getElementById('chart-active-installs');
-		if (aiEl && aiEl.dataset.chart) {
-			var data = JSON.parse(aiEl.dataset.chart);
-			var chart = echarts.init(aiEl);
-			chart.setOption({
-				grid: { top: 10, right: 16, bottom: 24, left: 50 },
-				xAxis: { type: 'category', show: false, data: data.map(function(_,i){return i;}) },
-				yAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
-				tooltip: { trigger: 'axis', formatter: function(p){ return 'Active installs: '+fmtCompact(p[0].value); } },
-				series: [{
-					type: 'line', data: data, showSymbol: false, smooth: true,
-					lineStyle: { color: brand500, width: 2 },
-					areaStyle: { color: 'rgba(255,45,123,0.08)' },
-					itemStyle: { color: brand500 }
-				}]
-			});
-			window.addEventListener('resize', function(){ chart.resize(); });
-		}
-
-		var fsEl = document.getElementById('chart-file-stats');
-		if (fsEl) {
-			var sizeData = fsEl.dataset.sizeChart ? JSON.parse(fsEl.dataset.sizeChart) : [];
-			var countData = fsEl.dataset.countChart ? JSON.parse(fsEl.dataset.countChart) : [];
-			if (sizeData.length || countData.length) {
-				var chart = echarts.init(fsEl);
-				var series = [];
-				if (sizeData.length) {
-					series.push({ name: 'Total size', type: 'line', data: sizeData, showSymbol: false, smooth: true, yAxisIndex: 0,
-						lineStyle: { color: brand500, width: 2 }, itemStyle: { color: brand500 } });
-				}
-				if (countData.length) {
-					series.push({ name: 'File count', type: 'line', data: countData, showSymbol: false, smooth: true, yAxisIndex: 1,
-						lineStyle: { color: brand300, width: 2 }, itemStyle: { color: brand300 } });
-				}
+			var aiEl = document.getElementById('chart-active-installs');
+			if (aiEl && aiEl.dataset.chart) {
+				var data = JSON.parse(aiEl.dataset.chart);
+				var chart = echarts.init(aiEl);
 				chart.setOption({
-					grid: { top: 10, right: 60, bottom: 24, left: 50 },
-					xAxis: { type: 'category', show: false, data: (sizeData.length ? sizeData : countData).map(function(_,i){return i;}) },
-					yAxis: [
-						{ type: 'value', position: 'left', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtBytes(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
-						{ type: 'value', position: 'right', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { show: false } }
-					],
-					tooltip: { trigger: 'axis', formatter: function(p){ var s=''; for(var i=0;i<p.length;i++){s+=p[i].marker+' '+p[i].seriesName+': '+(p[i].seriesName==='Total size'?fmtBytes(p[i].value):fmtCompact(p[i].value))+'<br>';} return s; } },
-					legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#7a8394' } },
-					series: series
+					grid: { top: 10, right: 16, bottom: 24, left: 50 },
+					xAxis: { type: 'category', show: false, data: data.map(function(_,i){return i;}) },
+					yAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
+					tooltip: { trigger: 'axis', formatter: function(p){ return 'Active installs: '+fmtCompact(p[0].value); } },
+					series: [{
+						type: 'line', data: data, showSymbol: false, smooth: true,
+						lineStyle: { color: brand500, width: 2 },
+						areaStyle: { color: 'rgba(255,45,123,0.08)' },
+						itemStyle: { color: brand500 }
+					}]
 				});
 				window.addEventListener('resize', function(){ chart.resize(); });
 			}
+
+			var fsEl = document.getElementById('chart-file-stats');
+			if (fsEl) {
+				var sizeData = fsEl.dataset.sizeChart ? JSON.parse(fsEl.dataset.sizeChart) : [];
+				var countData = fsEl.dataset.countChart ? JSON.parse(fsEl.dataset.countChart) : [];
+				if (sizeData.length || countData.length) {
+					var chart = echarts.init(fsEl);
+					var series = [];
+					if (sizeData.length) {
+						series.push({ name: 'Total size', type: 'line', data: sizeData, showSymbol: false, smooth: true, yAxisIndex: 0,
+							lineStyle: { color: brand500, width: 2 }, itemStyle: { color: brand500 } });
+					}
+					if (countData.length) {
+						series.push({ name: 'File count', type: 'line', data: countData, showSymbol: false, smooth: true, yAxisIndex: 1,
+							lineStyle: { color: brand300, width: 2 }, itemStyle: { color: brand300 } });
+					}
+					chart.setOption({
+						grid: { top: 10, right: 60, bottom: 24, left: 50 },
+						xAxis: { type: 'category', show: false, data: (sizeData.length ? sizeData : countData).map(function(_,i){return i;}) },
+						yAxis: [
+							{ type: 'value', position: 'left', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtBytes(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
+							{ type: 'value', position: 'right', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { show: false } }
+						],
+						tooltip: { trigger: 'axis', formatter: function(p){ var s=''; for(var i=0;i<p.length;i++){s+=p[i].marker+' '+p[i].seriesName+': '+(p[i].seriesName==='Total size'?fmtBytes(p[i].value):fmtCompact(p[i].value))+'<br>';} return s; } },
+						legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#7a8394' } },
+						series: series
+					});
+					window.addEventListener('resize', function(){ chart.resize(); });
+				}
+			}
+		}
+
+		if (typeof echarts !== 'undefined') {
+			init();
+		} else {
+			var s = document.querySelector('script[src*="echarts"]');
+			if (s) s.addEventListener('load', init);
 		}
 	})();
 	</script>
