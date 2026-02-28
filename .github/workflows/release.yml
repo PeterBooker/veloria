@@ -3,11 +3,6 @@ name: Release and Deploy
 on:
   release:
     types: [published]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to embed (defaults to release tag or short commit SHA)."
-        required: false
 
 permissions:
   contents: read
@@ -19,7 +14,6 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != '' && secrets.DEPLOY_SSH_KEY != '' }}
     env:
       GOEXPERIMENT: jsonv2,greenteagc
     steps:
@@ -43,14 +37,7 @@ jobs:
 
       - name: Set version
         id: version
-        run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "release" ]; then
-            echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
 
       - name: Build deployment binaries
         run: |
