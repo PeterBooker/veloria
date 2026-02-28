@@ -24,6 +24,10 @@ func NewMCPServer(name, version string, svc SearchService) *server.MCPServer {
 	s.AddTools(
 		searchCodeTool(svc),
 		listExtensionsTool(svc),
+		getExtensionDetailsTool(svc),
+		getRepoStatsTool(svc),
+		listFilesTool(svc),
+		readFileTool(svc),
 	)
 
 	return s
@@ -189,6 +193,159 @@ func handleListExtensions(svc SearchService) server.ToolHandlerFunc {
 
 		text := FormatExtensionList(resp, repo, offset)
 		return mcp.NewToolResultText(text), nil
+	}
+}
+
+func getExtensionDetailsTool(svc SearchService) server.ServerTool {
+	tool := mcp.NewTool("get_extension_details",
+		mcp.WithDescription("Get detailed metadata for a specific WordPress extension (plugin, theme, or core release). "+
+			"Returns version, description, requirements, ratings, install counts, and index status."),
+		mcp.WithString("repo",
+			mcp.Required(),
+			mcp.Description("Repository type: plugins, themes, or cores"),
+			mcp.Enum("plugins", "themes", "cores"),
+		),
+		mcp.WithString("slug",
+			mcp.Required(),
+			mcp.Description("Extension slug (or version number for cores, e.g. \"6.7.1\")"),
+		),
+	)
+
+	return server.ServerTool{
+		Tool: tool,
+		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			repo := request.GetString("repo", "")
+			slug := request.GetString("slug", "")
+			if repo == "" || slug == "" {
+				return mcp.NewToolResultError("repo and slug are required"), nil
+			}
+
+			details, err := svc.GetExtensionDetails(ctx, repo, slug)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			return mcp.NewToolResultText(FormatExtensionDetails(details)), nil
+		},
+	}
+}
+
+func getRepoStatsTool(svc SearchService) server.ServerTool {
+	tool := mcp.NewTool("get_repo_stats",
+		mcp.WithDescription("Get index statistics for WordPress extension repositories. "+
+			"Shows total extensions, indexed count, and coverage percentage. "+
+			"Omit repo to get stats for all repository types."),
+		mcp.WithString("repo",
+			mcp.Description("Repository type: plugins, themes, or cores. Omit for all."),
+			mcp.Enum("plugins", "themes", "cores"),
+		),
+	)
+
+	return server.ServerTool{
+		Tool: tool,
+		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			repo := request.GetString("repo", "")
+
+			stats, err := svc.GetRepoStats(ctx, repo)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			return mcp.NewToolResultText(FormatRepoStats(stats)), nil
+		},
+	}
+}
+
+func listFilesTool(svc SearchService) server.ServerTool {
+	tool := mcp.NewTool("list_files",
+		mcp.WithDescription("List files in a WordPress extension's source tree. "+
+			"Requires the extension to be indexed. Use an optional glob pattern to filter by filename."),
+		mcp.WithString("repo",
+			mcp.Required(),
+			mcp.Description("Repository type: plugins, themes, or cores"),
+			mcp.Enum("plugins", "themes", "cores"),
+		),
+		mcp.WithString("slug",
+			mcp.Required(),
+			mcp.Description("Extension slug (or version number for cores)"),
+		),
+		mcp.WithString("pattern",
+			mcp.Description("Glob pattern to filter filenames (e.g. \"*.php\", \"*.js\"). Matches against the base filename only."),
+		),
+	)
+
+	return server.ServerTool{
+		Tool: tool,
+		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			repo := request.GetString("repo", "")
+			slug := request.GetString("slug", "")
+			if repo == "" || slug == "" {
+				return mcp.NewToolResultError("repo and slug are required"), nil
+			}
+
+			pattern := request.GetString("pattern", "")
+
+			resp, err := svc.ListFiles(ctx, repo, slug, pattern)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			return mcp.NewToolResultText(FormatFileList(resp)), nil
+		},
+	}
+}
+
+func readFileTool(svc SearchService) server.ServerTool {
+	tool := mcp.NewTool("read_file",
+		mcp.WithDescription("Read the contents of a file from a WordPress extension's source tree. "+
+			"Requires the extension to be indexed. Returns numbered lines for easy reference. "+
+			"Use start_line and max_lines to read specific sections of large files."),
+		mcp.WithString("repo",
+			mcp.Required(),
+			mcp.Description("Repository type: plugins, themes, or cores"),
+			mcp.Enum("plugins", "themes", "cores"),
+		),
+		mcp.WithString("slug",
+			mcp.Required(),
+			mcp.Description("Extension slug (or version number for cores)"),
+		),
+		mcp.WithString("path",
+			mcp.Required(),
+			mcp.Description("File path within the extension (e.g. \"includes/class-wc.php\")"),
+		),
+		mcp.WithNumber("start_line",
+			mcp.Description("Line number to start reading from (default: 1)"),
+			mcp.DefaultNumber(1),
+			mcp.Min(1),
+		),
+		mcp.WithNumber("max_lines",
+			mcp.Description("Maximum number of lines to return (default: 500, max: 500)"),
+			mcp.DefaultNumber(float64(maxReadLines)),
+			mcp.Min(1),
+			mcp.Max(float64(maxReadLines)),
+		),
+	)
+
+	return server.ServerTool{
+		Tool: tool,
+		Handler: func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			repo := request.GetString("repo", "")
+			slug := request.GetString("slug", "")
+			path := request.GetString("path", "")
+			if repo == "" || slug == "" || path == "" {
+				return mcp.NewToolResultError("repo, slug, and path are required"), nil
+			}
+
+			startLine := clampInt(request.GetInt("start_line", 1), 1, maxReadLines*1000)
+			maxLines := clampInt(request.GetInt("max_lines", maxReadLines), 1, maxReadLines)
+
+			resp, err := svc.ReadFile(ctx, repo, slug, path, startLine, maxLines)
+			if err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+
+			return mcp.NewToolResultText(FormatReadFile(resp)), nil
+		},
 	}
 }
 

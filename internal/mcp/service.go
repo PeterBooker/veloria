@@ -1,8 +1,13 @@
 package mcp
 
 import (
+	"bufio"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -10,9 +15,11 @@ import (
 	"gorm.io/gorm"
 
 	"veloria/internal/manager"
+	"veloria/internal/repo"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/storage"
 	typespb "veloria/internal/types"
+	"veloria/internal/web"
 )
 
 // SearchService abstracts data access for MCP tools.
@@ -27,6 +34,19 @@ type SearchService interface {
 
 	// ListExtensions returns a paginated list of extensions.
 	ListExtensions(ctx context.Context, params ListParams) (*ListResponse, error)
+
+	// GetExtensionDetails returns full metadata for a single extension.
+	GetExtensionDetails(ctx context.Context, repo, slug string) (*ExtensionDetails, error)
+
+	// GetRepoStats returns index statistics for one or all repository types.
+	// If repo is empty, returns stats for all types.
+	GetRepoStats(ctx context.Context, repo string) ([]RepoStats, error)
+
+	// ListFiles returns the file listing for an extension's source tree.
+	ListFiles(ctx context.Context, repo, slug, pattern string) (*ListFilesResponse, error)
+
+	// ReadFile returns lines from a file in an extension's source tree.
+	ReadFile(ctx context.Context, repo, slug, path string, startLine, maxLines int) (*ReadFileResponse, error)
 }
 
 // searchSem limits concurrent MCP searches to 1, matching the REST API's
@@ -213,6 +233,291 @@ func (s *DirectService) ListExtensions(ctx context.Context, params ListParams) (
 		Total:      int(total),
 		Extensions: extensions,
 	}, nil
+}
+
+func (s *DirectService) GetExtensionDetails(ctx context.Context, repoType, slug string) (*ExtensionDetails, error) {
+	if !isValidRepo(repoType) {
+		return nil, fmt.Errorf("unknown repo: %s", repoType)
+	}
+
+	if repoType == "cores" {
+		return s.getCoreDetails(ctx, slug)
+	}
+
+	var row detailRow
+	err := s.db.WithContext(ctx).Table(repoType).
+		Select("slug, name, source, version, short_description, requires, tested, requires_php, rating, active_installs, downloaded, download_link, file_count, total_size").
+		Where("slug = ? AND deleted_at IS NULL", slug).
+		Scan(&row).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to load extension")
+	}
+	if row.Slug == "" {
+		return nil, fmt.Errorf("extension not found: %s", slug)
+	}
+
+	indexStatus := s.manager.IndexStatus(repoType)
+
+	return &ExtensionDetails{
+		Slug:             row.Slug,
+		Name:             row.Name,
+		Version:          row.Version,
+		Source:           row.Source,
+		ShortDescription: row.ShortDescription,
+		Requires:         row.Requires,
+		Tested:           row.Tested,
+		RequiresPHP:      row.RequiresPHP,
+		Rating:           row.Rating,
+		ActiveInstalls:   row.ActiveInstalls,
+		Downloaded:       row.Downloaded,
+		DownloadLink:     row.DownloadLink,
+		Indexed:          indexStatus[row.Slug],
+		FileCount:        row.FileCount,
+		TotalSize:        row.TotalSize,
+	}, nil
+}
+
+func (s *DirectService) getCoreDetails(ctx context.Context, version string) (*ExtensionDetails, error) {
+	var row struct {
+		Name      string `gorm:"column:name"`
+		Version   string `gorm:"column:version"`
+		FileCount int    `gorm:"column:file_count"`
+		TotalSize int64  `gorm:"column:total_size"`
+	}
+	err := s.db.WithContext(ctx).Table("cores").
+		Select("name, version, file_count, total_size").
+		Where("version = ? AND deleted_at IS NULL", version).
+		Scan(&row).Error
+	if err != nil || row.Version == "" {
+		return nil, fmt.Errorf("core release not found: %s", version)
+	}
+
+	indexStatus := s.manager.IndexStatus("cores")
+
+	return &ExtensionDetails{
+		Slug:      row.Version,
+		Name:      row.Name,
+		Version:   row.Version,
+		Source:    repo.SourceWordPress,
+		Indexed:   indexStatus[row.Version],
+		FileCount: row.FileCount,
+		TotalSize: row.TotalSize,
+	}, nil
+}
+
+func (s *DirectService) GetRepoStats(_ context.Context, repoType string) ([]RepoStats, error) {
+	if repoType != "" {
+		if !isValidRepo(repoType) {
+			return nil, fmt.Errorf("unknown repo: %s", repoType)
+		}
+		total, indexed, ok := s.manager.Stats(repoType)
+		if !ok {
+			return nil, fmt.Errorf("stats unavailable for %s", repoType)
+		}
+		return []RepoStats{{Repo: repoType, Total: total, Indexed: indexed}}, nil
+	}
+
+	var results []RepoStats
+	for _, rt := range []string{"plugins", "themes", "cores"} {
+		total, indexed, ok := s.manager.Stats(rt)
+		if !ok {
+			continue
+		}
+		results = append(results, RepoStats{Repo: rt, Total: total, Indexed: indexed})
+	}
+	return results, nil
+}
+
+func (s *DirectService) ListFiles(_ context.Context, repoType, slug, pattern string) (*ListFilesResponse, error) {
+	if !isValidRepo(repoType) {
+		return nil, fmt.Errorf("unknown repo: %s", repoType)
+	}
+
+	sourceDir, err := s.manager.ResolveSourceDir(repoType, slug)
+	if err != nil {
+		return nil, fmt.Errorf("extension not found or not indexed: %s", slug)
+	}
+
+	var files []FileEntry
+	err = filepath.WalkDir(sourceDir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		relPath, relErr := filepath.Rel(sourceDir, path)
+		if relErr != nil {
+			return relErr
+		}
+
+		// Strip .gz suffix for display — source files are gzip-compressed on disk.
+		relPath = strings.TrimSuffix(relPath, ".gz")
+
+		if pattern != "" {
+			matched, matchErr := filepath.Match(pattern, filepath.Base(relPath))
+			if matchErr != nil {
+				return fmt.Errorf("invalid pattern: %w", matchErr)
+			}
+			if !matched {
+				return nil
+			}
+		}
+
+		info, infoErr := d.Info()
+		if infoErr != nil {
+			return infoErr
+		}
+
+		files = append(files, FileEntry{Path: relPath, Size: info.Size()})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list files: %w", err)
+	}
+
+	return &ListFilesResponse{
+		Slug:  slug,
+		Repo:  repoType,
+		Total: len(files),
+		Files: files,
+	}, nil
+}
+
+const maxReadLines = 500
+
+func (s *DirectService) ReadFile(_ context.Context, repoType, slug, filePath string, startLine, maxLines int) (*ReadFileResponse, error) {
+	if !isValidRepo(repoType) {
+		return nil, fmt.Errorf("unknown repo: %s", repoType)
+	}
+
+	sourceDir, err := s.manager.ResolveSourceDir(repoType, slug)
+	if err != nil {
+		return nil, fmt.Errorf("extension not found or not indexed: %s", slug)
+	}
+
+	fullPath, err := web.SafeJoin(sourceDir, filePath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file path")
+	}
+
+	// Source files are stored gzip-compressed; try .gz first.
+	actualPath := fullPath + ".gz"
+	if _, err := os.Stat(actualPath); err != nil {
+		actualPath = fullPath
+		if _, err := os.Stat(actualPath); err != nil {
+			return nil, fmt.Errorf("file not found: %s", filePath)
+		}
+	}
+
+	lines, totalLines, err := readFileRange(actualPath, startLine, maxLines)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	endLine := startLine + len(lines) - 1
+	if len(lines) == 0 {
+		endLine = startLine
+	}
+
+	return &ReadFileResponse{
+		Slug:       slug,
+		Repo:       repoType,
+		Path:       filePath,
+		TotalLines: totalLines,
+		StartLine:  startLine,
+		EndLine:    endLine,
+		Content:    formatNumberedLines(lines, startLine),
+	}, nil
+}
+
+// readFileRange reads lines [startLine, startLine+maxLines) from a file,
+// transparently handling gzip-compressed sources.
+// Returns the lines read and the total line count of the file.
+func readFileRange(path string, startLine, maxLines int) ([]string, int, error) {
+	file, err := os.Open(path) // #nosec G304 -- path validated by SafeJoin
+	if err != nil {
+		return nil, 0, err
+	}
+	defer file.Close()
+
+	var r io.Reader = file
+
+	// Detect gzip by magic bytes.
+	var header [2]byte
+	if n, _ := io.ReadFull(file, header[:]); n == 2 && header[0] == 0x1f && header[1] == 0x8b {
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return nil, 0, err
+		}
+		gz, err := gzip.NewReader(file)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer gz.Close()
+		r = gz
+	} else {
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return nil, 0, err
+		}
+	}
+
+	if maxLines <= 0 || maxLines > maxReadLines {
+		maxLines = maxReadLines
+	}
+	if startLine < 1 {
+		startLine = 1
+	}
+
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024) // handle long lines
+
+	var lines []string
+	lineNum := 0
+	endLine := startLine + maxLines
+
+	for scanner.Scan() {
+		lineNum++
+		if lineNum >= startLine && lineNum < endLine {
+			lines = append(lines, scanner.Text())
+		}
+	}
+
+	return lines, lineNum, scanner.Err()
+}
+
+// formatNumberedLines prepends line numbers to each line.
+func formatNumberedLines(lines []string, startLine int) string {
+	if len(lines) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	maxNum := startLine + len(lines) - 1
+	width := len(fmt.Sprintf("%d", maxNum))
+
+	for i, line := range lines {
+		fmt.Fprintf(&b, "%*d  %s\n", width, startLine+i, line)
+	}
+	return b.String()
+}
+
+// detailRow is used for scanning plugin/theme detail queries.
+type detailRow struct {
+	Slug             string `gorm:"column:slug"`
+	Name             string `gorm:"column:name"`
+	Source           string `gorm:"column:source"`
+	Version          string `gorm:"column:version"`
+	ShortDescription string `gorm:"column:short_description"`
+	Requires         string `gorm:"column:requires"`
+	Tested           string `gorm:"column:tested"`
+	RequiresPHP      string `gorm:"column:requires_php"`
+	Rating           int    `gorm:"column:rating"`
+	ActiveInstalls   int    `gorm:"column:active_installs"`
+	Downloaded       int    `gorm:"column:downloaded"`
+	DownloadLink     string `gorm:"column:download_link"`
+	FileCount        int    `gorm:"column:file_count"`
+	TotalSize        int64  `gorm:"column:total_size"`
 }
 
 // extensionRow is a minimal struct for scanning extension list queries.
