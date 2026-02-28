@@ -15,7 +15,7 @@ type FakeDataSource struct {
 	StatsFunc            func() (int, int)
 	IndexStatusFunc      func() map[string]bool
 	SearchFunc           func(term string, opt *index.SearchOptions, fn func(int, int)) ([]*repo.SearchResult, error)
-	PrepareUpdatesFunc   func() []repo.IndexTask
+	PrepareUpdatesFunc   func() ([]repo.IndexTask, error)
 	ResumeUnindexedFunc  func() []repo.IndexTask
 	GetExtensionFunc     func(slug string) (repo.Extension, bool)
 	MakeReindexTaskFunc  func(slug string) (repo.IndexTask, bool)
@@ -52,11 +52,11 @@ func (f *FakeDataSource) Search(term string, opt *index.SearchOptions, fn func(i
 	return nil, nil
 }
 
-func (f *FakeDataSource) PrepareUpdates() []repo.IndexTask {
+func (f *FakeDataSource) PrepareUpdates() ([]repo.IndexTask, error) {
 	if f.PrepareUpdatesFunc != nil {
 		return f.PrepareUpdatesFunc()
 	}
-	return nil
+	return nil, nil
 }
 
 func (f *FakeDataSource) ResumeUnindexed() []repo.IndexTask {
@@ -104,14 +104,14 @@ func (f *FakeSearchService) Search(repoType string, term string, params *manager
 
 // FakeReindexService is a hand-written fake implementing web.ReindexService.
 type FakeReindexService struct {
-	SubmitReindexFunc func(repoType, slug string) bool
+	SubmitReindexFunc func(repoType, slug string) error
 }
 
-func (f *FakeReindexService) SubmitReindex(repoType, slug string) bool {
+func (f *FakeReindexService) SubmitReindex(repoType, slug string) error {
 	if f.SubmitReindexFunc != nil {
 		return f.SubmitReindexFunc(repoType, slug)
 	}
-	return false
+	return nil
 }
 
 // FakeSourceResolver is a hand-written fake implementing web.SourceResolver.

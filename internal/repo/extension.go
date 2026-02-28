@@ -121,17 +121,37 @@ func (ie *IndexedExtension) UpdateIndex(idx *index.Index) {
 	ie.idx = idx
 	ie.mu.Unlock()
 
-	// Close old index to release mmap after a delay
 	if oldIdx != nil {
-		go closeOldIndex(oldIdx)
+		scheduleIndexClose(oldIdx)
 	}
 }
 
-// closeOldIndex closes an old index after a delay.
-// The delay ensures no readers are still accessing the mmap'd files.
-func closeOldIndex(idx *index.Index) {
-	time.Sleep(5 * time.Second)
-	idx.Close()
+// indexCloseQueue is a bounded channel that limits the number of concurrent
+// old-index cleanup goroutines. A dedicated goroutine drains the queue,
+// preventing unbounded goroutine creation during bulk reindex operations.
+var indexCloseQueue = make(chan *index.Index, 64)
+
+func init() {
+	go func() {
+		for idx := range indexCloseQueue {
+			time.Sleep(5 * time.Second)
+			idx.Close()
+		}
+	}()
+}
+
+// scheduleIndexClose queues an old index for deferred closing. If the queue
+// is full, it falls back to closing in a single bounded goroutine.
+func scheduleIndexClose(idx *index.Index) {
+	select {
+	case indexCloseQueue <- idx:
+	default:
+		// Queue full — close synchronously in one goroutine to stay bounded.
+		go func() {
+			time.Sleep(5 * time.Second)
+			idx.Close()
+		}()
+	}
 }
 
 // SearchResult contains search results for a single extension.

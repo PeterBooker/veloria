@@ -48,6 +48,7 @@ type RouterDeps struct {
 	OGGen             *ogimage.Generator // OG image generator; or nil
 	MCP               http.Handler       // MCP streamable HTTP handler; or nil
 	PrometheusHandler http.Handler       // Prometheus metrics handler; or nil
+	HealthHandler     http.HandlerFunc   // Health readiness endpoint; or nil
 	Options           Options
 }
 
@@ -79,10 +80,15 @@ func New(deps RouterDeps) *chi.Mux {
 		r.Use(deps.Session.AuthMiddleware)
 	}
 
-	// Health check
+	// Liveness check
 	r.Get("/up", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+
+	// Readiness / health check
+	if deps.HealthHandler != nil {
+		r.Get("/health", deps.HealthHandler)
+	}
 
 	// Metrics
 	if deps.PrometheusHandler != nil {

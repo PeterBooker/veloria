@@ -18,6 +18,7 @@ import (
 	"veloria/internal/auth"
 	"veloria/internal/cache"
 	"veloria/internal/config"
+	"veloria/internal/health"
 	ogimage "veloria/internal/image"
 	"veloria/internal/manager"
 	veloriamc "veloria/internal/mcp"
@@ -99,13 +100,16 @@ func New(ctx context.Context) (*App, error) {
 		_ = a.Tasks.AddJob(workerCtx, "search-cleanup", tasks.CleanupStuckSearches(a.DB, l), tasks.SearchCleanupInterval)
 		a.Tasks.Start()
 
-		apiClient := repo.NewAPIClient(c.AspireCloudAPIKey)
+		apiClient := repo.NewAPIClient(c.AspireCloudAPIKey, l)
+
+		eventRecorder := repo.NewIndexEventRecorder(a.DB, l)
+		_ = a.Tasks.AddJob(workerCtx, "index-event-cleanup", repo.CleanupOldEvents(a.DB, l, 30*24*time.Hour), 1*time.Hour)
 
 		pr := repo.NewPluginStore(workerCtx, a.DB, c, l, appCache, apiClient)
 		tr := repo.NewThemeStore(workerCtx, a.DB, c, l, appCache, apiClient)
 		cr := repo.NewCoreStore(workerCtx, a.DB, c, l, appCache, apiClient)
 
-		m, err := manager.NewManager(workerCtx, l, []repo.DataSource{pr, tr, cr}, c.IndexerConcurrency)
+		m, err := manager.NewManager(workerCtx, l, []repo.DataSource{pr, tr, cr}, c.IndexerConcurrency, eventRecorder, apiClient)
 		if err != nil {
 			l.Error("Failed to load repositories; running in no-search mode", zap.Error(err))
 		} else {
@@ -171,6 +175,12 @@ func New(ctx context.Context) (*App, error) {
 		l.Info("MCP server enabled at /mcp")
 	}
 
+	// Health checker
+	healthChecker := &health.Checker{
+		DB:      a.SqlDB,
+		Manager: a.Manager,
+	}
+
 	r := router.New(router.RouterDeps{
 		DB:                a.DB,
 		Search:            a.Manager,
@@ -182,6 +192,7 @@ func New(ctx context.Context) (*App, error) {
 		OGGen:             ogGen,
 		MCP:               mcpHandler,
 		PrometheusHandler: tel.PrometheusHandler,
+		HealthHandler:     health.Handler(healthChecker),
 		Options: router.Options{
 			HandlerTimeout:   c.HTTPHandlerTimeout,
 			SearchEnabled:    searchEnabled,
@@ -219,8 +230,19 @@ func (a *App) Shutdown(ctx context.Context) error {
 		a.Tasks.Stop()
 	}
 
-	// Give workers time to finish current operations
-	time.Sleep(1 * time.Second)
+	// Wait for the manager's updater goroutine to finish (with deadline).
+	if a.Manager != nil {
+		done := make(chan struct{})
+		go func() {
+			a.Manager.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			a.Logger.Warn("Timed out waiting for manager updater to stop")
+		}
+	}
 
 	// Shutdown HTTP servers
 	if err := a.Server.Shutdown(ctx); err != nil {

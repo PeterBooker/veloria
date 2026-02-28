@@ -62,10 +62,11 @@ type ExtensionStore[T Indexable] struct {
 // IndexTask represents a single indexing operation ready to execute.
 // The Run function contains all the work: invoking veloria-indexer,
 // opening the resulting index, and swapping it into the repository.
+// It returns nil on success or an error describing the failure.
 type IndexTask struct {
 	ExtensionType ExtensionType
-	Slug     string
-	Run      func()
+	Slug          string
+	Run           func() error
 }
 
 // StoreConfig holds configuration for creating a new extension store.
@@ -453,15 +454,14 @@ func (r *ExtensionStore[T]) Search(term string, opt *index.SearchOptions, progre
 // PrepareUpdates fetches pending items, saves them to the database, and returns
 // IndexTasks ready for execution by a shared worker pool. The caller is
 // responsible for running the tasks with appropriate concurrency control.
-func (r *ExtensionStore[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn func(db *gorm.DB, ext T) error) []IndexTask {
+func (r *ExtensionStore[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn func(db *gorm.DB, ext T) error) ([]IndexTask, error) {
 	extensions, err := fetchFn()
 	if err != nil {
-		r.l.Error("Failed to fetch updates", zap.String("type", string(r.repoType)), zap.Error(err))
-		return nil
+		return nil, fmt.Errorf("failed to fetch %s updates: %w", r.repoType, err)
 	}
 
 	if len(extensions) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	r.l.Info("Preparing extensions for indexing", zap.Int("count", len(extensions)), zap.String("type", string(r.repoType)))
@@ -508,7 +508,7 @@ func (r *ExtensionStore[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn f
 		tasks = append(tasks, r.makeIndexTask(taskExt, taskSlug, taskSource))
 	}
 
-	return tasks
+	return tasks, nil
 }
 
 // MakeReindexTask creates an IndexTask for re-indexing an already-loaded extension.
@@ -521,8 +521,8 @@ func (r *ExtensionStore[T]) MakeReindexTask(ext T) IndexTask {
 func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string) IndexTask {
 	return IndexTask{
 		ExtensionType: r.repoType,
-		Slug:     taskSlug,
-		Run: func() {
+		Slug:          taskSlug,
+		Run: func() error {
 			r.l.Info("Indexing extension", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 
 			taskIE := taskExt.GetIndexedExtension()
@@ -538,10 +538,10 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 						r.l.Warn("Download not found, skipping", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 						r.Unlist(taskSlug)
 					}
-					return
+					return nil // graceful degradation, not a retryable error
 				}
 				r.l.Error("Indexer failed", zap.String("slug", taskSlug), zap.Error(err))
-				return
+				return fmt.Errorf("indexer failed for %s/%s: %w", r.repoType, taskSlug, err)
 			}
 
 			if result.Stats != nil {
@@ -551,15 +551,16 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 			newIdx := index.Open(result.IndexPath)
 			if newIdx == nil {
 				r.l.Error("Failed to open new index", zap.String("path", result.IndexPath))
-				return
+				return fmt.Errorf("failed to open new index at %s", result.IndexPath)
 			}
 
 			if err := r.UpdateIndex(newIdx, taskSlug); err != nil {
 				r.l.Error("Failed to update index", zap.String("slug", taskSlug), zap.Error(err))
-				return
+				return fmt.Errorf("failed to update index for %s: %w", taskSlug, err)
 			}
 
 			r.l.Info("Successfully indexed", zap.String("slug", taskSlug))
+			return nil
 		},
 	}
 }
@@ -589,7 +590,10 @@ func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*IndexerResul
 
 	if err := cmd.Run(); err != nil {
 		stderrStr := strings.TrimSpace(stderr.String())
-		if strings.Contains(stderrStr, "404") {
+		// Exit code 2 is the structured signal for "download not found" from
+		// veloria-indexer, replacing the fragile stderr "404" string match.
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
 			return nil, ErrDownloadNotFound
 		}
 		return nil, fmt.Errorf("%w: %s", err, stderrStr)

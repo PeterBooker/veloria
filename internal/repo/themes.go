@@ -80,7 +80,6 @@ func (t *Theme) TableName() string { return "themes" }
 // ThemeStore manages themes using the generic ExtensionStore.
 type ThemeStore struct {
 	*ExtensionStore[*Theme]
-	lastFullScan time.Time
 }
 
 // NewThemeStore creates a new theme store.
@@ -125,15 +124,15 @@ func (tr *ThemeStore) Load() error {
 }
 
 // PrepareUpdates fetches pending themes and returns IndexTasks for the shared worker pool.
-func (tr *ThemeStore) PrepareUpdates() []IndexTask {
+func (tr *ThemeStore) PrepareUpdates() ([]IndexTask, error) {
 	fetchFn := func() ([]*Theme, error) {
-		if tr.lastFullScan.IsZero() || time.Since(tr.lastFullScan) >= FullScanInterval {
+		if tr.needsFullScan() {
 			tr.l.Info("Running full theme discovery scan...")
 			themes, err := tr.discoverNewThemes()
 			if err != nil {
 				return nil, err
 			}
-			tr.lastFullScan = time.Now()
+			tr.recordFullScan()
 			return themes, nil
 		}
 
@@ -169,6 +168,29 @@ func (tr *ThemeStore) PrepareUpdates() []IndexTask {
 	}
 
 	return tr.ExtensionStore.PrepareUpdates(fetchFn, saveFn)
+}
+
+// needsFullScan checks the datasources table to determine if a full discovery
+// scan is due. This survives server restarts, unlike the previous in-memory field.
+func (tr *ThemeStore) needsFullScan() bool {
+	var lastScan *time.Time
+	err := tr.db.Table("datasources").
+		Where("repo_type = ?", string(TypeThemes)).
+		Pluck("last_full_scan_at", &lastScan).Error
+	if err != nil || lastScan == nil {
+		return true
+	}
+	return time.Since(*lastScan) >= FullScanInterval
+}
+
+// recordFullScan writes the current time as the last full scan timestamp.
+func (tr *ThemeStore) recordFullScan() {
+	err := tr.db.Table("datasources").
+		Where("repo_type = ?", string(TypeThemes)).
+		Update("last_full_scan_at", time.Now()).Error
+	if err != nil {
+		tr.l.Error("Failed to record full scan timestamp", zap.Error(err))
+	}
 }
 
 // discoverNewThemes paginates the full AspireCloud theme catalog and returns

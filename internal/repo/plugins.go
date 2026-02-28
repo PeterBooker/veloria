@@ -85,7 +85,6 @@ func (p *Plugin) TableName() string { return "plugins" }
 // PluginStore manages plugins using the generic ExtensionStore.
 type PluginStore struct {
 	*ExtensionStore[*Plugin]
-	lastFullScan time.Time
 }
 
 // NewPluginStore creates a new plugin store.
@@ -130,15 +129,15 @@ func (pr *PluginStore) Load() error {
 }
 
 // PrepareUpdates fetches pending plugins and returns IndexTasks for the shared worker pool.
-func (pr *PluginStore) PrepareUpdates() []IndexTask {
+func (pr *PluginStore) PrepareUpdates() ([]IndexTask, error) {
 	fetchFn := func() ([]*Plugin, error) {
-		if pr.lastFullScan.IsZero() || time.Since(pr.lastFullScan) >= FullScanInterval {
+		if pr.needsFullScan() {
 			pr.l.Info("Running full plugin discovery scan...")
 			plugins, err := pr.discoverNewPlugins()
 			if err != nil {
 				return nil, err
 			}
-			pr.lastFullScan = time.Now()
+			pr.recordFullScan()
 			return plugins, nil
 		}
 
@@ -174,6 +173,29 @@ func (pr *PluginStore) PrepareUpdates() []IndexTask {
 	}
 
 	return pr.ExtensionStore.PrepareUpdates(fetchFn, saveFn)
+}
+
+// needsFullScan checks the datasources table to determine if a full discovery
+// scan is due. This survives server restarts, unlike the previous in-memory field.
+func (pr *PluginStore) needsFullScan() bool {
+	var lastScan *time.Time
+	err := pr.db.Table("datasources").
+		Where("repo_type = ?", string(TypePlugins)).
+		Pluck("last_full_scan_at", &lastScan).Error
+	if err != nil || lastScan == nil {
+		return true
+	}
+	return time.Since(*lastScan) >= FullScanInterval
+}
+
+// recordFullScan writes the current time as the last full scan timestamp.
+func (pr *PluginStore) recordFullScan() {
+	err := pr.db.Table("datasources").
+		Where("repo_type = ?", string(TypePlugins)).
+		Update("last_full_scan_at", time.Now()).Error
+	if err != nil {
+		pr.l.Error("Failed to record full scan timestamp", zap.Error(err))
+	}
 }
 
 // discoverNewPlugins paginates the full AspireCloud plugin catalog and returns

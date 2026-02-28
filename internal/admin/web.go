@@ -1,9 +1,11 @@
 package admin
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
+	"veloria/internal/manager"
 	"veloria/internal/web"
 )
 
@@ -30,10 +32,15 @@ func ReindexExtension(d *web.Deps) http.HandlerFunc {
 			return
 		}
 
-		ok := d.Reindex.SubmitReindex(repoType, slug)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if !ok {
-			_, _ = fmt.Fprint(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg">Not found or queue full</span>`)
+
+		err := d.Reindex.SubmitReindex(repoType, slug)
+		if err != nil {
+			msg := "Not found"
+			if errors.Is(err, manager.ErrQueueFull) {
+				msg = "Queue full — try again later"
+			}
+			_, _ = fmt.Fprintf(w, `<span class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg">%s</span>`, msg)
 			return
 		}
 

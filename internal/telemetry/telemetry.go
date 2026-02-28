@@ -68,6 +68,11 @@ func Setup(ctx context.Context, cfg *config.Config) (*Telemetry, error) {
 	t.shutdownFuncs = append(t.shutdownFuncs, metricsResult.Provider.Shutdown)
 	t.PrometheusHandler = metricsResult.PrometheusHandler
 
+	// Register application metric instruments now that the meter provider is set.
+	if err := InitMetrics(); err != nil {
+		return t, errors.Join(err, t.Shutdown(ctx))
+	}
+
 	// Set up runtime metrics if enabled.
 	if cfg.EnableRuntimeMetrics {
 		if err := runtime.Start(); err != nil {
