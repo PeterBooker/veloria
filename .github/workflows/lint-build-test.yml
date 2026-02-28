@@ -43,7 +43,8 @@ jobs:
       #   with:
       #     version: v2.6
 
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.22.10
+
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@v2.22.10
-        with:
-          args: -exclude-generated -exclude-dir=internal/codesearch ./...
+        run: $(go env GOPATH)/bin/gosec -exclude-generated -exclude-dir=internal/codesearch ./...
