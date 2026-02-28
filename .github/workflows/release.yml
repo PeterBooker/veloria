@@ -1,4 +1,4 @@
-name: Build & Deploy
+name: Release and Deploy
 
 on:
   release:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to embed (e.g. v1.2.3). Defaults to short commit SHA.'
+        description: "Version to embed (defaults to release tag or short commit SHA)."
         required: false
 
 permissions:
@@ -19,6 +19,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != '' && secrets.DEPLOY_SSH_KEY != '' }}
     env:
       GOEXPERIMENT: jsonv2,greenteagc
     steps:
@@ -27,18 +28,18 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '~1.26.0'
+          go-version: "1.26.0"
           cache: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
-          cache: 'npm'
+          node-version: "24"
+          cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
       - name: Generate assets
-        run: go generate ./assets
+        run: go generate ./assets/...
 
       - name: Set version
         id: version
@@ -51,65 +52,44 @@ jobs:
             echo "version=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build
+      - name: Build deployment binaries
         run: |
           LDFLAGS="-s -w -X veloria/internal/config.Version=${{ steps.version.outputs.version }}"
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o veloria ./cmd/veloria
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o veloria-indexer ./cmd/veloria-indexer
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="$LDFLAGS" -o veloria-migrate ./cmd/veloria-migrate
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria ./cmd/veloria
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria-indexer ./cmd/veloria-indexer
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria-migrate ./cmd/veloria-migrate
 
-      - name: Deploy
+      - name: Deploy to production
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           HOST: ${{ secrets.DEPLOY_HOST }}
           USER: ${{ secrets.DEPLOY_USER }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          echo "${SSH_KEY}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${HOST}" >> ~/.ssh/known_hosts
 
-          # Upload binaries with temporary names
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
-            veloria "${USER}@${HOST}:/opt/veloria/veloria.new"
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
-            veloria-indexer "${USER}@${HOST}:/opt/veloria/veloria-indexer.new"
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" \
-            veloria-migrate "${USER}@${HOST}:/opt/veloria/veloria-migrate.new"
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria "${USER}@${HOST}:/opt/veloria/veloria.new"
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria-indexer "${USER}@${HOST}:/opt/veloria/veloria-indexer.new"
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria-migrate "${USER}@${HOST}:/opt/veloria/veloria-migrate.new"
 
-          # Atomic swap & restart
           ssh -i ~/.ssh/deploy_key "${USER}@${HOST}" << 'ENDSSH'
             set -e
             cd /opt/veloria
 
             chmod +x veloria.new veloria-indexer.new veloria-migrate.new
 
-            # Keep previous versions for rollback
             for bin in veloria veloria-indexer veloria-migrate; do
               if [ -f "$bin" ]; then
                 cp "$bin" "${bin}.prev"
               fi
             done
 
-            # Atomic swap
             mv veloria.new veloria
             mv veloria-indexer.new veloria-indexer
             mv veloria-migrate.new veloria-migrate
 
             sudo systemctl restart veloria
             sleep 3
-
-            # Health check
-            # if curl -skf --max-time 5 https://localhost/up > /dev/null; then
-            #   echo "✅ Deploy successful — health check passed"
-            # else
-            #   echo "❌ Health check failed — rolling back"
-            #   for bin in veloria veloria-indexer veloria-migrate; do
-            #     if [ -f "${bin}.prev" ]; then
-            #       mv "${bin}.prev" "$bin"
-            #     fi
-            #   done
-            #   sudo systemctl restart veloria
-            #   exit 1
-            # fi
           ENDSSH

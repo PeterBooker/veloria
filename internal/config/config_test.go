@@ -36,7 +36,7 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, true, cfg.HTTPLoggingEnabled)
 	assert.Equal(t, "localhost", cfg.DBHost)
 	assert.Equal(t, 5432, cfg.DBPort)
-	assert.Equal(t, "fundy", cfg.DBName)
+	assert.Equal(t, "veloria", cfg.DBName)
 	assert.Equal(t, "root", cfg.DBUser)
 	assert.Equal(t, "", cfg.DBPass)
 	assert.Equal(t, "disable", cfg.DBSSLMode)

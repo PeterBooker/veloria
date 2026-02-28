@@ -36,7 +36,7 @@ Configuration is parsed using [caarlos0/env/v10](https://github.com/caarlos0/env
 |---|---|---|
 | `DB_HOST` | `localhost` | PostgreSQL host |
 | `DB_PORT` | `5432` | PostgreSQL port |
-| `DB_DATABASE` | `fundy` | Database name |
+| `DB_DATABASE` | `veloria` | Database name |
 | `DB_USERNAME` | `root` | Database user |
 | `DB_PASSWORD` | (empty) | Database password |
 | `DB_SSLMODE` | (auto) | SSL mode. In development defaults to `disable`, otherwise `require`. Accepts: `disable`, `require`, `verify-full`, `verify-ca`, `prefer`, `allow` |

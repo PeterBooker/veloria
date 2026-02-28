@@ -2,10 +2,11 @@
 
 ## Prerequisites
 
-- **Go 1.25.5+**
+- **Go 1.26.0**
+- **Node.js 22+ and npm** (for frontend assets)
 - **PostgreSQL 17+** (via Docker or native install)
 - **MinIO** (S3-compatible storage, via Docker)
-- **goose** for migrations: `go install github.com/pressly/goose/v3/cmd/goose@latest`
+- **Migration binary** built from `./cmd/veloria-migrate` (example name: `veloria-migrations`)
 
 ## Quick Start
 
@@ -44,18 +45,18 @@ In development mode (`ENV=development`), the `.env` file is loaded automatically
 ### 3. Run Migrations
 
 ```bash
-go run ./cmd/veloria-migrate
+go build -o veloria-migrations ./cmd/veloria-migrate
+./veloria-migrations up
 ```
 
-Or with goose directly:
-
-```bash
-goose -dir migrations postgres "host=localhost user=postgres password=postgres dbname=veloria sslmode=disable" up
-```
+The migration binary loads your existing environment config (`.env` in development), builds the DB connection string, and runs migrations without manual DSN input.
 
 ### 4. Build and Run
 
 ```bash
+# Build frontend assets (required after CSS/template/dependency changes)
+go generate ./assets/...
+
 # Build all binaries
 go build ./...
 
@@ -82,11 +83,11 @@ go build -o veloria-indexer ./cmd/veloria-indexer
 cmd/
 ├── veloria/           # Main server binary
 ├── veloria-indexer/   # CLI indexer subprocess
-├── veloria-migrate/   # Database migration runner
+├── veloria-migrate/   # Database migration source (build as veloria-migrations)
 └── veloria-converter/ # WPDirectory data converter (one-time use)
 
 internal/              # All application packages (see architecture.md)
-migrations/            # SQL migration files (goose format)
+migrations/            # SQL migration files used by veloria-migrations
 templates/             # Go html/template files (embedded via embed.FS)
 docs/                  # Developer documentation
 ```
@@ -98,7 +99,7 @@ docs/                  # Developer documentation
 Create a new migration file following the naming convention:
 
 ```bash
-goose -dir migrations create <description> sql
+./veloria-migrations create <description> sql
 ```
 
 This creates a file like `migrations/20260222000001_<description>.sql` with `-- +goose Up` and `-- +goose Down` sections.

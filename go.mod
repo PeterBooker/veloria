@@ -1,6 +1,6 @@
 module veloria
 
-go 1.25.5
+go 1.26.0
 
 require (
 	github.com/antonlindstrom/pgstore v0.0.0-20220421113606-e3a6e3fed12a
