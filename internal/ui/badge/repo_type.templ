@@ -3,10 +3,10 @@ package badge
 templ RepoType(repoType string) {
 	switch repoType {
 		case "plugins":
-			<span class="text-xs font-medium px-2 py-0.5 rounded-md bg-brand-200 text-brand-400">Plugin</span>
+			<span class="text-xs font-medium px-2.5 py-0.5 rounded-md bg-brand-200 text-brand-400 border-l-2 border-neon-pink">Plugin</span>
 		case "themes":
-			<span class="text-xs font-medium px-2 py-0.5 rounded-md bg-[rgba(180,77,255,0.14)] text-neon-purple">Theme</span>
+			<span class="text-xs font-medium px-2.5 py-0.5 rounded-md bg-[rgba(180,77,255,0.14)] text-neon-purple border-l-2 border-neon-purple">Theme</span>
 		case "cores":
-			<span class="text-xs font-medium px-2 py-0.5 rounded-md bg-[rgba(255,215,0,0.10)] text-neon-gold">Core</span>
+			<span class="text-xs font-medium px-2.5 py-0.5 rounded-md bg-[rgba(255,215,0,0.10)] text-neon-gold border-l-2 border-neon-gold">Core</span>
 	}
 }
