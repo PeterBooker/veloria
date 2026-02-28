@@ -14,8 +14,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
-	"github.com/rs/zerolog"
 	bolt "go.etcd.io/bbolt"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -121,8 +121,7 @@ func main() {
 
 		// Initialize S3.
 		log.Printf("connecting to S3: endpoint=%s bucket=%s ssl=%v", c.S3Endpoint, c.S3Bucket, c.S3UseSSL)
-		zl := zerolog.New(os.Stderr).With().Timestamp().Logger()
-		s3Client, err := storage.NewS3Client(c, &zl)
+		s3Client, err := storage.NewS3Client(c, zap.NewNop())
 		if err != nil {
 			log.Fatalf("failed to create S3 client: %v", err)
 		}

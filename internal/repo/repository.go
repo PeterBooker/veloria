@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"veloria/internal/cache"
@@ -43,7 +43,7 @@ const (
 // ExtensionStore is a generic in-memory store for managing WordPress extensions.
 // It provides common functionality for loading, indexing, and searching extensions.
 type ExtensionStore[T Indexable] struct {
-	l        *zerolog.Logger
+	l        *zap.Logger
 	c        *config.Config
 	db       *gorm.DB
 	ctx      context.Context
@@ -73,7 +73,7 @@ type StoreConfig[T Indexable] struct {
 	Ctx           context.Context
 	DB            *gorm.DB
 	Config        *config.Config
-	Logger        *zerolog.Logger
+	Logger        *zap.Logger
 	Cache         cache.Cache
 	API           *APIClient
 	ExtensionType ExtensionType
@@ -109,7 +109,7 @@ func (r *ExtensionStore[T]) LoadFromDB(loader func(db *gorm.DB) ([]T, error)) er
 	}
 
 	r.Total = len(extensions)
-	r.l.Debug().Msgf("Loaded %d %s", r.Total, r.repoType)
+	r.l.Debug("Loaded extensions", zap.Int("count", r.Total), zap.String("type", string(r.repoType)))
 
 	return nil
 }
@@ -122,11 +122,11 @@ func (r *ExtensionStore[T]) LoadIndexes() error {
 
 	dirs, err := os.ReadDir(indexDir)
 	if err != nil {
-		r.l.Debug().Msgf("No index directory found for %s: %s", r.repoType, err)
+		r.l.Debug("No index directory found", zap.String("type", string(r.repoType)), zap.Error(err))
 		return nil
 	}
 
-	r.l.Debug().Msgf("Found %d existing %s index directories", len(dirs), r.repoType)
+	r.l.Debug("Found existing index directories", zap.Int("count", len(dirs)), zap.String("type", string(r.repoType)))
 
 	// Group directories by slug to handle legacy versioned directories
 	type indexInfo struct {
@@ -185,9 +185,9 @@ func (r *ExtensionStore[T]) LoadIndexes() error {
 				loadedPath = info.path
 				break
 			}
-			r.l.Warn().Msgf("Failed to open index at %s, removing", info.path)
+			r.l.Warn("Failed to open index, removing", zap.String("path", info.path))
 			if err := os.RemoveAll(info.path); err != nil {
-				r.l.Warn().Err(err).Msgf("Failed to remove index at %s", info.path)
+				r.l.Warn("Failed to remove index", zap.String("path", info.path), zap.Error(err))
 			}
 		}
 
@@ -199,23 +199,23 @@ func (r *ExtensionStore[T]) LoadIndexes() error {
 		canonicalPath := filepath.Join(indexDir, slug)
 		for _, info := range indexes {
 			if info.path != loadedPath && info.path != canonicalPath {
-				r.l.Debug().Msgf("Removing legacy versioned index at %s", info.path)
+				r.l.Debug("Removing legacy versioned index", zap.String("path", info.path))
 				if err := os.RemoveAll(info.path); err != nil {
-					r.l.Warn().Err(err).Msgf("Failed to remove legacy index at %s", info.path)
+					r.l.Warn("Failed to remove legacy index", zap.String("path", info.path), zap.Error(err))
 				}
 			}
 		}
 
 		// Update the extension's index
 		if err := r.UpdateIndex(loadedIdx, slug); err != nil {
-			r.l.Debug().Msgf("Skipping index for %s: %s", slug, err)
+			r.l.Debug("Skipping index", zap.String("slug", slug), zap.Error(err))
 			continue
 		}
 
 		loaded++
 	}
 
-	r.l.Debug().Msgf("Loaded %d/%d indexes for %s", loaded, len(slugToIndexes), r.repoType)
+	r.l.Debug("Loaded indexes", zap.Int("loaded", loaded), zap.Int("total", len(slugToIndexes)), zap.String("type", string(r.repoType)))
 	return nil
 }
 
@@ -424,7 +424,7 @@ func (r *ExtensionStore[T]) Search(term string, opt *index.SearchOptions, progre
 
 			resp, err := ie.SearchCompiled(cs)
 			if err != nil {
-				r.l.Warn().Err(err).Msgf("Failed to search %s", e.GetSlug())
+				r.l.Warn("Failed to search extension", zap.String("slug", e.GetSlug()), zap.Error(err))
 				return
 			}
 
@@ -456,7 +456,7 @@ func (r *ExtensionStore[T]) Search(term string, opt *index.SearchOptions, progre
 func (r *ExtensionStore[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn func(db *gorm.DB, ext T) error) []IndexTask {
 	extensions, err := fetchFn()
 	if err != nil {
-		r.l.Error().Err(err).Msgf("Failed to fetch updated %s", r.repoType)
+		r.l.Error("Failed to fetch updates", zap.String("type", string(r.repoType)), zap.Error(err))
 		return nil
 	}
 
@@ -464,26 +464,26 @@ func (r *ExtensionStore[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn f
 		return nil
 	}
 
-	r.l.Info().Msgf("Preparing %d %s for indexing", len(extensions), r.repoType)
+	r.l.Info("Preparing extensions for indexing", zap.Int("count", len(extensions)), zap.String("type", string(r.repoType)))
 
 	var tasks []IndexTask
 
 	for _, ext := range extensions {
 		slug := ext.GetSlug()
 		if slug == "" {
-			r.l.Warn().Msgf("Skipping %s with empty slug", r.repoType)
+			r.l.Warn("Skipping extension with empty slug", zap.String("type", string(r.repoType)))
 			continue
 		}
 
 		downloadLink := ext.GetDownloadLink()
 		if downloadLink == "" {
-			r.l.Warn().Msgf("Skipping %s %s with empty download link", r.repoType, slug)
+			r.l.Warn("Skipping extension with empty download link", zap.String("type", string(r.repoType)), zap.String("slug", slug))
 			continue
 		}
 
 		// Save to database (do this sequentially to avoid DB contention)
 		if err := saveFn(r.db, ext); err != nil {
-			r.l.Error().Err(err).Msgf("Failed to save %s %s to DB", r.repoType, slug)
+			r.l.Error("Failed to save extension to DB", zap.String("type", string(r.repoType)), zap.String("slug", slug), zap.Error(err))
 			continue
 		}
 
@@ -523,7 +523,7 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 		ExtensionType: r.repoType,
 		Slug:     taskSlug,
 		Run: func() {
-			r.l.Info().Msgf("Indexing %s: %s", r.repoType, taskSlug)
+			r.l.Info("Indexing extension", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 
 			taskIE := taskExt.GetIndexedExtension()
 			taskIE.LockUpdates()
@@ -533,14 +533,14 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 			if err != nil {
 				if errors.Is(err, ErrDownloadNotFound) {
 					if taskIE.HasIndex() {
-						r.l.Warn().Msgf("Download not found for %s %s, keeping existing index", r.repoType, taskSlug)
+						r.l.Warn("Download not found, keeping existing index", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 					} else {
-						r.l.Warn().Msgf("Download not found for %s %s, skipping", r.repoType, taskSlug)
+						r.l.Warn("Download not found, skipping", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 						r.Unlist(taskSlug)
 					}
 					return
 				}
-				r.l.Error().Err(err).Msgf("Indexer failed for %s", taskSlug)
+				r.l.Error("Indexer failed", zap.String("slug", taskSlug), zap.Error(err))
 				return
 			}
 
@@ -550,16 +550,16 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 
 			newIdx := index.Open(result.IndexPath)
 			if newIdx == nil {
-				r.l.Error().Msgf("Failed to open new index at %s", result.IndexPath)
+				r.l.Error("Failed to open new index", zap.String("path", result.IndexPath))
 				return
 			}
 
 			if err := r.UpdateIndex(newIdx, taskSlug); err != nil {
-				r.l.Error().Err(err).Msgf("Failed to update index for %s", taskSlug)
+				r.l.Error("Failed to update index", zap.String("slug", taskSlug), zap.Error(err))
 				return
 			}
 
-			r.l.Info().Msgf("Successfully indexed %s", taskSlug)
+			r.l.Info("Successfully indexed", zap.String("slug", taskSlug))
 		},
 	}
 }
@@ -639,7 +639,7 @@ func (r *ExtensionStore[T]) saveExtractStats(slug, source, name string, stats *E
 	}).Error
 
 	if err != nil {
-		r.l.Error().Err(err).Msgf("Failed to save extract stats for %s", slug)
+		r.l.Error("Failed to save extract stats", zap.String("slug", slug), zap.Error(err))
 	}
 
 	r.saveLargestRepoFiles(slug, name, stats.LargestFiles)
@@ -653,7 +653,7 @@ func (r *ExtensionStore[T]) saveLargestRepoFiles(slug, name string, files []*Fil
 	if err := r.db.Table("largest_repo_files").
 		Where("repo_type = ? AND slug = ?", repoType, slug).
 		Delete(nil).Error; err != nil {
-		r.l.Error().Err(err).Msgf("Failed to delete old largest_repo_files for %s", slug)
+		r.l.Error("Failed to delete old largest_repo_files", zap.String("slug", slug), zap.Error(err))
 		return
 	}
 
@@ -674,7 +674,7 @@ func (r *ExtensionStore[T]) saveLargestRepoFiles(slug, name string, files []*Fil
 	}
 
 	if err := r.db.Table("largest_repo_files").Create(rows).Error; err != nil {
-		r.l.Error().Err(err).Msgf("Failed to insert largest_repo_files for %s", slug)
+		r.l.Error("Failed to insert largest_repo_files", zap.String("slug", slug), zap.Error(err))
 	}
 }
 
@@ -696,7 +696,7 @@ func (r *ExtensionStore[T]) ResumeUnindexed() []IndexTask {
 		return nil
 	}
 
-	r.l.Info().Msgf("Resuming %d unindexed %s", len(unindexed), r.repoType)
+	r.l.Info("Resuming unindexed extensions", zap.Int("count", len(unindexed)), zap.String("type", string(r.repoType)))
 
 	var tasks []IndexTask
 	for _, ext := range unindexed {

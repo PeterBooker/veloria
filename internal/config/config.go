@@ -29,7 +29,6 @@ type Config struct {
 	HTTPIdleTimeout        time.Duration `env:"HTTP_IDLE_TIMEOUT" envDefault:"60s"`
 	HTTPShutdownTimeout    time.Duration `env:"HTTP_SHUTDOWN_TIMEOUT" envDefault:"10s"`
 	HTTPRateLimitEnabled   bool          `env:"HTTP_RATE_LIMIT_ENABLED" envDefault:"true"`
-	HTTPLoggingEnabled     bool          `env:"HTTP_LOGGING_ENABLED" envDefault:"true"`
 	DBHost                 string        `env:"DB_HOST" envDefault:"localhost" validate:"required"`
 	DBPort                 int           `env:"DB_PORT" envDefault:"5432" validate:"min=1,max=65535"`
 	DBName                 string        `env:"DB_DATABASE" envDefault:"veloria" validate:"required"`
@@ -43,10 +42,6 @@ type Config struct {
 	DBMaxOpenConns         int           `env:"DB_MAX_OPEN_CONNS" envDefault:"100"`
 	DBConnMaxIdleTime      time.Duration `env:"DB_CONN_MAX_IDLE_TIME" envDefault:"10m"`
 	DBConnMaxLifetime      time.Duration `env:"DB_CONN_MAX_LIFETIME" envDefault:"1h"`
-	SentryDSN              string        `env:"SENTRY_DSN" envDefault:""`
-	SentrySampleRate       float64       `env:"SENTRY_SAMPLE_RATE" envDefault:"0.0"`
-	SentryTracesSampleRate float64       `env:"SENTRY_TRACES_SAMPLE_RATE" envDefault:"0.0"`
-
 	// S3/MinIO Configuration
 	S3Endpoint     string        `env:"S3_ENDPOINT" envDefault:"localhost:9000"`
 	S3Bucket       string        `env:"S3_BUCKET" envDefault:"veloria-searches"`
@@ -81,6 +76,14 @@ type Config struct {
 
 	// Debug mode: controls informational (non-error/warning) log output
 	AppDebug bool `env:"APP_DEBUG" envDefault:"false"`
+
+	// OpenTelemetry Configuration
+	OTelExporterType     string        `env:"OTEL_EXPORTER_TYPE" envDefault:"none"`
+	OTLPEndpoint         string        `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:"localhost:4317"`
+	OTLPInsecure         bool          `env:"OTEL_EXPORTER_OTLP_INSECURE" envDefault:"true"`
+	TraceBatchTimeout    time.Duration `env:"OTEL_TRACE_BATCH_TIMEOUT" envDefault:"5s"`
+	LogBatchTimeout      time.Duration `env:"OTEL_LOG_BATCH_TIMEOUT" envDefault:"5s"`
+	EnableRuntimeMetrics bool          `env:"OTEL_ENABLE_RUNTIME_METRICS" envDefault:"true"`
 
 	// Application URL (production TLS via certmagic)
 	AppURL             string   `env:"APP_URL" envDefault:""`

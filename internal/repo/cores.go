@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -59,7 +59,7 @@ type CoreStore struct {
 }
 
 // NewCoreStore creates a new core store.
-func NewCoreStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zerolog.Logger, ch cache.Cache, api *APIClient) *CoreStore {
+func NewCoreStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Logger, ch cache.Cache, api *APIClient) *CoreStore {
 	store := NewExtensionStore[*Core](StoreConfig[*Core]{
 		Ctx:           ctx,
 		DB:            db,
@@ -113,7 +113,7 @@ func (cr *CoreStore) PrepareUpdates() []IndexTask {
 			c.IndexedExtension = NewIndexedExtension()
 
 			if cr.isVersionIndexed(c.Version) {
-				cr.l.Debug().Msgf("Skipping already indexed core version: %s", c.Version)
+				cr.l.Debug("Skipping already indexed core version", zap.String("version", c.Version))
 				continue
 			}
 
@@ -122,7 +122,7 @@ func (cr *CoreStore) PrepareUpdates() []IndexTask {
 
 		sortCoresByVersion(toIndex)
 
-		cr.l.Info().Msgf("Found %d core versions to index (out of %d total)", len(toIndex), len(cores))
+		cr.l.Info("Found core versions to index", zap.Int("toIndex", len(toIndex)), zap.Int("total", len(cores)))
 		return toIndex, nil
 	}
 

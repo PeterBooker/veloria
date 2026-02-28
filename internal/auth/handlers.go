@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"veloria/internal/user"
@@ -18,11 +18,11 @@ import (
 type Handler struct {
 	db           *gorm.DB
 	sessionStore *SessionStore
-	log          *zerolog.Logger
+	log          *zap.Logger
 }
 
 // NewHandler creates a new auth handler.
-func NewHandler(db *gorm.DB, sessionStore *SessionStore, log *zerolog.Logger) *Handler {
+func NewHandler(db *gorm.DB, sessionStore *SessionStore, log *zap.Logger) *Handler {
 	return &Handler{
 		db:           db,
 		sessionStore: sessionStore,
@@ -44,7 +44,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
-		h.log.Error().Err(err).Str("provider", provider).Msg("OAuth authentication failed")
+		h.log.Error("OAuth authentication failed", zap.Error(err), zap.String("provider", provider))
 		http.Redirect(w, r, "/login?error=auth_failed", http.StatusSeeOther)
 		return
 	}
@@ -52,19 +52,19 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	// Find or create user
 	u, err := h.findOrCreateUser(gothUser)
 	if err != nil {
-		h.log.Error().Err(err).Str("provider", provider).Msg("Failed to process user")
+		h.log.Error("Failed to process user", zap.Error(err), zap.String("provider", provider))
 		http.Redirect(w, r, "/login?error=user_failed", http.StatusSeeOther)
 		return
 	}
 
 	// Create session
 	if err := h.sessionStore.SetUser(w, r, u.ID); err != nil {
-		h.log.Error().Err(err).Msg("Failed to create session")
+		h.log.Error("Failed to create session", zap.Error(err))
 		http.Redirect(w, r, "/login?error=session_failed", http.StatusSeeOther)
 		return
 	}
 
-	h.log.Info().Str("user_id", u.ID.String()).Str("provider", provider).Msg("User logged in")
+	h.log.Info("User logged in", zap.String("user_id", u.ID.String()), zap.String("provider", provider))
 
 	// Redirect to home
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -73,7 +73,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 // Logout clears the session and redirects to home.
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	if err := h.sessionStore.ClearSession(w, r); err != nil {
-		h.log.Error().Err(err).Msg("Failed to clear session")
+		h.log.Error("Failed to clear session", zap.Error(err))
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

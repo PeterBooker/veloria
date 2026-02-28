@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"go.uber.org/zap"
+
 	"veloria/internal/app"
 )
 
@@ -26,14 +28,14 @@ func main() {
 		defer cancel()
 
 		if err := a.Shutdown(shutdownCtx); err != nil {
-			a.Logger.Error().Err(err).Msg("Shutdown failure")
+			a.Logger.Error("Shutdown failure", zap.Error(err))
 		}
 
 		close(closed)
 	}()
 
 	if err := a.Start(); err != nil {
-		a.Logger.Fatal().Err(err).Msg("Server startup failure")
+		a.Logger.Fatal("Server startup failure", zap.Error(err))
 	}
 
 	<-closed

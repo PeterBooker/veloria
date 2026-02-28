@@ -6,12 +6,9 @@ import (
 	"strings"
 	"time"
 
-	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rs/zerolog"
 	"gorm.io/gorm"
 
 	"veloria/assets"
@@ -19,9 +16,8 @@ import (
 	api "veloria/internal/api"
 	"veloria/internal/auth"
 	"veloria/internal/core"
-	"veloria/internal/logger"
-	"veloria/internal/manager"
 	ogimage "veloria/internal/image"
+	"veloria/internal/manager"
 	"veloria/internal/plugin"
 	"veloria/internal/report"
 	"veloria/internal/search"
@@ -35,7 +31,6 @@ type Options struct {
 	HandlerTimeout   time.Duration
 	SearchEnabled    bool
 	RateLimitEnabled bool
-	LoggingEnabled   bool
 	AppURL           string   // Target URL for legacy domain redirects (e.g., "https://veloria.dev")
 	RedirectDomains  []string // Legacy domains to redirect (e.g., ["wpdirectory.net", "www.wpdirectory.net"])
 }
@@ -43,27 +38,21 @@ type Options struct {
 // RouterDeps holds all dependencies needed to construct the router.
 // Optional fields may be nil when the corresponding subsystem is unavailable.
 type RouterDeps struct {
-	Logger  *zerolog.Logger
-	DB      *gorm.DB
-	Search  manager.Searcher                       // for API search endpoint; or nil
-	Stats   map[string]manager.RepoStatsProvider   // per-type stats for API list endpoints; or nil
-	S3      storage.ResultStorage
-	WebDeps *web.Deps
-	Session *auth.SessionStore
-	Auth    *auth.Handler
-	OGGen   *ogimage.Generator                     // OG image generator; or nil
-	MCP     http.Handler                             // MCP streamable HTTP handler; or nil
-	Options Options
+	DB                *gorm.DB
+	Search            manager.Searcher                     // for API search endpoint; or nil
+	Stats             map[string]manager.RepoStatsProvider // per-type stats for API list endpoints; or nil
+	S3                storage.ResultStorage
+	WebDeps           *web.Deps
+	Session           *auth.SessionStore
+	Auth              *auth.Handler
+	OGGen             *ogimage.Generator // OG image generator; or nil
+	MCP               http.Handler       // MCP streamable HTTP handler; or nil
+	PrometheusHandler http.Handler       // Prometheus metrics handler; or nil
+	Options           Options
 }
 
 func New(deps RouterDeps) *chi.Mux {
 	r := chi.NewRouter()
-
-	sentryHandler := sentryhttp.New(sentryhttp.Options{
-		Repanic:         true,
-		WaitForDelivery: false,
-		Timeout:         2 * time.Second,
-	})
 
 	opts := deps.Options
 
@@ -75,12 +64,7 @@ func New(deps RouterDeps) *chi.Mux {
 	// Security headers
 	r.Use(securityHeaders)
 
-	// Access logging (stdout)
-	if opts.LoggingEnabled {
-		r.Use(logger.AccessLogger)
-	}
 	r.Use(middleware.Recoverer)
-	r.Use(sentryHandler.Handle)
 	r.Use(middleware.RequestID)
 	handlerTimeout := 5 * time.Second
 	if opts.HandlerTimeout > 0 {
@@ -101,7 +85,9 @@ func New(deps RouterDeps) *chi.Mux {
 	})
 
 	// Metrics
-	r.Handle("/metrics", promhttp.Handler())
+	if deps.PrometheusHandler != nil {
+		r.Handle("/metrics", deps.PrometheusHandler)
+	}
 
 	// Auth routes
 	if deps.Auth != nil {

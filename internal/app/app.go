@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/rs/zerolog"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -19,15 +19,14 @@ import (
 	"veloria/internal/cache"
 	"veloria/internal/config"
 	ogimage "veloria/internal/image"
-	"veloria/internal/logger"
 	"veloria/internal/manager"
 	veloriamc "veloria/internal/mcp"
 	"veloria/internal/repo"
 	"veloria/internal/router"
-	"veloria/internal/sentry"
 	"veloria/internal/server"
 	"veloria/internal/storage"
 	"veloria/internal/tasks"
+	"veloria/internal/telemetry"
 	"veloria/internal/web"
 )
 
@@ -36,7 +35,8 @@ const fmtDBString = "host=%s user=%s password=%s dbname=%s port=%d sslmode=%s Ti
 // App encapsulates the entire application lifecycle.
 type App struct {
 	Config       *config.Config
-	Logger       *zerolog.Logger
+	Logger       *zap.Logger
+	Telemetry    *telemetry.Telemetry
 	DB           *gorm.DB
 	SqlDB        *sql.DB
 	S3           storage.ResultStorage
@@ -60,22 +60,26 @@ func New(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("failed to ensure data directories: %w", err)
 	}
 
-	l := logger.New(c.AppDebug)
-	sentry.Setup(c)
+	tel, err := telemetry.Setup(ctx, c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup telemetry: %w", err)
+	}
+	l := tel.Logger
 
 	a := &App{
-		Config: c,
-		Logger: l,
+		Config:    c,
+		Logger:    l,
+		Telemetry: tel,
 	}
 
 	// Initialize database
 	if err := a.initDB(); err != nil {
-		l.Error().Err(err).Msg("DB initialization failed; running in no-search mode")
+		l.Error("DB initialization failed; running in no-search mode", zap.Error(err))
 	}
 
 	// Initialize S3
 	if err := a.initS3(); err != nil {
-		l.Error().Err(err).Msg("S3 initialization failed; running in no-search mode")
+		l.Error("S3 initialization failed; running in no-search mode", zap.Error(err))
 	}
 
 	// Initialize cache
@@ -103,7 +107,7 @@ func New(ctx context.Context) (*App, error) {
 
 		m, err := manager.NewManager(workerCtx, l, []repo.DataSource{pr, tr, cr}, c.IndexerConcurrency)
 		if err != nil {
-			l.Error().Err(err).Msg("Failed to load repositories; running in no-search mode")
+			l.Error("Failed to load repositories; running in no-search mode", zap.Error(err))
 		} else {
 			a.Manager = m
 		}
@@ -115,11 +119,11 @@ func New(ctx context.Context) (*App, error) {
 	// Initialize session store and auth handler
 	if a.DB != nil {
 		if c.Env != "development" && c.SessionSecret == "" {
-			l.Error().Msg("SESSION_SECRET not set; continuing without auth")
+			l.Error("SESSION_SECRET not set; continuing without auth")
 		} else {
 			sessionStore, err := auth.NewSessionStore(a.SqlDB, a.DB, c)
 			if err != nil {
-				l.Error().Err(err).Msg("Failed to create session store; continuing without auth")
+				l.Error("Failed to create session store; continuing without auth", zap.Error(err))
 			} else {
 				a.SessionStore = sessionStore
 				a.AuthHandler = auth.NewHandler(a.DB, sessionStore, l)
@@ -138,14 +142,14 @@ func New(ctx context.Context) (*App, error) {
 		default:
 			searchDisabledReason = "Search index is not ready."
 		}
-		l.Warn().Msgf("Search disabled: %s", searchDisabledReason)
+		l.Warn("Search disabled", zap.String("reason", searchDisabledReason))
 	}
 	deps := web.NewDeps(a.DB, a.Manager, a.Manager, a.Manager, a.Manager, a.S3, appCache, c, searchEnabled, searchDisabledReason)
 
 	// Initialize OG image generator
 	ogGen, err := ogimage.New(assets.FS)
 	if err != nil {
-		l.Error().Err(err).Msg("Failed to initialize OG image generator; OG images disabled")
+		l.Error("Failed to initialize OG image generator; OG images disabled", zap.Error(err))
 	}
 
 	// Build per-type stats map for the router's API list handlers.
@@ -164,25 +168,24 @@ func New(ctx context.Context) (*App, error) {
 		mcpSvc := veloriamc.NewDirectService(a.Manager, a.DB, a.S3)
 		mcpServer := veloriamc.NewMCPServer(c.Name, config.Version, mcpSvc)
 		mcpHandler = veloriamc.NewHTTPHandler(mcpServer)
-		l.Info().Msg("MCP server enabled at /mcp")
+		l.Info("MCP server enabled at /mcp")
 	}
 
 	r := router.New(router.RouterDeps{
-		Logger:  l,
-		DB:      a.DB,
-		Search:  a.Manager,
-		Stats:   statsMap,
-		S3:      a.S3,
-		WebDeps: deps,
-		Session: a.SessionStore,
-		Auth:    a.AuthHandler,
-		OGGen:   ogGen,
-		MCP:     mcpHandler,
+		DB:                a.DB,
+		Search:            a.Manager,
+		Stats:             statsMap,
+		S3:                a.S3,
+		WebDeps:           deps,
+		Session:           a.SessionStore,
+		Auth:              a.AuthHandler,
+		OGGen:             ogGen,
+		MCP:               mcpHandler,
+		PrometheusHandler: tel.PrometheusHandler,
 		Options: router.Options{
 			HandlerTimeout:   c.HTTPHandlerTimeout,
 			SearchEnabled:    searchEnabled,
 			RateLimitEnabled: c.HTTPRateLimitEnabled,
-			LoggingEnabled:   c.HTTPLoggingEnabled,
 			AppURL:           c.AppURL,
 			RedirectDomains:  c.RedirectDomains,
 		},
@@ -204,7 +207,7 @@ func (a *App) Start() error {
 
 // Shutdown gracefully shuts down all components.
 func (a *App) Shutdown(ctx context.Context) error {
-	a.Logger.Info().Msg("Shutting down application")
+	a.Logger.Info("Shutting down application")
 
 	// Cancel background workers first
 	if a.cancelWorkers != nil {
@@ -221,7 +224,7 @@ func (a *App) Shutdown(ctx context.Context) error {
 
 	// Shutdown HTTP servers
 	if err := a.Server.Shutdown(ctx); err != nil {
-		a.Logger.Error().Err(err).Msg("Server shutdown failure")
+		a.Logger.Error("Server shutdown failure", zap.Error(err))
 	}
 
 	// Close session store
@@ -237,13 +240,18 @@ func (a *App) Shutdown(ctx context.Context) error {
 	// Close database
 	if a.SqlDB != nil {
 		if err := a.SqlDB.Close(); err != nil {
-			a.Logger.Error().Err(err).Msg("DB connection closing failure")
+			a.Logger.Error("DB connection closing failure", zap.Error(err))
 		}
 	}
 
-	sentry.Flush()
+	// Shutdown telemetry (flushes traces, metrics, logs)
+	if a.Telemetry != nil {
+		if err := a.Telemetry.Shutdown(ctx); err != nil {
+			a.Logger.Error("Telemetry shutdown failure", zap.Error(err))
+		}
+	}
 
-	a.Logger.Info().Msg("Application shutdown complete")
+	a.Logger.Info("Application shutdown complete")
 	return nil
 }
 

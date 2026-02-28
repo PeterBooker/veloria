@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
-	"github.com/rs/zerolog/log"
+	"go.uber.org/zap"
 )
 
 // JSONRecoverer is a middleware that recovers from panics in API routes
@@ -13,10 +13,10 @@ func JSONRecoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if rvr := recover(); rvr != nil {
-				log.Error().
-					Interface("panic", rvr).
-					Str("stack", string(debug.Stack())).
-					Msg("panic recovered in API handler")
+				zap.L().Error("panic recovered in API handler",
+					zap.Any("panic", rvr),
+					zap.String("stack", string(debug.Stack())),
+				)
 
 				WriteJSON(w, ErrInternal("internal server error"))
 			}
