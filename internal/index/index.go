@@ -339,7 +339,7 @@ func extractAfterContext(buf []byte, lineEnd int, n int) []string {
 }
 
 // gzipMagic is the two-byte header that identifies gzip-compressed data.
-var gzipMagic = []byte{0x1f, 0x8b}
+var gzipMagic = [2]byte{0x1f, 0x8b}
 
 // readSourceFile reads a source file, transparently decompressing gzip content.
 // Files without the gzip magic header are returned as-is for backward compatibility
@@ -378,7 +378,7 @@ func openSourceReader(filename string) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	if n == 2 && header[0] == gzipMagic[0] && header[1] == gzipMagic[1] {
+	if n == len(header) && bytes.Equal(header[:], gzipMagic[:]) {
 		gz, err := gzip.NewReader(f)
 		if err != nil {
 			_ = f.Close()

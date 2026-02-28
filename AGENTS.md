@@ -1,7 +1,7 @@
 # Claude Code Agent Instructions for Veloria
 
 **System:** Veloria - Code Search Engine for the WordPress Ecosystem
-**Tech Stack:** Go 1.25, PostgreSQL 17, MinIO/S3, google/codesearch
+**Tech Stack:** Go 1.26.0, PostgreSQL 17, MinIO/S3, google/codesearch
 **Status:** Production - High-Performance Search Service
 
 ---
@@ -169,7 +169,7 @@ Veloria provides:
 
 | Component | Technology |
 |-----------|------------|
-| Language | Go 1.25 (min 1.24) |
+| Language | Go 1.26.0 (min 1.26.0) |
 | Router | chi/v5 |
 | Database | PostgreSQL 17 (GORM) |
 | Search Engine | google/codesearch (trigram) |

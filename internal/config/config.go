@@ -32,7 +32,7 @@ type Config struct {
 	HTTPLoggingEnabled     bool          `env:"HTTP_LOGGING_ENABLED" envDefault:"true"`
 	DBHost                 string        `env:"DB_HOST" envDefault:"localhost" validate:"required"`
 	DBPort                 int           `env:"DB_PORT" envDefault:"5432" validate:"min=1,max=65535"`
-	DBName                 string        `env:"DB_DATABASE" envDefault:"fundy" validate:"required"`
+	DBName                 string        `env:"DB_DATABASE" envDefault:"veloria" validate:"required"`
 	DBUser                 string        `env:"DB_USERNAME" envDefault:"root" validate:"required"`
 	DBPass                 string        `env:"DB_PASSWORD" envDefault:""`
 	DBSSLMode              string        `env:"DB_SSLMODE" envDefault:""`

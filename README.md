@@ -14,16 +14,16 @@ A code search engine for the WordPress ecosystem. Veloria downloads, indexes, an
 
 ### Prerequisites
 
-- Go 1.24+
-- Node.js 18+ and npm (for building frontend assets)
-- PostgreSQL 14+
+- Go 1.26.0
+- Node.js 22+ and npm (for building frontend assets)
+- PostgreSQL 17+
 - Docker (optional)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/veloria.git
+git clone https://github.com/PeterBooker/veloria.git
 cd veloria
 
 # Build frontend assets (Tailwind CSS, htmx, ECharts)
@@ -32,6 +32,7 @@ go generate ./assets/...
 # Build the binaries
 go build -o veloria ./cmd/veloria
 go build -o veloria-indexer ./cmd/veloria-indexer
+go build -o veloria-migrations ./cmd/veloria-migrate
 ```
 
 ### Configuration
@@ -57,6 +58,9 @@ See [Configuration Reference](docs/configuration.md) for all options.
 # Start PostgreSQL (using Docker)
 docker compose up -d
 
+# Run database migrations
+./veloria-migrations up
+
 # Run the server
 ./veloria
 ```
@@ -75,6 +79,11 @@ The core component exposes a REST API, which is used by the frontend.
 | [API Reference](docs/api.md) | Complete API endpoint documentation |
 | [Configuration](docs/configuration.md) | Environment variables and settings |
 | [Development Guide](docs/development.md) | Setup, building, testing, and debugging |
+| [Contributing](CONTRIBUTING.md) | Contribution workflow and PR requirements |
+| [Security Policy](SECURITY.md) | Vulnerability reporting and response policy |
+| [Support](SUPPORT.md) | Where to get help |
+| [Code of Conduct](CODE_OF_CONDUCT.md) | Community behavior standards |
+| [Governance](GOVERNANCE.md) | Project decision model |
 
 ## Project Structure
 
@@ -82,7 +91,8 @@ The core component exposes a REST API, which is used by the frontend.
 veloria/
 ├── cmd/
 │   ├── veloria/            # Main API server
-│   └── veloria-indexer/    # Indexing utility
+│   ├── veloria-indexer/    # Indexing utility
+│   └── veloria-migrate/    # Database migration source (build as veloria-migrations)
 ├── internal/
 │   ├── api/               # HTTP handlers
 │   ├── config/            # Configuration
@@ -139,12 +149,22 @@ See [Development Guide](docs/development.md) for complete instructions.
 
 ## Tech Stack
 
-- **Language**: Go 1.24+
+- **Language**: Go 1.26.0
 - **Database**: PostgreSQL (metadata storage)
 - **Search**: google/codesearch (trigram indexing)
 - **HTTP Router**: chi
 - **ORM**: GORM
 - **Monitoring**: Prometheus metrics, Sentry error tracking
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+## Sponsorship
+
+If Veloria is useful to your team, consider sponsoring maintenance and roadmap work:
+
+- GitHub Sponsors: https://github.com/sponsors/PeterBooker
 
 ## License
 

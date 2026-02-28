@@ -8,7 +8,7 @@ This document covers the high-level design of Veloria, a code search engine for 
 |---|---|---|
 | `veloria` | `cmd/veloria/` | Main server: HTTP API, web UI, background indexer |
 | `veloria-indexer` | `cmd/veloria-indexer/` | CLI tool that downloads a ZIP, extracts source, and builds a search index. Invoked as a subprocess by the server. |
-| `veloria-migrate` | `cmd/veloria-migrate/` | Runs database migrations via [goose](https://github.com/pressly/goose) |
+| `veloria-migrations` | `cmd/veloria-migrate/` | Project migration binary. Loads environment config and runs DB migrations. |
 | `veloria-converter` | `cmd/veloria-converter/` | One-time utility for migrating data from WPDirectory's BoltDB format |
 
 ## Package Layout
