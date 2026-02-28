@@ -44,6 +44,6 @@ jobs:
       #     version: v2.6
 
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@v2
+        uses: securego/gosec@v2.22.10
         with:
           args: -exclude-generated -exclude-dir=internal/codesearch ./...
