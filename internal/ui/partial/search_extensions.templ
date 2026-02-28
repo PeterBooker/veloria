@@ -16,8 +16,15 @@ func searchExtensionsURL(searchID string, page int, search string) string {
 	return url
 }
 
-func extDetailOnclick(searchID, slug string) templ.Attributes {
-	return templ.Attributes{"onclick": "toggleExtDetail(this, '/search/" + searchID + "/extension/" + slug + "', 'ext-detail-" + slug + "')"}
+func extDetailAttrs(searchID, slug string) templ.Attributes {
+	jsCall := "toggleExtDetail(this, '/search/" + searchID + "/extension/" + slug + "', 'ext-detail-" + slug + "')"
+	return templ.Attributes{
+		"role":        "button",
+		"tabindex":    "0",
+		"aria-expanded": "false",
+		"onclick":     jsCall,
+		"onkeydown":   "if(event.key==='Enter'||event.key===' '){event.preventDefault();" + jsCall + "}",
+	}
 }
 
 templ SearchExtensions(data ui.SearchExtensionsData) {
@@ -29,10 +36,10 @@ templ SearchExtensions(data ui.SearchExtensionsData) {
 					<!-- Clickable Header -->
 					<div
 						class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 lg:px-5 py-3.5 bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer"
-						{ extDetailOnclick(data.SearchID, ext.Slug)... }
+						{ extDetailAttrs(data.SearchID, ext.Slug)... }
 					>
 						<div class="flex items-center gap-3 text-text-body min-w-0">
-							<svg data-chevron class="w-4 h-4 text-text-subtle shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<svg data-chevron class="w-4 h-4 text-text-subtle shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 								<polyline points="9 18 15 12 9 6"></polyline>
 							</svg>
 							<div class="min-w-0">
@@ -51,8 +58,8 @@ templ SearchExtensions(data ui.SearchExtensionsData) {
 					<!-- Detail Container (hidden until header clicked) -->
 					<div data-detail class="hidden border-t border-white/[0.08]">
 						<div id={ "ext-detail-" + ext.Slug }>
-							<div class="flex items-center justify-center gap-2 py-8 text-text-subtle">
-								<div class="w-4 h-4 border-2 border-white/[0.06] border-t-neon-pink rounded-full animate-spin"></div>
+							<div class="flex items-center justify-center gap-2 py-8 text-text-subtle" role="status" aria-label="Loading">
+								<div class="w-4 h-4 border-2 border-white/[0.06] border-t-neon-pink rounded-full animate-spin" aria-hidden="true"></div>
 								<span class="text-xs">Loading matches...</span>
 							</div>
 						</div>

@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"html"
 	"math"
 	"net/http"
 	"strconv"
@@ -191,7 +192,7 @@ func fetchPluginItems(d *Deps, page int, pageSize int, search string) ([]RepoIte
 	for i, row := range rows {
 		items[i] = RepoItem{
 			ID:         row.ID,
-			Name:       row.Name,
+			Name:       html.UnescapeString(row.Name),
 			Slug:       row.Slug,
 			Version:    row.Version,
 			Indexed:    indexStatus[row.Slug],
@@ -239,7 +240,7 @@ func fetchThemeItems(d *Deps, page int, pageSize int, search string) ([]RepoItem
 	for i, row := range rows {
 		items[i] = RepoItem{
 			ID:         row.ID,
-			Name:       row.Name,
+			Name:       html.UnescapeString(row.Name),
 			Slug:       row.Slug,
 			Version:    row.Version,
 			Indexed:    indexStatus[row.Slug],
@@ -382,5 +383,8 @@ func fetchLargestExtensions(d *Deps, table string, limit int, orderCol string) [
 		Order(orderCol + " DESC").
 		Limit(limit).
 		Scan(&extensions)
+	for i := range extensions {
+		extensions[i].Name = html.UnescapeString(extensions[i].Name)
+	}
 	return extensions
 }

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"html"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -46,13 +47,13 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		pd := d.PageData(r)
-		pd.OG.Title = row.Name + " - Veloria"
+		pd.OG.Title = html.UnescapeString(row.Name) + " - Veloria"
 		pd.OG.Description = "WordPress " + row.Version + " core source code indexed by Veloria."
 
 		data := web.ExtensionData{
 			PageData:     pd,
 			RepoType:     "cores",
-			Name:         row.Name,
+			Name:         html.UnescapeString(row.Name),
 			Slug:         row.Version,
 			Version:      row.Version,
 			DownloadLink: row.DownloadLink,

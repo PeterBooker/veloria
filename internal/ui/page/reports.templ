@@ -60,7 +60,7 @@ templ Reports(data ui.ReportsPageData) {
 													hx-post={ "/admin/search/" + report.SearchID + "/visibility" }
 													hx-target={ "#visibility-" + report.ReportID }
 													hx-swap="innerHTML"
-													class="text-xs text-brand-600 hover:text-brand-700 font-medium"
+													class="text-xs text-brand-600 hover:text-brand-700 hover:underline hover:underline-offset-2 font-medium"
 												>
 													Make Public
 												</button>
@@ -72,7 +72,7 @@ templ Reports(data ui.ReportsPageData) {
 													hx-post={ "/admin/search/" + report.SearchID + "/visibility" }
 													hx-target={ "#visibility-" + report.ReportID }
 													hx-swap="innerHTML"
-													class="text-xs text-red-600 hover:text-red-700 font-medium"
+													class="text-xs text-red-600 hover:text-red-700 hover:underline hover:underline-offset-2 font-medium"
 												>
 													Make Private
 												</button>

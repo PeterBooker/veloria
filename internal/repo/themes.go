@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/url"
 	"strings"
 	"time"
@@ -61,7 +62,7 @@ type Theme struct {
 // Implement Extension interface
 func (t *Theme) GetSlug() string         { return t.Slug }
 func (t *Theme) GetSource() string       { return t.Source }
-func (t *Theme) GetName() string         { return t.Name }
+func (t *Theme) GetName() string         { return html.UnescapeString(t.Name) }
 func (t *Theme) GetVersion() string      { return t.Version }
 func (t *Theme) GetDownloadLink() string { return t.DownloadLink }
 func (t *Theme) GetActiveInstalls() int  { return t.ActiveInstalls }

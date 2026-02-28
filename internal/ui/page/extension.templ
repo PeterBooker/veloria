@@ -32,9 +32,9 @@ templ Extension(data ui.ExtensionData) {
 		<!-- Heading -->
 		<div class="mb-6 pt-8 lg:pt-10">
 			<nav class="text-sm text-text-subtle mb-3">
-				<a href="/data-sources" class="hover:text-neon-pink transition-colors">Data Sources</a>
+				<a href="/data-sources" class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors">Data Sources</a>
 				<span class="mx-2">/</span>
-				<a href={ templ.SafeURL("/data-sources/" + data.RepoType) } class="hover:text-neon-pink transition-colors capitalize">{ data.RepoType }</a>
+				<a href={ templ.SafeURL("/data-sources/" + data.RepoType) } class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors capitalize">{ data.RepoType }</a>
 				<span class="mx-2">/</span>
 				<span class="text-text-body font-medium">{ data.Name }</span>
 			</nav>
@@ -149,7 +149,7 @@ templ Extension(data ui.ExtensionData) {
 							<div class="flex justify-between items-center">
 								<dt class="text-text-muted">Download</dt>
 								<dd>
-									<a href={ templ.SafeURL(data.DownloadLink) } class="text-brand-600 hover:text-brand-700 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
+									<a href={ templ.SafeURL(data.DownloadLink) } class="text-brand-600 hover:text-brand-700 hover:underline hover:underline-offset-2 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
 								</dd>
 							</div>
 						}
@@ -176,7 +176,7 @@ templ Extension(data ui.ExtensionData) {
 						<div class="flex justify-between items-center">
 							<dt class="text-text-muted">Download</dt>
 							<dd>
-								<a href={ templ.SafeURL(data.DownloadLink) } class="text-brand-600 hover:text-brand-700 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
+								<a href={ templ.SafeURL(data.DownloadLink) } class="text-brand-600 hover:text-brand-700 hover:underline hover:underline-offset-2 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
 							</dd>
 						</div>
 					}
