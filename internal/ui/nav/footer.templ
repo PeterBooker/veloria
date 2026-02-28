@@ -24,7 +24,7 @@ templ Footer(version string, requestStart time.Time) {
 				<a href="/terms" class="text-[18px] text-text-subtle hover:text-text-muted transition">Terms</a>
 				<span class="text-[18px] text-text-subtle">&copy; 2026 Veloria</span>
 				if !requestStart.IsZero() {
-					<span class="text-[18px] text-text-subtle">{ ui.Elapsed(requestStart) }</span>
+					<span class="text-[18px] text-text-subtle">Request: { ui.Elapsed(requestStart) }</span>
 				}
 			</nav>
 		</div>
