@@ -9,6 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"veloria/internal/ui/page"
+	"veloria/internal/ui/partial"
 )
 
 // ReposPage renders the repositories listing page.
@@ -37,10 +40,7 @@ func ReposPage(d *Deps) http.HandlerFunc {
 			RepoSummaries: repoSummaries,
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "repos.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, page.Repos(data))
 	}
 }
 
@@ -99,10 +99,7 @@ func RepoPage(d *Deps) http.HandlerFunc {
 			LargestByFileCount: largestByFileCount,
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "repo.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, page.Repo(data))
 	}
 }
 
@@ -154,10 +151,7 @@ func RepoItemsPartial(d *Deps, repoType string) http.HandlerFunc {
 			Search:     search,
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "repo-items.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, partial.RepoItems(data))
 	}
 }
 

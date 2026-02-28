@@ -1,0 +1,367 @@
+package page
+
+import (
+	"veloria/internal/ui"
+	"veloria/internal/ui/layout"
+)
+
+templ Docs(pd ui.PageData) {
+	@layout.Base(pd) {
+		<!-- Heading -->
+		<div class="mb-6 pt-8 lg:pt-10">
+			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Documentation</h1>
+			<p class="text-sm text-text-body">Everything you need to search WordPress source code with Veloria</p>
+		</div>
+		<div class="lg:flex lg:items-start lg:gap-10">
+			<div class="max-w-3xl space-y-10 flex-1 min-w-0">
+				<!-- Mobile Table of Contents -->
+				<nav aria-label="Table of contents" class="lg:hidden">
+					<ul class="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+						<li><a href="#search" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">Search Guide</a></li>
+						<li><a href="#regex" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">Regex Reference</a></li>
+						<li><a href="#examples" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">Example Patterns</a></li>
+						<li><a href="#options" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">Search Options</a></li>
+						<li><a href="#mcp" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">MCP Integration</a></li>
+					</ul>
+				</nav>
+				<!-- Search Guide -->
+				<section id="search" class="docs-section">
+					<h2 class="text-2xl font-bold text-text-bright mb-3">Search Guide</h2>
+					<div class="space-y-3">
+						<p class="text-lg text-text-body leading-relaxed">
+							Veloria is a code search engine for the WordPress ecosystem. It indexes the source code of every plugin, theme, and core version published on wordpress.org, letting you search across the entire directory in seconds.
+						</p>
+						<ul class="space-y-2 text-lg text-text-body leading-relaxed list-none">
+							<li class="flex items-start gap-2.5">
+								<span class="text-neon-pink mt-0.5 shrink-0">▸</span>
+								<span>Search uses <strong class="text-text-bright font-semibold">regex</strong> (Go's RE2 syntax) for powerful pattern matching across source files.</span>
+							</li>
+							<li class="flex items-start gap-2.5">
+								<span class="text-neon-pink mt-0.5 shrink-0">▸</span>
+								<span>Results are <strong class="text-text-bright font-semibold">cached</strong> and <strong class="text-text-bright font-semibold">shareable via URL</strong> so you can bookmark or send them to others.</span>
+							</li>
+							<li class="flex items-start gap-2.5">
+								<span class="text-neon-pink mt-0.5 shrink-0">▸</span>
+								<span><strong class="text-text-bright font-semibold">Public</strong> searches are visible to everyone on the recent searches page. <strong class="text-text-bright font-semibold">Private</strong> searches are only visible to you.</span>
+							</li>
+						</ul>
+					</div>
+				</section>
+				<!-- Regex Reference -->
+				<section id="regex" class="docs-section">
+					<h2 class="text-2xl font-bold text-text-bright mb-3">Regex Reference</h2>
+					<p class="text-lg text-text-body leading-relaxed mb-4">
+						Veloria uses Go's RE2 regular expression engine. Below is a quick reference of common syntax.
+					</p>
+					<div class="glass-inner rounded-xl overflow-hidden">
+						<table class="docs-table w-full text-sm">
+							<thead>
+								<tr>
+									<th class="text-left text-text-bright font-semibold">Pattern</th>
+									<th class="text-left text-text-bright font-semibold">Description</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">.</code></td>
+									<td class="text-text-body">Any character (except newline)</td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">*</code></td>
+									<td class="text-text-body">Zero or more of the preceding element</td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">+</code></td>
+									<td class="text-text-body">One or more of the preceding element</td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">?</code></td>
+									<td class="text-text-body">Zero or one of the preceding element</td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">\d</code></td>
+									<td class="text-text-body">Digit <span class="text-text-muted">(equivalent to [0-9])</span></td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">\w</code></td>
+									<td class="text-text-body">Word character <span class="text-text-muted">(letter, digit, or underscore)</span></td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">\s</code></td>
+									<td class="text-text-body">Whitespace character <span class="text-text-muted">(space, tab, newline)</span></td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">[abc]</code></td>
+									<td class="text-text-body">Character class — matches a, b, or c</td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">[^abc]</code></td>
+									<td class="text-text-body">Negated class — matches anything except a, b, or c</td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">(a|b)</code></td>
+									<td class="text-text-body">Alternation — matches a or b</td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">(?:...)</code></td>
+									<td class="text-text-body">Non-capturing group</td>
+								</tr>
+								<tr>
+									<td>
+										<code class="text-neon-cyan font-mono">^</code> / <code class="text-neon-cyan font-mono">$</code>
+									</td>
+									<td class="text-text-body">Start / end of line</td>
+								</tr>
+								<tr>
+									<td><code class="text-neon-cyan font-mono">\b</code></td>
+									<td class="text-text-body">Word boundary</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</section>
+				<!-- Example Patterns -->
+				<section id="examples" class="docs-section">
+					<h2 class="text-2xl font-bold text-text-bright mb-3">Example Patterns</h2>
+					<p class="text-lg text-text-body leading-relaxed mb-4">
+						WordPress-specific regex patterns to help you get started.
+					</p>
+					<div class="space-y-4">
+						<!-- WordPress Hooks -->
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-pink mb-1.5">WordPress Hooks</h3>
+							<div class="docs-code mb-2"><code>do_action\(\s*['"]</code></div>
+							<p class="text-sm text-text-muted">Find action hook invocations throughout plugin and theme code.</p>
+						</div>
+						<!-- Filter Applications -->
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-pink mb-1.5">Filter Applications</h3>
+							<div class="docs-code mb-2"><code>apply_filters\(\s*['"]</code></div>
+							<p class="text-sm text-text-muted">Find where filters are applied, useful for discovering extension points.</p>
+						</div>
+						<!-- Database Queries -->
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-pink mb-1.5">Database Queries</h3>
+							<div class="docs-code mb-2"><code>\$wpdb->(query|prepare|get_results)\(</code></div>
+							<p class="text-sm text-text-muted">Locate direct database calls for security auditing and performance review.</p>
+						</div>
+						<!-- Sanitization Functions -->
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-pink mb-1.5">Sanitization Functions</h3>
+							<div class="docs-code mb-2"><code>sanitize_[a-z_]+\(</code></div>
+							<p class="text-sm text-text-muted">Find usage of WordPress sanitization functions across the codebase.</p>
+						</div>
+						<!-- REST API Routes -->
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-pink mb-1.5">REST API Routes</h3>
+							<div class="docs-code mb-2"><code>register_rest_route\(</code></div>
+							<p class="text-sm text-text-muted">Discover REST API endpoint registrations in plugins and themes.</p>
+						</div>
+						<!-- Enqueue Scripts -->
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-pink mb-1.5">Enqueue Scripts</h3>
+							<div class="docs-code mb-2"><code>wp_enqueue_(script|style)\(</code></div>
+							<p class="text-sm text-text-muted">Find where scripts and stylesheets are enqueued for the front-end or admin.</p>
+						</div>
+						<!-- Options API -->
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-pink mb-1.5">Options API</h3>
+							<div class="docs-code mb-2"><code>(get|update|delete)_option\(</code></div>
+							<p class="text-sm text-text-muted">Track WordPress options usage for configuration and settings management.</p>
+						</div>
+						<!-- Gutenberg Blocks -->
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-pink mb-1.5">Gutenberg Blocks</h3>
+							<div class="docs-code mb-2"><code>registerBlockType\(</code></div>
+							<p class="text-sm text-text-muted">Find block registration calls in JavaScript for the Gutenberg editor.</p>
+						</div>
+					</div>
+				</section>
+				<!-- Search Options -->
+				<section id="options" class="docs-section">
+					<h2 class="text-2xl font-bold text-text-bright mb-3">Search Options</h2>
+					<p class="text-lg text-text-body leading-relaxed mb-4">
+						Fine-tune your search with these options, all available from the home page search form.
+					</p>
+					<div class="space-y-4">
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-gold mb-1.5">Source</h3>
+							<p class="text-sm text-text-body leading-relaxed">
+								Choose which repository to search. <strong class="text-text-bright font-semibold">Plugins</strong> covers 60,000+ WordPress.org plugins.
+								<strong class="text-text-bright font-semibold">Themes</strong> covers 12,000+ WordPress.org themes.
+								<strong class="text-text-bright font-semibold">Core</strong> includes all tagged WordPress core releases.
+							</p>
+						</div>
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-gold mb-1.5">File Type Filter</h3>
+							<p class="text-sm text-text-body leading-relaxed">
+								Restrict results to specific file extensions such as <code class="text-neon-cyan font-mono text-xs">.php</code>, <code class="text-neon-cyan font-mono text-xs">.js</code>, <code class="text-neon-cyan font-mono text-xs">.css</code>, <code class="text-neon-cyan font-mono text-xs">.html</code>, <code class="text-neon-cyan font-mono text-xs">.json</code>, <code class="text-neon-cyan font-mono text-xs">.xml</code>, <code class="text-neon-cyan font-mono text-xs">.txt</code>, <code class="text-neon-cyan font-mono text-xs">.md</code>, or <code class="text-neon-cyan font-mono text-xs">.sql</code>. Leave set to "All files" to search everything.
+							</p>
+						</div>
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-gold mb-1.5">Case Sensitivity</h3>
+							<p class="text-sm text-text-body leading-relaxed">
+								Enabled by default. When case sensitive, <code class="text-neon-cyan font-mono text-xs">getData</code> will not match <code class="text-neon-cyan font-mono text-xs">getdata</code> or <code class="text-neon-cyan font-mono text-xs">GETDATA</code>. Disable for broader matching.
+							</p>
+						</div>
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-gold mb-1.5">Exclude Minified</h3>
+							<p class="text-sm text-text-body leading-relaxed">
+								When enabled, files ending in <code class="text-neon-cyan font-mono text-xs">.min.js</code> and <code class="text-neon-cyan font-mono text-xs">.min.css</code> are skipped. This reduces noise from compiled or compressed assets.
+							</p>
+						</div>
+						<div class="glass-inner rounded-xl p-4">
+							<h3 class="text-xl font-semibold text-neon-gold mb-1.5">Visibility</h3>
+							<p class="text-sm text-text-body leading-relaxed">
+								<strong class="text-text-bright font-semibold">Public</strong> searches appear on the shared recent searches page and can be found by anyone with the link.
+								<strong class="text-text-bright font-semibold">Private</strong> searches are only visible to you when signed in.
+							</p>
+						</div>
+					</div>
+				</section>
+				<!-- MCP Integration -->
+				<section id="mcp" class="docs-section">
+					<h2 class="text-2xl font-bold text-text-bright mb-3">MCP Integration</h2>
+					<p class="text-lg text-text-body leading-relaxed mb-4">
+						Veloria exposes an <strong class="text-text-bright font-semibold">MCP (Model Context Protocol)</strong> server so AI assistants can search WordPress source code directly. Connect your favourite AI tool and query the entire WordPress directory without leaving your editor.
+					</p>
+					<!-- Available Tools -->
+					<div class="mb-6">
+						<h3 class="text-xl font-semibold text-neon-purple mb-3">Available Tools</h3>
+						<div class="space-y-3">
+							<div class="glass-inner rounded-xl p-4">
+								<div class="flex items-center gap-2 mb-1.5">
+									<code class="text-neon-cyan font-mono text-sm font-semibold">search_code</code>
+								</div>
+								<p class="text-sm text-text-body leading-relaxed">
+									Search source code with regex patterns. Supports file type filtering, case sensitivity, context lines around matches, and pagination via <code class="text-neon-cyan font-mono text-xs">search_id</code>.
+								</p>
+							</div>
+							<div class="glass-inner rounded-xl p-4">
+								<div class="flex items-center gap-2 mb-1.5">
+									<code class="text-neon-cyan font-mono text-sm font-semibold">list_extensions</code>
+								</div>
+								<p class="text-sm text-text-body leading-relaxed">
+									Browse available extensions by repository type (plugins, themes, cores). Supports search filtering and pagination.
+								</p>
+							</div>
+							<div class="glass-inner rounded-xl p-4">
+								<div class="flex items-center gap-2 mb-1.5">
+									<code class="text-neon-cyan font-mono text-sm font-semibold">get_extension_details</code>
+								</div>
+								<p class="text-sm text-text-body leading-relaxed">
+									Get detailed metadata for a specific plugin, theme, or core release. Returns version, description, WP/PHP requirements, ratings, install counts, and index status.
+								</p>
+							</div>
+							<div class="glass-inner rounded-xl p-4">
+								<div class="flex items-center gap-2 mb-1.5">
+									<code class="text-neon-cyan font-mono text-sm font-semibold">get_repo_stats</code>
+								</div>
+								<p class="text-sm text-text-body leading-relaxed">
+									Get index statistics for one or all repository types. Shows total extensions, indexed count, and coverage percentage.
+								</p>
+							</div>
+							<div class="glass-inner rounded-xl p-4">
+								<div class="flex items-center gap-2 mb-1.5">
+									<code class="text-neon-cyan font-mono text-sm font-semibold">list_files</code>
+								</div>
+								<p class="text-sm text-text-body leading-relaxed">
+									List all files in an indexed extension's source tree. Supports an optional glob pattern to filter by filename (e.g. <code class="text-neon-cyan font-mono text-xs">*.php</code>).
+								</p>
+							</div>
+							<div class="glass-inner rounded-xl p-4">
+								<div class="flex items-center gap-2 mb-1.5">
+									<code class="text-neon-cyan font-mono text-sm font-semibold">read_file</code>
+								</div>
+								<p class="text-sm text-text-body leading-relaxed">
+									Read the contents of a file from an indexed extension's source tree. Returns numbered lines with support for <code class="text-neon-cyan font-mono text-xs">start_line</code> and <code class="text-neon-cyan font-mono text-xs">max_lines</code> parameters for reading sections of large files.
+								</p>
+							</div>
+						</div>
+					</div>
+					<!-- Remote HTTP -->
+					<div class="mb-6">
+						<h3 class="text-xl font-semibold text-neon-purple mb-3">Remote Server (Recommended)</h3>
+						<p class="text-sm text-text-body leading-relaxed mb-3">
+							Veloria hosts a remote MCP endpoint at <code class="text-neon-cyan font-mono text-xs">https://veloria.dev/mcp</code> using Streamable HTTP transport. No local dependencies required — just point your client at the URL.
+						</p>
+					</div>
+					<!-- Claude Desktop -->
+					<div class="mb-6">
+						<h3 class="text-xl font-semibold text-neon-purple mb-3">Claude Desktop</h3>
+						<p class="text-sm text-text-body leading-relaxed mb-3">
+							Add the following to your Claude Desktop configuration file:
+						</p>
+						<div class="docs-code mb-3">
+							<code>
+								@templ.Raw(`{"mcpServers": {"veloria": {"type": "streamable-http", "url": "https://veloria.dev/mcp"}}}`)
+							</code>
+						</div>
+						<p class="text-sm text-text-muted leading-relaxed">
+							Config file location: <code class="text-neon-cyan font-mono text-xs">~/Library/Application Support/Claude/claude_desktop_config.json</code> on macOS or <code class="text-neon-cyan font-mono text-xs">%APPDATA%\Claude\claude_desktop_config.json</code> on Windows.
+						</p>
+					</div>
+					<!-- Claude Code -->
+					<div class="mb-6">
+						<h3 class="text-xl font-semibold text-neon-purple mb-3">Claude Code</h3>
+						<p class="text-sm text-text-body leading-relaxed mb-3">
+							Register the MCP server with the Claude Code CLI:
+						</p>
+						<div class="docs-code mb-3"><code>claude mcp add --transport http veloria https://veloria.dev/mcp</code></div>
+					</div>
+					<!-- VS Code Copilot -->
+					<div class="mb-6">
+						<h3 class="text-xl font-semibold text-neon-purple mb-3">VS Code Copilot</h3>
+						<p class="text-sm text-text-body leading-relaxed mb-3">
+							Add the following to your <code class="text-neon-cyan font-mono text-xs">.vscode/settings.json</code>:
+						</p>
+						<div class="docs-code mb-3">
+							<code>
+								@templ.Raw(`{"mcp": {"servers": {"veloria": {"type": "http", "url": "https://veloria.dev/mcp"}}}}`)
+							</code>
+						</div>
+					</div>
+					<!-- Note -->
+					<div class="glass-inner rounded-xl p-4">
+						<p class="text-sm text-text-muted leading-relaxed">
+							<strong class="text-neon-gold font-semibold">Note:</strong> The remote server at <code class="text-neon-cyan font-mono text-xs">https://veloria.dev/mcp</code> requires no API keys or additional configuration.
+						</p>
+					</div>
+				</section>
+			</div>
+			<!-- Desktop sidebar TOC -->
+			<aside class="hidden lg:block shrink-0 w-44 lg:self-stretch">
+				<nav class="sticky top-24" aria-label="Table of contents">
+					<ul class="docs-toc flex flex-col gap-1 text-lg">
+						<li><a href="#search" class="docs-toc-link" data-section="search">Search Guide</a></li>
+						<li><a href="#regex" class="docs-toc-link" data-section="regex">Regex Reference</a></li>
+						<li><a href="#examples" class="docs-toc-link" data-section="examples">Example Patterns</a></li>
+						<li><a href="#options" class="docs-toc-link" data-section="options">Search Options</a></li>
+						<li><a href="#mcp" class="docs-toc-link" data-section="mcp">MCP Integration</a></li>
+					</ul>
+				</nav>
+			</aside>
+		</div>
+		<script>
+			(function() {
+				var links = document.querySelectorAll('.docs-toc-link');
+				var sections = Array.from(links).map(function(l) {
+					return document.getElementById(l.dataset.section);
+				}).filter(Boolean);
+				if (!sections.length) return;
+
+				var observer = new IntersectionObserver(function(entries) {
+					entries.forEach(function(e) {
+						if (e.isIntersecting) {
+							links.forEach(function(l) { l.classList.remove('active'); });
+							var active = document.querySelector('.docs-toc-link[data-section="' + e.target.id + '"]');
+							if (active) active.classList.add('active');
+						}
+					});
+				}, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+
+				sections.forEach(function(s) { observer.observe(s); });
+			})();
+		</script>
+	}
+}

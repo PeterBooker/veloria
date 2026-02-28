@@ -1,0 +1,12 @@
+package icon
+
+templ Repo(repoType string, size int) {
+	switch repoType {
+		case "plugins":
+			@Plugin(size)
+		case "themes":
+			@Theme(size)
+		case "cores":
+			@Core(size)
+	}
+}

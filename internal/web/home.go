@@ -5,6 +5,7 @@ import (
 
 	"veloria/internal/auth"
 	searchmodel "veloria/internal/search/model"
+	"veloria/internal/ui/page"
 )
 
 // HomePage renders the home page with search form.
@@ -28,10 +29,7 @@ func HomePage(d *Deps) http.HandlerFunc {
 			RecentSearches: summaries,
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "home.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, page.Home(data))
 	}
 }
 
@@ -54,9 +52,6 @@ func LoginPage(d *Deps) http.HandlerFunc {
 			Error:    r.URL.Query().Get("error"),
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "login.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, page.Login(data))
 	}
 }

@@ -16,6 +16,7 @@ import (
 	api "veloria/internal/api"
 	"veloria/internal/auth"
 	searchmodel "veloria/internal/search/model"
+	uipage "veloria/internal/ui/page"
 	"veloria/internal/web"
 )
 
@@ -149,10 +150,7 @@ func ReportsPage(d *web.Deps) http.HandlerFunc {
 			TotalPages: totalPages,
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "reports.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, uipage.Reports(data))
 	}
 }
 

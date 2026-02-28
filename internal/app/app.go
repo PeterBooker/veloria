@@ -29,7 +29,6 @@ import (
 	"veloria/internal/storage"
 	"veloria/internal/tasks"
 	"veloria/internal/web"
-	"veloria/templates"
 )
 
 const fmtDBString = "host=%s user=%s password=%s dbname=%s port=%d sslmode=%s TimeZone=%s connect_timeout=%d"
@@ -128,12 +127,6 @@ func New(ctx context.Context) (*App, error) {
 		}
 	}
 
-	// Initialize templates and web handler
-	tmpl, err := web.NewTemplates(templates.FS)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load templates: %w", err)
-	}
-
 	searchEnabled := a.DB != nil && a.S3 != nil && a.Manager != nil
 	searchDisabledReason := ""
 	if !searchEnabled {
@@ -147,7 +140,7 @@ func New(ctx context.Context) (*App, error) {
 		}
 		l.Warn().Msgf("Search disabled: %s", searchDisabledReason)
 	}
-	deps := web.NewDeps(tmpl, a.DB, a.Manager, a.Manager, a.Manager, a.Manager, a.S3, appCache, c, searchEnabled, searchDisabledReason)
+	deps := web.NewDeps(a.DB, a.Manager, a.Manager, a.Manager, a.Manager, a.S3, appCache, c, searchEnabled, searchDisabledReason)
 
 	// Initialize OG image generator
 	ogGen, err := ogimage.New(assets.FS)

@@ -1,5 +1,5 @@
 @import "tailwindcss" source(none);
-@source "../../templates/**/*.html";
+@source "../../internal/ui/**/*.templ";
 @source "../../internal/**/*.go";
 
 /* ── Theme tokens ── */
@@ -19,6 +19,17 @@
     --color-neon-purple: #b44dff;
 
     --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+    /* ── Semantic text colors ── */
+    --color-text-bright: #f4f6f9;
+    --color-text-active: #eef1f6;
+    --color-text-body: #cdd5e0;
+    --color-text-muted: #7a8394;
+    --color-text-subtle: #4e5666;
+
+    /* ── Semantic background colors ── */
+    --color-bg-base: #080a14;
+    --color-bg-card: #0d0f1a;
 
     /* ── Minimum 18px font size ── */
     --text-xs: 1.125rem;
@@ -44,15 +55,15 @@
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 18px;
-    background-color: #080a14;
-    color: #cdd5e0;
+    background-color: var(--color-bg-base);
+    color: var(--color-text-body);
 }
 
 ::selection { background: rgba(0,229,255,0.2); color: #f4f6f9; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
-input::placeholder { color: #4e5666; }
+input::placeholder { color: var(--color-text-subtle); }
 select { color-scheme: dark; }
 
 /* ── Clickable elements ── */
@@ -135,13 +146,13 @@ input[type="checkbox"], input[type="radio"] {
 .nav-link {
     font-size: 18px; font-weight: 400; cursor: pointer;
     padding: 6px 12px; border-radius: 8px;
-    color: #7a8394; background: transparent;
+    color: var(--color-text-muted); background: transparent;
     position: relative; transition: color 0.15s;
     text-decoration: none; display: inline-block;
 }
-.nav-link:hover { color: #cdd5e0; }
+.nav-link:hover { color: var(--color-text-body); }
 .nav-link-active {
-    font-weight: 600; color: #eef1f6;
+    font-weight: 600; color: var(--color-text-active);
     background: rgba(255,255,255,0.06);
 }
 .nav-link-active::after {
@@ -306,17 +317,31 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
     letter-spacing: 0.3px;
 }
 
+/* ── Ghost button ── */
+.btn-ghost {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 8px;
+    font-size: 18px; font-weight: 500;
+    color: var(--color-text-body);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.10);
+    transition: background 0.15s, border-color 0.15s;
+}
+.btn-ghost:hover {
+    background: rgba(255,255,255,0.08);
+}
+
 /* ── Docs page styling ── */
 .docs-section { scroll-margin-top: 80px; }
 .docs-toc-link {
     display: block;
     padding: 6px 12px;
-    color: #7a8394;
+    color: var(--color-text-muted);
     border-left: 2px solid transparent;
     border-radius: 0 6px 6px 0;
     transition: all 0.15s ease;
 }
-.docs-toc-link:hover { color: #cdd5e0; background: rgba(255,255,255,0.04); }
+.docs-toc-link:hover { color: var(--color-text-body); background: rgba(255,255,255,0.04); }
 .docs-toc-link.active {
     color: #00e5ff;
     border-left-color: #00e5ff;
@@ -333,7 +358,7 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
     padding: 16px 20px;
     font-size: 18px;
     line-height: 1.65;
-    color: #cdd5e0;
+    color: var(--color-text-body);
     white-space: pre;
 }
 .docs-table {
@@ -345,7 +370,7 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
     padding: 10px 16px;
     font-size: 18px;
     font-weight: 600;
-    color: #7a8394;
+    color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 1px solid rgba(255,255,255,0.10);

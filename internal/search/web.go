@@ -20,6 +20,8 @@ import (
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
 	typespb "veloria/internal/types"
+	uipage "veloria/internal/ui/page"
+	"veloria/internal/ui/partial"
 	"veloria/internal/web"
 )
 
@@ -87,11 +89,8 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			}
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		if err := d.Templates.Render(w, "search.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, uipage.SearchView(data))
 	}
 }
 
@@ -195,10 +194,7 @@ func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
 			Search:     r.URL.Query().Get("search"),
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "search-extensions.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, partial.SearchExtensions(data))
 	}
 }
 
@@ -274,12 +270,12 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			if d.SearchDisabledReason != "" {
 				reason = d.SearchDisabledReason
 			}
-			renderSearchError(d, w, reason)
+			renderSearchError(d, w, r, reason)
 			return
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 		if err := r.ParseForm(); err != nil {
-			renderSearchError(d, w, "Failed to parse form")
+			renderSearchError(d, w, r, "Failed to parse form")
 			return
 		}
 
@@ -291,7 +287,7 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 		excludeMinified := r.FormValue("exclude_minified") == "on"
 
 		if term == "" {
-			renderSearchError(d, w, "Search term is required")
+			renderSearchError(d, w, r, "Search term is required")
 			return
 		}
 		if repo == "" {
@@ -322,7 +318,7 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			s.UserID = &currentUser.ID
 		}
 		if err := d.DB.Create(&s).Error; err != nil {
-			renderSearchError(d, w, "Failed to create search")
+			renderSearchError(d, w, r, "Failed to create search")
 			return
 		}
 
@@ -373,12 +369,8 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 	})
 }
 
-func renderSearchError(d *web.Deps, w http.ResponseWriter, errMsg string) {
-	data := web.SearchResultsData{Error: errMsg}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Templates.Render(w, "search_results.html", data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+func renderSearchError(d *web.Deps, w http.ResponseWriter, r *http.Request, errMsg string) {
+	d.RenderComponent(w, r, partial.SearchError(errMsg))
 }
 
 // ListPage renders the public searches list page.
@@ -426,10 +418,7 @@ func ListPage(d *web.Deps) http.HandlerFunc {
 			TotalPages: totalPages,
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "searches.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, uipage.Searches(data))
 	}
 }
 
@@ -484,10 +473,7 @@ func MyListPage(d *web.Deps) http.HandlerFunc {
 			TotalPages: totalPages,
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "my_searches.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, uipage.MySearches(data))
 	}
 }
 
@@ -553,10 +539,7 @@ func ExtensionResultsPage(d *web.Deps) http.HandlerFunc {
 			Result:     match,
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := d.Templates.Render(w, "search_extension_results.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+		d.RenderComponent(w, r, partial.SearchExtensionResults(data))
 	}
 }
 
@@ -575,54 +558,51 @@ func ContextPage(d *web.Deps) http.HandlerFunc {
 		}
 		if d.Sources == nil {
 			data.Error = "Search context is unavailable."
-			renderSearchContext(d, w, data)
+			renderSearchContext(d, w, r, data)
 			return
 		}
 
 		lineNumber, err := strconv.Atoi(lineStr)
 		if err != nil || lineNumber <= 0 {
 			data.Error = "Invalid line number."
-			renderSearchContext(d, w, data)
+			renderSearchContext(d, w, r, data)
 			return
 		}
 
 		if repoType == "" || slug == "" || filename == "" {
 			data.Error = "Missing context details."
-			renderSearchContext(d, w, data)
+			renderSearchContext(d, w, r, data)
 			return
 		}
 
 		sourceDir, err := resolveSourceDir(d, repoType, slug)
 		if err != nil {
 			data.Error = err.Error()
-			renderSearchContext(d, w, data)
+			renderSearchContext(d, w, r, data)
 			return
 		}
 
 		fullPath, err := web.SafeJoin(sourceDir, filename)
 		if err != nil {
 			data.Error = "Invalid file path."
-			renderSearchContext(d, w, data)
+			renderSearchContext(d, w, r, data)
 			return
 		}
 
 		lines, err := web.ReadContextLines(fullPath, lineNumber, 4)
 		if err != nil {
 			data.Error = "Unable to load file context."
-			renderSearchContext(d, w, data)
+			renderSearchContext(d, w, r, data)
 			return
 		}
 
 		data.Lines = lines
-		renderSearchContext(d, w, data)
+		renderSearchContext(d, w, r, data)
 	}
 }
 
-func renderSearchContext(d *web.Deps, w http.ResponseWriter, data web.SearchContextData) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := d.Templates.Render(w, "search_context.html", data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+func renderSearchContext(d *web.Deps, w http.ResponseWriter, r *http.Request, data web.SearchContextData) {
+	d.RenderComponent(w, r, partial.SearchContext(data))
 }
 
 func resolveSourceDir(d *web.Deps, repoType string, slug string) (string, error) {

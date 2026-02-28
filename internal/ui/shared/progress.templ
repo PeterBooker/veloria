@@ -1,0 +1,21 @@
+package shared
+
+import "strconv"
+
+templ NeonProgress(percent int) {
+	<div class="w-full h-2 rounded-full bg-white/5 border border-white/10 overflow-hidden">
+		<div
+			class="h-full rounded-full bg-brand-500 transition-all duration-500 ease-out"
+			style={ "width: " + strconv.Itoa(percent) + "%" }
+		></div>
+	</div>
+}
+
+templ GradientProgress(percent int) {
+	<div class="neon-progress">
+		<div
+			class="neon-progress-bar"
+			style={ "width: " + strconv.Itoa(percent) + "%; background: linear-gradient(135deg, #ff2d7b, #b44dff)" }
+		></div>
+	</div>
+}

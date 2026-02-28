@@ -44,6 +44,9 @@ node_modules
 assets/static/css/
 assets/static/js/
 
+# Generated templ code (built via go generate)
+*_templ.go
+
 # AI files.
 ./claude
 ./codex

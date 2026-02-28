@@ -1,0 +1,102 @@
+package partial
+
+import (
+	"fmt"
+	"strconv"
+
+	"veloria/internal/ui"
+	"veloria/internal/ui/badge"
+)
+
+func searchExtensionsURL(searchID string, page int, search string) string {
+	url := "/search/" + searchID + "/extensions?page=" + strconv.Itoa(page)
+	if search != "" {
+		url += "&search=" + search
+	}
+	return url
+}
+
+func extDetailOnclick(searchID, slug string) templ.Attributes {
+	return templ.Attributes{"onclick": "toggleExtDetail(this, '/search/" + searchID + "/extension/" + slug + "', 'ext-detail-" + slug + "')"}
+}
+
+templ SearchExtensions(data ui.SearchExtensionsData) {
+	if len(data.Extensions) > 0 {
+		<div class="flex flex-col gap-3">
+			for _, ext := range data.Extensions {
+				<!-- Extension Row -->
+				<article class="rounded-xl overflow-hidden bg-[rgba(0,0,0,0.4)] border border-white/[0.08] hover:border-white/[0.14] transition-colors">
+					<!-- Clickable Header -->
+					<div
+						class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 lg:px-5 py-3.5 bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer"
+						{ extDetailOnclick(data.SearchID, ext.Slug)... }
+					>
+						<div class="flex items-center gap-3 text-text-body min-w-0">
+							<svg data-chevron class="w-4 h-4 text-text-subtle shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="9 18 15 12 9 6"></polyline>
+							</svg>
+							<div class="min-w-0">
+								<span class="text-text-bright text-sm lg:text-base font-semibold block truncate">{ ext.Name }</span>
+								<span class="text-text-subtle text-xs font-mono block truncate">{ ext.Slug }/{ ext.Version }</span>
+							</div>
+						</div>
+						<div class="flex flex-wrap items-center gap-2.5 sm:gap-4 pl-7 sm:pl-0">
+							@badge.RepoType(data.SearchRepo)
+							if ext.ActiveInstalls > 0 {
+								<span class="text-text-muted text-xs whitespace-nowrap">{ ui.FormatInstalls(ext.ActiveInstalls) } installs</span>
+							}
+							<span class="text-neon-cyan text-sm font-bold whitespace-nowrap">{ ui.FormatNumber(ext.TotalMatches) } matches</span>
+						</div>
+					</div>
+					<!-- Detail Container (hidden until header clicked) -->
+					<div data-detail class="hidden border-t border-white/[0.08]">
+						<div id={ "ext-detail-" + ext.Slug }>
+							<div class="flex items-center justify-center gap-2 py-8 text-text-subtle">
+								<div class="w-4 h-4 border-2 border-white/[0.06] border-t-neon-pink rounded-full animate-spin"></div>
+								<span class="text-xs">Loading matches...</span>
+							</div>
+						</div>
+					</div>
+				</article>
+			}
+		</div>
+		<!-- Pagination -->
+		if data.TotalPages > 1 {
+			<div class="mt-4 flex items-center justify-between">
+				<p class="text-sm text-text-muted">
+					{ fmt.Sprintf("Page %d of %d", data.Page, data.TotalPages) }
+				</p>
+				<div class="flex items-center gap-2">
+					if data.Page > 1 {
+						<button
+							hx-get={ searchExtensionsURL(data.SearchID, data.Page-1, data.Search) }
+							hx-target="#search-extensions"
+							hx-swap="innerHTML"
+							class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+						>
+							Previous
+						</button>
+					}
+					if data.Page < data.TotalPages {
+						<button
+							hx-get={ searchExtensionsURL(data.SearchID, data.Page+1, data.Search) }
+							hx-target="#search-extensions"
+							hx-swap="innerHTML"
+							class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+						>
+							Next
+						</button>
+					}
+				</div>
+			</div>
+		}
+	} else {
+		<div class="text-center py-12">
+			if data.Search != "" {
+				<p class="text-text-muted text-sm">No extensions matching "{ data.Search }".</p>
+			} else {
+				<p class="text-text-muted text-sm">No matching extensions found.</p>
+			}
+		</div>
+	}
+}
