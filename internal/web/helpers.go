@@ -2,6 +2,7 @@ package web
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,8 @@ import (
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
 )
+
+var gzipMagicHeader = [2]byte{0x1f, 0x8b}
 
 // BuildSearchSummary builds a SearchSummary from a Search record.
 // Match counts are read directly from the DB columns populated at search completion.
@@ -150,10 +153,12 @@ func ReadContextLines(path string, lineNumber int, radius int) (lines []SearchCo
 	// Detect gzip by peeking at the first two bytes.
 	var r io.Reader = file
 	var header [2]byte
-	if n, _ := io.ReadFull(file, header[:]); n == 2 && header[0] == 0x1f && header[1] == 0x8b {
-		if _, serr := file.Seek(0, io.SeekStart); serr != nil {
-			return nil, serr
-		}
+	n, _ := io.ReadFull(file, header[:])
+	isGzip := n == len(header) && bytes.Equal(header[:], gzipMagicHeader[:])
+	if _, serr := file.Seek(0, io.SeekStart); serr != nil {
+		return nil, serr
+	}
+	if isGzip {
 		gz, gerr := gzip.NewReader(file)
 		if gerr != nil {
 			return nil, gerr
@@ -164,10 +169,6 @@ func ReadContextLines(path string, lineNumber int, radius int) (lines []SearchCo
 			}
 		}()
 		r = gz
-	} else {
-		if _, serr := file.Seek(0, io.SeekStart); serr != nil {
-			return nil, serr
-		}
 	}
 
 	start := max(lineNumber-radius, 1)

@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -54,6 +55,13 @@ type SearchService interface {
 // concurrent MCP tool calls could overload the trigram search engine.
 var searchSem = make(chan struct{}, 1)
 
+var (
+	// gzipMagicHeader identifies gzip-compressed files.
+	gzipMagicHeader = [2]byte{0x1f, 0x8b}
+	// contextLinesTable converts validated context line counts to uint without casting.
+	contextLinesTable = [maxContext + 1]uint{0, 1, 2, 3, 4, 5}
+)
+
 func acquireSearchSlot(ctx context.Context) error {
 	select {
 	case searchSem <- struct{}{}:
@@ -65,6 +73,10 @@ func acquireSearchSlot(ctx context.Context) error {
 
 func releaseSearchSlot() {
 	<-searchSem
+}
+
+func contextLinesToUint(v int) uint {
+	return contextLinesTable[clampInt(v, 0, maxContext)]
 }
 
 // DirectService implements SearchService using the Manager, DB, and S3 directly.
@@ -90,7 +102,7 @@ func (s *DirectService) Search(ctx context.Context, params SearchParams) (string
 		FileMatch:        params.FileMatch,
 		ExcludeFileMatch: params.ExcludeFileMatch,
 		CaseInsensitive:  !params.CaseSensitive,
-		LinesOfContext:   uint(max(params.ContextLines, 0)), //nolint:gosec // clamped to 0-5 by caller
+		LinesOfContext:   contextLinesToUint(params.ContextLines),
 	})
 	if err != nil {
 		return "", nil, fmt.Errorf("search failed: %w", err)
@@ -446,20 +458,18 @@ func readFileRange(path string, startLine, maxLines int) ([]string, int, error) 
 
 	// Detect gzip by magic bytes.
 	var header [2]byte
-	if n, _ := io.ReadFull(file, header[:]); n == 2 && header[0] == 0x1f && header[1] == 0x8b {
-		if _, err := file.Seek(0, io.SeekStart); err != nil {
-			return nil, 0, err
-		}
+	n, _ := io.ReadFull(file, header[:])
+	isGzip := n == len(header) && bytes.Equal(header[:], gzipMagicHeader[:])
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil, 0, err
+	}
+	if isGzip {
 		gz, err := gzip.NewReader(file)
 		if err != nil {
 			return nil, 0, err
 		}
 		defer gz.Close()
 		r = gz
-	} else {
-		if _, err := file.Seek(0, io.SeekStart); err != nil {
-			return nil, 0, err
-		}
 	}
 
 	if maxLines <= 0 || maxLines > maxReadLines {
