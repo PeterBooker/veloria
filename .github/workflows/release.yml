@@ -66,16 +66,13 @@ jobs:
             chmod +x veloria.new
             chmod +x veloria-converter.new
 
-            if [ -f veloria ]; then
-              cp veloria veloria.prev
-              cp veloria-converter veloria-converter.prev
-            fi
+            # Back up current binaries
+            for bin in veloria veloria-converter; do
+              [ -f "$bin" ] && cp "$bin" "$bin.prev"
+            done
 
             mv veloria.new veloria
             mv veloria-converter.new veloria-converter
-
-            # Clean up old separate binaries from previous releases
-            rm -f veloria-indexer veloria-migrate
 
             sudo systemctl restart veloria
             sleep 3
