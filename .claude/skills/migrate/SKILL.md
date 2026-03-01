@@ -54,17 +54,17 @@ Run all pending migrations.
 
 1. **Check current status**
    ```bash
-   go run ./cmd/veloria-migrate status
+   go run ./cmd/veloria migrate status
    ```
 
 2. **Run migrations**
    ```bash
-   go run ./cmd/veloria-migrate up
+   go run ./cmd/veloria migrate up
    ```
 
 3. **Verify success**
    ```bash
-   go run ./cmd/veloria-migrate status
+   go run ./cmd/veloria migrate status
    ```
 
 ### down
@@ -75,7 +75,7 @@ Rollback the last migration.
 
 2. **Run rollback**
    ```bash
-   go run ./cmd/veloria-migrate down
+   go run ./cmd/veloria migrate down
    ```
 
 3. **Verify rollback** by checking status again
@@ -85,7 +85,7 @@ Rollback the last migration.
 Show current migration status.
 
 ```bash
-go run ./cmd/veloria-migrate status
+go run ./cmd/veloria migrate status
 ```
 
 Display:

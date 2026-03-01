@@ -29,10 +29,8 @@ cd veloria
 # Build frontend assets (Tailwind CSS, htmx, ECharts)
 go generate ./assets/...
 
-# Build the binaries
+# Build the binary
 go build -o veloria ./cmd/veloria
-go build -o veloria-indexer ./cmd/veloria-indexer
-go build -o veloria-migrations ./cmd/veloria-migrate
 ```
 
 ### Configuration
@@ -59,9 +57,9 @@ See [Configuration Reference](docs/configuration.md) for all options.
 docker compose up -d
 
 # Run database migrations
-./veloria-migrations up
+./veloria migrate up
 
-# Run the server
+# Run the server (default command)
 ./veloria
 ```
 
@@ -90,9 +88,7 @@ The core component exposes a REST API, which is used by the frontend.
 ```
 veloria/
 ├── cmd/
-│   ├── veloria/            # Main API server
-│   ├── veloria-indexer/    # Indexing utility
-│   └── veloria-migrate/    # Database migration source (build as veloria-migrations)
+│   └── veloria/            # Single binary (subcommands: serve, index, migrate, version)
 ├── internal/
 │   ├── api/               # HTTP handlers
 │   ├── config/            # Configuration

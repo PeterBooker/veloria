@@ -60,7 +60,7 @@ type ExtensionStore[T Indexable] struct {
 }
 
 // IndexTask represents a single indexing operation ready to execute.
-// The Run function contains all the work: invoking veloria-indexer,
+// The Run function contains all the work: invoking the index subcommand,
 // opening the resulting index, and swapping it into the repository.
 // It returns nil on success or an error describing the failure.
 type IndexTask struct {
@@ -571,17 +571,23 @@ type IndexerResult struct {
 	Stats     *ExtractStats
 }
 
-// runIndexer executes the veloria-indexer command and returns the index path and stats.
+// runIndexer executes the "veloria index" subcommand as a subprocess and returns the index path and stats.
 func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*IndexerResult, error) {
 	ctx, cancel := context.WithTimeout(r.ctx, IndexTimeout)
 	defer cancel()
 
+	self, err := os.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve executable path: %w", err)
+	}
+
 	cmd := exec.CommandContext( // #nosec G204 -- args are from internal DB, not user input
 		ctx,
-		"veloria-indexer",
-		"-repo="+string(r.repoType),
-		"-slug="+slug,
-		"-zipurl="+downloadLink,
+		self,
+		"index",
+		"--repo="+string(r.repoType),
+		"--slug="+slug,
+		"--zipurl="+downloadLink,
 	)
 
 	var stdout, stderr bytes.Buffer
@@ -591,7 +597,7 @@ func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*IndexerResul
 	if err := cmd.Run(); err != nil {
 		stderrStr := strings.TrimSpace(stderr.String())
 		// Exit code 2 is the structured signal for "download not found" from
-		// veloria-indexer, replacing the fragile stderr "404" string match.
+		// the index subcommand.
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
 			return nil, ErrDownloadNotFound

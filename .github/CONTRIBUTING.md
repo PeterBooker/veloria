@@ -25,8 +25,7 @@ Thanks for your interest in contributing.
    ```
 5. Run migrations and start the app:
    ```bash
-   go build -o veloria-migrations ./cmd/veloria-migrate
-   ./veloria-migrations up
+   go run ./cmd/veloria migrate up
    go run ./cmd/veloria
    ```
 

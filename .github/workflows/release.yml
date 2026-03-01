@@ -39,12 +39,10 @@ jobs:
         id: version
         run: echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
 
-      - name: Build deployment binaries
+      - name: Build deployment binary
         run: |
           LDFLAGS="-s -w -X veloria/internal/config.Version=${{ steps.version.outputs.version }}"
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria ./cmd/veloria
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria-indexer ./cmd/veloria-indexer
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria-migrate ./cmd/veloria-migrate
 
       - name: Deploy to production
         env:
@@ -58,24 +56,21 @@ jobs:
           ssh-keyscan -H "${HOST}" >> ~/.ssh/known_hosts
 
           rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria "${USER}@${HOST}:/opt/veloria/veloria.new"
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria-indexer "${USER}@${HOST}:/opt/veloria/veloria-indexer.new"
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria-migrate "${USER}@${HOST}:/opt/veloria/veloria-migrate.new"
 
           ssh -i ~/.ssh/deploy_key "${USER}@${HOST}" << 'ENDSSH'
             set -e
             cd /opt/veloria
 
-            chmod +x veloria.new veloria-indexer.new veloria-migrate.new
+            chmod +x veloria.new
 
-            for bin in veloria veloria-indexer veloria-migrate; do
-              if [ -f "$bin" ]; then
-                cp "$bin" "${bin}.prev"
-              fi
-            done
+            if [ -f veloria ]; then
+              cp veloria veloria.prev
+            fi
 
             mv veloria.new veloria
-            mv veloria-indexer.new veloria-indexer
-            mv veloria-migrate.new veloria-migrate
+
+            # Clean up old separate binaries from previous releases
+            rm -f veloria-indexer veloria-migrate
 
             sudo systemctl restart veloria
             sleep 3
