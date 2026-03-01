@@ -529,19 +529,34 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 			taskIE.LockUpdates()
 			defer taskIE.UnlockUpdates()
 
-			result, err := r.runIndexer(taskSlug, taskExt.GetDownloadLink())
+			primaryURL := taskExt.GetDownloadLink()
+			result, err := r.runIndexer(taskSlug, primaryURL)
 			if err != nil {
 				if errors.Is(err, ErrDownloadNotFound) {
-					if taskIE.HasIndex() {
-						r.l.Warn("Download not found, keeping existing index", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
-					} else {
-						r.l.Warn("Download not found, skipping", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
-						r.Unlist(taskSlug)
+					// Try wordpress.org fallback for mirrored packages.
+					fallbackURL := wordpressDownloadURL(r.repoType, taskSlug, taskExt.GetVersion())
+					if taskSource == SourceWordPress && fallbackURL != "" && fallbackURL != primaryURL {
+						r.l.Info("Primary download not found, trying wordpress.org fallback",
+							zap.String("type", string(r.repoType)),
+							zap.String("slug", taskSlug),
+							zap.String("fallback_url", fallbackURL),
+						)
+						result, err = r.runIndexer(taskSlug, fallbackURL)
 					}
-					return nil // graceful degradation, not a retryable error
 				}
-				r.l.Error("Indexer failed", zap.String("slug", taskSlug), zap.Error(err))
-				return fmt.Errorf("indexer failed for %s/%s: %w", r.repoType, taskSlug, err)
+				if err != nil {
+					if errors.Is(err, ErrDownloadNotFound) {
+						if taskIE.HasIndex() {
+							r.l.Warn("Download not found, keeping existing index", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
+						} else {
+							r.l.Warn("Download not found, skipping", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
+							r.Unlist(taskSlug)
+						}
+						return nil // graceful degradation, not a retryable error
+					}
+					r.l.Error("Indexer failed", zap.String("slug", taskSlug), zap.Error(err))
+					return fmt.Errorf("indexer failed for %s/%s: %w", r.repoType, taskSlug, err)
+				}
 			}
 
 			if result.Stats != nil {
@@ -562,6 +577,19 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 			r.l.Info("Successfully indexed", zap.String("slug", taskSlug))
 			return nil
 		},
+	}
+}
+
+// wordpressDownloadURL constructs a direct wordpress.org download URL for
+// plugins and themes. Used as a fallback when the AspireCloud mirror 404s.
+func wordpressDownloadURL(repoType ExtensionType, slug, version string) string {
+	switch repoType {
+	case TypePlugins:
+		return fmt.Sprintf("https://downloads.wordpress.org/plugin/%s.%s.zip", slug, version)
+	case TypeThemes:
+		return fmt.Sprintf("https://downloads.wordpress.org/theme/%s.%s.zip", slug, version)
+	default:
+		return ""
 	}
 }
 

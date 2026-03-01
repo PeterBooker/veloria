@@ -118,6 +118,41 @@ templ Repo(data ui.RepoData) {
 				}
 			</div>
 		}
+		<!-- Failed Indexing -->
+		if len(data.FailedEvents) > 0 {
+			<div class="glass-inner overflow-hidden mb-6">
+				<div class="px-6 py-4 border-b-medium">
+					<h2 class="text-xl font-semibold text-text-bright">Failed Indexing</h2>
+					<p class="text-sm text-text-muted">{ strconv.Itoa(len(data.FailedEvents)) + " recent failures" }</p>
+				</div>
+				<div class="overflow-x-auto">
+					<table class="w-full">
+						<thead style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
+							<tr>
+								<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body">Slug</th>
+								<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body">Error</th>
+								<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body whitespace-nowrap">Time</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, ev := range data.FailedEvents {
+								<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+									<td class="px-5 py-3">
+										<a href={ templ.SafeURL("/data-sources/" + data.RepoSummary.Repo + "/" + ev.Slug) } class="text-sm text-brand-600 hover:underline hover:underline-offset-2 font-medium transition-colors">{ ev.Slug }</a>
+									</td>
+									<td class="px-5 py-3 max-w-md">
+										<span class="text-sm text-text-muted truncate block" title={ ev.ErrorMessage }>{ ev.ErrorMessage }</span>
+									</td>
+									<td class="px-5 py-3 whitespace-nowrap">
+										<span class="text-sm text-text-subtle">{ ui.TimeAgo(ev.CreatedAt) }</span>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		}
 		<!-- Items List -->
 		<div class="glass-inner overflow-hidden">
 			<div class="px-6 py-4 flex items-center justify-between gap-4 border-b-medium">

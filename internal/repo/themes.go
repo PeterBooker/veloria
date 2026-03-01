@@ -65,7 +65,7 @@ func (t *Theme) GetSlug() string         { return t.Slug }
 func (t *Theme) GetSource() string       { return t.Source }
 func (t *Theme) GetName() string         { return html.UnescapeString(t.Name) }
 func (t *Theme) GetVersion() string      { return t.Version }
-func (t *Theme) GetDownloadLink() string { return t.DownloadLink }
+func (t *Theme) GetDownloadLink() string { return html.UnescapeString(t.DownloadLink) }
 func (t *Theme) GetActiveInstalls() int  { return t.ActiveInstalls }
 func (t *Theme) GetDownloaded() int      { return t.Downloaded }
 func (t *Theme) GetIndexedExtension() *IndexedExtension {

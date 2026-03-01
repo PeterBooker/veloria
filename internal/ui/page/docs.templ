@@ -22,6 +22,7 @@ templ Docs(pd ui.PageData) {
 						<li><a href="#examples" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">Example Patterns</a></li>
 						<li><a href="#options" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">Search Options</a></li>
 						<li><a href="#mcp" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">MCP Integration</a></li>
+						<li><a href="#self-hosting" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2 transition">Self-Hosting</a></li>
 					</ul>
 				</nav>
 				<!-- Search Guide -->
@@ -328,6 +329,74 @@ templ Docs(pd ui.PageData) {
 						</p>
 					</div>
 				</section>
+				<!-- Self-Hosting -->
+				<section id="self-hosting" class="docs-section">
+					<h2 class="text-2xl font-bold text-text-bright mb-3">Self-Hosting</h2>
+					<p class="text-lg text-text-body leading-relaxed mb-4">
+						Veloria is open source and can be self-hosted on your own infrastructure. This guide walks through setting up a production instance using Docker Compose for dependencies and the Veloria binary.
+					</p>
+					<div class="mb-6">
+						<h3 class="text-xl font-semibold text-neon-gold mb-3">Prerequisites</h3>
+						<div class="space-y-3">
+							<div class="glass-inner rounded-xl p-4">
+								<h4 class="text-sm font-semibold text-text-bright mb-1">Build tools</h4>
+								<p class="text-sm text-text-body leading-relaxed">
+									Go 1.26 or later and Node.js 22 or later are required to compile the binary and frontend assets.
+								</p>
+							</div>
+							<div class="glass-inner rounded-xl p-4">
+								<h4 class="text-sm font-semibold text-text-bright mb-1">Docker and Docker Compose</h4>
+								<p class="text-sm text-text-body leading-relaxed">
+									Used to run PostgreSQL and MinIO alongside the Veloria binary.
+								</p>
+							</div>
+							<div class="glass-inner rounded-xl p-4">
+								<h4 class="text-sm font-semibold text-text-bright mb-1">Git</h4>
+								<p class="text-sm text-text-body leading-relaxed">
+									For cloning the repository.
+								</p>
+							</div>
+						</div>
+					</div>
+					<div class="mb-6">
+						<h3 class="text-xl font-semibold text-neon-gold mb-3">1. Start Dependencies</h3>
+						<p class="text-sm text-text-body leading-relaxed mb-3">
+							Create a docker-compose.yml for the required services:
+						</p>
+						<div class="docs-code mb-3">
+							<code>
+								@templ.Raw(`services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: veloria
+      POSTGRES_PASSWORD: veloria
+      POSTGRES_DB: veloria
+    volumes:
+      - veloria-postgres:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - veloria-minio:/data
+
+volumes:
+  veloria-postgres:
+  veloria-minio:`)
+							</code>
+						</div>
+						<div class="docs-code mb-3"><code>docker compose up -d</code></div>
+					</div>
+					@docsSelfHostingSteps()
+				</section>
 			</div>
 			<!-- Desktop sidebar TOC -->
 			<aside class="hidden lg:block shrink-0 w-44 lg:self-stretch">
@@ -338,6 +407,7 @@ templ Docs(pd ui.PageData) {
 						<li><a href="#examples" class="docs-toc-link" data-section="examples">Example Patterns</a></li>
 						<li><a href="#options" class="docs-toc-link" data-section="options">Search Options</a></li>
 						<li><a href="#mcp" class="docs-toc-link" data-section="mcp">MCP Integration</a></li>
+						<li><a href="#self-hosting" class="docs-toc-link" data-section="self-hosting">Self-Hosting</a></li>
 					</ul>
 				</nav>
 			</aside>

@@ -90,6 +90,14 @@ func RepoPage(d *Deps) http.HandlerFunc {
 		pd.OG.Title = fmt.Sprintf("%s Repository - Veloria", title)
 		pd.OG.Description = fmt.Sprintf("Browse %d %s (%d indexed) in the Veloria code search index.", total, repoType, indexed)
 
+		var failedEvents []FailedIndexEvent
+		d.DB.Table("index_events").
+			Select("slug, error_message, created_at").
+			Where("repo_type = ? AND status = ?", repoType, "failed").
+			Order("created_at DESC").
+			Limit(50).
+			Scan(&failedEvents)
+
 		data := RepoData{
 			PageData:           pd,
 			RepoSummary:        BuildRepoSummary(repoType, title, total, indexed),
@@ -98,6 +106,7 @@ func RepoPage(d *Deps) http.HandlerFunc {
 			FileSize:           fileSize,
 			LargestBySize:      largestBySize,
 			LargestByFileCount: largestByFileCount,
+			FailedEvents:       failedEvents,
 		}
 
 		d.RenderComponent(w, r, page.Repo(data))

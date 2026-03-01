@@ -70,7 +70,7 @@ func (p *Plugin) GetSlug() string         { return p.Slug }
 func (p *Plugin) GetSource() string       { return p.Source }
 func (p *Plugin) GetName() string         { return html.UnescapeString(p.Name) }
 func (p *Plugin) GetVersion() string      { return p.Version }
-func (p *Plugin) GetDownloadLink() string { return p.DownloadLink }
+func (p *Plugin) GetDownloadLink() string { return html.UnescapeString(p.DownloadLink) }
 func (p *Plugin) GetActiveInstalls() int  { return p.ActiveInstalls }
 func (p *Plugin) GetDownloaded() int      { return p.Downloaded }
 func (p *Plugin) GetIndexedExtension() *IndexedExtension {

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"html"
 	"net/http"
 
@@ -24,7 +25,6 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			ID           uuid.UUID
 			Name         string
 			Version      string
-			DownloadLink string
 			FileCount    int
 			TotalSize    int64
 			LargestFiles []byte
@@ -32,7 +32,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 
 		var row coreRow
 		err := d.DB.Table("cores").
-			Select("id, name, version, zip_url AS download_link, file_count, total_size, largest_files").
+			Select("id, name, version, file_count, total_size, largest_files").
 			Where("version = ? AND deleted_at IS NULL", version).
 			Scan(&row).Error
 
@@ -56,7 +56,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			Name:         html.UnescapeString(row.Name),
 			Slug:         row.Version,
 			Version:      row.Version,
-			DownloadLink: row.DownloadLink,
+			DownloadLink: fmt.Sprintf("https://wordpress.org/wordpress-%s.zip", row.Version),
 			Indexed:      indexStatus[row.Version],
 			FileCount:    row.FileCount,
 			TotalSize:    row.TotalSize,
