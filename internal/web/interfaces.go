@@ -11,7 +11,7 @@ type SearchService interface {
 
 // ReindexService queues ad-hoc re-index tasks.
 type ReindexService interface {
-	SubmitReindex(repoType, slug string) bool
+	SubmitReindex(repoType, slug string) error
 }
 
 // SourceResolver locates the on-disk source directory for an extension.

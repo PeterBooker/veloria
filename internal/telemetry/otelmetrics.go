@@ -21,6 +21,14 @@ var (
 	SearchDuration     metric.Float64Histogram
 	MCPToolUseCount    metric.Int64Counter
 	MCPToolUseDuration metric.Float64Histogram
+
+	// Indexer metrics
+	IndexingTasksTotal     metric.Int64Counter
+	IndexingTaskDuration   metric.Float64Histogram
+	CircuitBreakerChanges  metric.Int64Counter
+	AdhocQueueLength       metric.Int64Gauge
+	ConsecutiveFailures    metric.Int64Gauge
+	LastSuccessfulUpdateTS metric.Float64Gauge
 )
 
 // InitMetrics registers all application metric instruments.
@@ -95,6 +103,49 @@ func InitMetrics() error {
 	MCPToolUseDuration, err = meter.Float64Histogram("mcp_tool_use_duration_seconds",
 		metric.WithDescription("Duration of MCP tool invocations."),
 		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	IndexingTasksTotal, err = meter.Int64Counter("indexing_tasks_total",
+		metric.WithDescription("Total number of indexing tasks by status and repo type."),
+	)
+	if err != nil {
+		return err
+	}
+
+	IndexingTaskDuration, err = meter.Float64Histogram("indexing_task_duration_seconds",
+		metric.WithDescription("Duration of individual indexing tasks."),
+		metric.WithUnit("s"),
+	)
+	if err != nil {
+		return err
+	}
+
+	CircuitBreakerChanges, err = meter.Int64Counter("circuit_breaker_state_changes_total",
+		metric.WithDescription("Number of circuit breaker state transitions."),
+	)
+	if err != nil {
+		return err
+	}
+
+	AdhocQueueLength, err = meter.Int64Gauge("indexer_adhoc_queue_length",
+		metric.WithDescription("Current number of pending ad-hoc reindex requests."),
+	)
+	if err != nil {
+		return err
+	}
+
+	ConsecutiveFailures, err = meter.Int64Gauge("datasource_consecutive_failures",
+		metric.WithDescription("Number of consecutive PrepareUpdates failures per data source."),
+	)
+	if err != nil {
+		return err
+	}
+
+	LastSuccessfulUpdateTS, err = meter.Float64Gauge("datasource_last_success_timestamp",
+		metric.WithDescription("Unix timestamp of last successful update per data source."),
 	)
 	if err != nil {
 		return err

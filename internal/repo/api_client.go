@@ -8,8 +8,12 @@ import (
 	"time"
 
 	gobreaker "github.com/sony/gobreaker/v2"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.uber.org/zap"
 
 	"veloria/internal/client"
+	"veloria/internal/telemetry"
 )
 
 // APIClient wraps the HTTP client, API key, and circuit breaker for
@@ -19,8 +23,9 @@ type APIClient struct {
 	breaker *gobreaker.CircuitBreaker[[]byte]
 }
 
-// NewAPIClient creates a new API client with the given API key.
-func NewAPIClient(apiKey string) *APIClient {
+// NewAPIClient creates a new API client with the given API key and logger.
+// The logger is used to report circuit breaker state transitions.
+func NewAPIClient(apiKey string, l *zap.Logger) *APIClient {
 	breaker := gobreaker.NewCircuitBreaker[[]byte](gobreaker.Settings{
 		Name:        "aspirecloud-api",
 		MaxRequests: 3,
@@ -29,11 +34,31 @@ func NewAPIClient(apiKey string) *APIClient {
 		ReadyToTrip: func(counts gobreaker.Counts) bool {
 			return counts.ConsecutiveFailures > 5
 		},
+		OnStateChange: func(name string, from, to gobreaker.State) {
+			l.Warn("Circuit breaker state change",
+				zap.String("name", name),
+				zap.String("from", from.String()),
+				zap.String("to", to.String()),
+			)
+			if telemetry.CircuitBreakerChanges != nil {
+				telemetry.CircuitBreakerChanges.Add(context.Background(), 1,
+					metric.WithAttributes(
+						attribute.String("name", name),
+						attribute.String("to_state", to.String()),
+					),
+				)
+			}
+		},
 	})
 	return &APIClient{
 		apiKey:  apiKey,
 		breaker: breaker,
 	}
+}
+
+// BreakerState returns the current circuit breaker state name.
+func (ac *APIClient) BreakerState() string {
+	return ac.breaker.State().String()
 }
 
 // FetchJSON fetches JSON from a WordPress/AspireCloud API URL, using

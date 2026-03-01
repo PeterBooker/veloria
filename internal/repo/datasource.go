@@ -12,7 +12,7 @@ type DataSource interface {
 	Stats() (total int, indexed int)
 	IndexStatus() map[string]bool
 	Search(term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error)
-	PrepareUpdates() []IndexTask
+	PrepareUpdates() ([]IndexTask, error)
 	ResumeUnindexed() []IndexTask
 	GetExtension(slug string) (Extension, bool)
 	MakeReindexTaskBySlug(slug string) (IndexTask, bool)

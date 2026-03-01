@@ -141,6 +141,13 @@ func downloadZip(u string) (string, func(), error) {
 		}
 	}()
 
+	if resp.StatusCode == http.StatusNotFound {
+		cleanup()
+		// Exit code 2 signals "download not found" to the calling server process,
+		// replacing the fragile stderr "404" string match.
+		log.Printf("download not found (404): %s", u)
+		os.Exit(2)
+	}
 	if resp.StatusCode != http.StatusOK {
 		cleanup()
 		return "", func() {}, &downloadError{status: resp.Status}

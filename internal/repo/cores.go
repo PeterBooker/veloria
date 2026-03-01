@@ -101,7 +101,7 @@ func (cr *CoreStore) Load() error {
 }
 
 // PrepareUpdates fetches pending core versions and returns IndexTasks for the shared worker pool.
-func (cr *CoreStore) PrepareUpdates() []IndexTask {
+func (cr *CoreStore) PrepareUpdates() ([]IndexTask, error) {
 	fetchFn := func() ([]*Core, error) {
 		cores, err := FetchCoreUpdates(cr.ctx, cr.c)
 		if err != nil {

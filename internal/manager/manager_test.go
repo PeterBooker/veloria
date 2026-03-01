@@ -89,8 +89,8 @@ func TestSearch_SortsByActiveInstalls(t *testing.T) {
 
 func TestSubmitReindex_UnknownType(t *testing.T) {
 	m := newTestManager(t)
-	if m.SubmitReindex("nonexistent", "slug") {
-		t.Error("expected SubmitReindex to return false for unknown type")
+	if err := m.SubmitReindex("nonexistent", "slug"); err == nil {
+		t.Error("expected SubmitReindex to return error for unknown type")
 	}
 }
 
@@ -103,8 +103,8 @@ func TestSubmitReindex_NotFound(t *testing.T) {
 	}
 
 	m := newTestManager(t, ds)
-	if m.SubmitReindex("plugins", "not-found") {
-		t.Error("expected SubmitReindex to return false for missing slug")
+	if err := m.SubmitReindex("plugins", "not-found"); err == nil {
+		t.Error("expected SubmitReindex to return error for missing slug")
 	}
 }
 
@@ -116,14 +116,14 @@ func TestSubmitReindex_Success(t *testing.T) {
 			return repo.IndexTask{
 				ExtensionType: repo.TypePlugins,
 				Slug:          slug,
-				Run:           func() { ran = true },
+				Run:           func() error { ran = true; return nil },
 			}, true
 		},
 	}
 
 	m := newTestManager(t, ds)
-	if !m.SubmitReindex("plugins", "test-plugin") {
-		t.Error("expected SubmitReindex to return true")
+	if err := m.SubmitReindex("plugins", "test-plugin"); err != nil {
+		t.Errorf("expected SubmitReindex to succeed, got: %v", err)
 	}
 	// The task is queued, not immediately run.
 	_ = ran
