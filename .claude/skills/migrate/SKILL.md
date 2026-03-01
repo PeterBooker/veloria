@@ -3,7 +3,7 @@ name: migrate
 description: Create and manage database migrations using goose. Use for schema changes, new tables, or index optimization.
 disable-model-invocation: true
 argument-hint: [create|up|down|status|validate] [name]
-allowed-tools: Bash(go run *, goose *, ls *), Read, Glob, Grep, Write
+allowed-tools: Bash(go install ./..., veloria *, goose *, ls *), Read, Glob, Grep, Write
 ---
 
 # Database Migration Management
@@ -52,19 +52,24 @@ Create a new migration file.
 
 Run all pending migrations.
 
-1. **Check current status**
+1. **Ensure binary is current**
    ```bash
-   go run ./cmd/veloria migrate status
+   go install ./...
    ```
 
-2. **Run migrations**
+2. **Check current status**
    ```bash
-   go run ./cmd/veloria migrate up
+   veloria migrate status
    ```
 
-3. **Verify success**
+3. **Run migrations**
    ```bash
-   go run ./cmd/veloria migrate status
+   veloria migrate up
+   ```
+
+4. **Verify success**
+   ```bash
+   veloria migrate status
    ```
 
 ### down
@@ -75,7 +80,7 @@ Rollback the last migration.
 
 2. **Run rollback**
    ```bash
-   go run ./cmd/veloria migrate down
+   veloria migrate down
    ```
 
 3. **Verify rollback** by checking status again
@@ -85,7 +90,7 @@ Rollback the last migration.
 Show current migration status.
 
 ```bash
-go run ./cmd/veloria migrate status
+veloria migrate status
 ```
 
 Display:

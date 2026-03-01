@@ -3,7 +3,7 @@ name: race-check
 description: Run Go race detector to find data races in concurrent code. Use after any change to mutexes, goroutines, or channels.
 disable-model-invocation: true
 argument-hint: [package-path]
-allowed-tools: Bash(go test *), Read, Glob, Grep
+allowed-tools: Bash(go install ./..., go test *), Read, Glob, Grep
 ---
 
 # Race Condition Detection
@@ -21,14 +21,19 @@ Run Go's race detector to identify data races in concurrent code.
    - If `$ARGUMENTS` specifies a package, use that
    - Otherwise, run on all packages with tests
 
-2. **Run race detector**
+2. **Ensure binary is current**
+   ```bash
+   go install ./...
+   ```
+
+3. **Run race detector**
    ```bash
    go test -race -timeout 5m $ARGUMENTS 2>&1
    ```
 
    Use extended timeout since race detection is slower.
 
-3. **Parse race detector output**
+4. **Parse race detector output**
 
    Look for patterns like:
    ```
@@ -38,20 +43,20 @@ Run Go's race detector to identify data races in concurrent code.
    Previous read at 0x... by goroutine M:
    ```
 
-4. **For each race detected, identify:**
+5. **For each race detected, identify:**
    - The memory address being accessed
    - Which goroutines are involved
    - The file and line numbers of conflicting accesses
    - The stack traces showing how each goroutine reached that point
 
-5. **Analyze the race**
+6. **Analyze the race**
 
    Read the identified source files and determine:
    - What data structure is being accessed unsafely
    - Whether it's a read-write or write-write race
    - What synchronization is missing or incorrect
 
-6. **Suggest fixes based on codebase patterns**
+7. **Suggest fixes based on codebase patterns**
 
    Veloria uses these synchronization patterns:
 
@@ -74,7 +79,7 @@ Run Go's race detector to identify data races in concurrent code.
    atomic.AddInt64(&counter, 1)
    ```
 
-7. **Report findings**
+8. **Report findings**
 
    For each race:
    ```

@@ -3,7 +3,7 @@ name: profile
 description: Run CPU and memory profiling with pprof to identify performance hotspots. Use when investigating high resource usage.
 disable-model-invocation: true
 argument-hint: [cpu|memory|all] [package-path]
-allowed-tools: Bash(go test *, go tool pprof *), Read, Glob, Grep, Write
+allowed-tools: Bash(go install ./..., go test *, go tool pprof *), Read, Glob, Grep, Write
 ---
 
 # CPU and Memory Profiling
@@ -22,12 +22,17 @@ Profile Go code to identify CPU hotspots and memory allocators using pprof.
    - `$ARGUMENTS[0]` or `$0`: Profile type (`cpu`, `memory`, or `all`)
    - `$ARGUMENTS[1]` or `$1`: Package path (defaults to `./...`)
 
-2. **Create profile output directory**
+2. **Ensure binary is current**
+   ```bash
+   go install ./...
+   ```
+
+3. **Create profile output directory**
    ```bash
    mkdir -p .profiles
    ```
 
-3. **Run profiling benchmarks**
+4. **Run profiling benchmarks**
 
    For CPU profiling:
    ```bash
@@ -39,7 +44,7 @@ Profile Go code to identify CPU hotspots and memory allocators using pprof.
    go test -memprofile=.profiles/mem.prof -bench=. $1 2>&1
    ```
 
-4. **Analyze CPU profile**
+5. **Analyze CPU profile**
    ```bash
    go tool pprof -top -cum .profiles/cpu.prof 2>&1 | head -30
    ```
@@ -49,7 +54,7 @@ Profile Go code to identify CPU hotspots and memory allocators using pprof.
    - Functions with high self time (computation hotspots)
    - Unexpected entries (potential optimization targets)
 
-5. **Analyze memory profile**
+6. **Analyze memory profile**
    ```bash
    go tool pprof -top -alloc_space .profiles/mem.prof 2>&1 | head -30
    ```
@@ -59,12 +64,12 @@ Profile Go code to identify CPU hotspots and memory allocators using pprof.
    - Functions with high allocation counts
    - Potential sources of GC pressure
 
-6. **Generate flamegraph data** (if requested)
+7. **Generate flamegraph data** (if requested)
    ```bash
    go tool pprof -raw .profiles/cpu.prof > .profiles/cpu.raw
    ```
 
-7. **Report findings**
+8. **Report findings**
 
    Structure the report as:
 
