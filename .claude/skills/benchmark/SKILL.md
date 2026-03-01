@@ -3,7 +3,7 @@ name: benchmark
 description: Run Go benchmarks and compare results to detect performance regressions. Use before and after performance-related changes.
 disable-model-invocation: true
 argument-hint: [package-path]
-allowed-tools: Bash(go test *), Read, Glob, Grep
+allowed-tools: Bash(go install ./..., go test *), Read, Glob, Grep
 ---
 
 # Performance Benchmarking
@@ -23,24 +23,29 @@ Run Go benchmarks to measure and compare performance. Flags regressions exceedin
    - Otherwise, find packages with `*_test.go` files containing `Benchmark` functions
    - Focus on performance-critical packages: `internal/index/`, `internal/repo/`, `internal/api/`
 
-2. **Run benchmarks**
+2. **Ensure binary is current**
+   ```bash
+   go install ./...
+   ```
+
+3. **Run benchmarks**
    ```bash
    go test -bench=. -benchmem -count=5 $ARGUMENTS 2>&1
    ```
    - Use `-count=5` for statistical reliability
    - Use `-benchmem` to track allocations
 
-3. **Parse and analyze results**
+4. **Parse and analyze results**
    For each benchmark, extract:
    - `ns/op` - Nanoseconds per operation
    - `B/op` - Bytes allocated per operation
    - `allocs/op` - Allocations per operation
 
-4. **Check for baseline comparison**
+5. **Check for baseline comparison**
    - Look for `.benchmark-baseline` file in project root
    - If `-compare` flag used and baseline exists, compare results
 
-5. **Report findings**
+6. **Report findings**
    Format results as a table:
    ```
    | Benchmark | ns/op | B/op | allocs/op | Change |
@@ -49,7 +54,7 @@ Run Go benchmarks to measure and compare performance. Flags regressions exceedin
 
    Flag any metric that regressed more than 10% with a warning.
 
-6. **Offer to save baseline**
+7. **Offer to save baseline**
    If no baseline exists or results improved, offer to save current results:
    ```bash
    go test -bench=. -benchmem -count=5 ./... > .benchmark-baseline
