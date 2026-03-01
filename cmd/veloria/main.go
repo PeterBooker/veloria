@@ -8,6 +8,7 @@ var cli struct {
 	Serve   ServeCmd   `cmd:"" default:"withargs" help:"Start the HTTP server (default)."`
 	Index   IndexCmd   `cmd:"" help:"Download, extract, and index a single extension."`
 	Migrate MigrateCmd `cmd:"" help:"Run database migrations."`
+	Wipe    WipeCmd    `cmd:"" help:"Wipe data from the database and storage."`
 	Version VersionCmd `cmd:"" help:"Print version information."`
 }
 

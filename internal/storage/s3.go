@@ -188,6 +188,27 @@ func (s *S3Client) DeleteResult(ctx context.Context, searchID string) error {
 	return nil
 }
 
+// DeleteAllResults removes all search result objects from the S3 bucket.
+// Returns the number of objects deleted.
+func (s *S3Client) DeleteAllResults(ctx context.Context) (int, error) {
+	objectsCh := s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{
+		Prefix:    "searches/",
+		Recursive: true,
+	})
+
+	deleted := 0
+	for obj := range objectsCh {
+		if obj.Err != nil {
+			return deleted, fmt.Errorf("failed to list objects: %w", obj.Err)
+		}
+		if err := s.client.RemoveObject(ctx, s.bucket, obj.Key, minio.RemoveObjectOptions{}); err != nil {
+			return deleted, fmt.Errorf("failed to delete %q: %w", obj.Key, err)
+		}
+		deleted++
+	}
+	return deleted, nil
+}
+
 func (s *S3Client) readZstdObject(ctx context.Context, key string) (data []byte, err error) {
 	obj, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if err != nil {
