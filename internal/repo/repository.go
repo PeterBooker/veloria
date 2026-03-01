@@ -555,7 +555,7 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 						return nil // graceful degradation, not a retryable error
 					}
 					r.l.Error("Indexer failed", zap.String("slug", taskSlug), zap.Error(err))
-					return fmt.Errorf("indexer failed for %s/%s: %w", r.repoType, taskSlug, err)
+					return err
 				}
 			}
 
@@ -630,7 +630,9 @@ func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*IndexerResul
 		if errors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
 			return nil, ErrDownloadNotFound
 		}
-		return nil, fmt.Errorf("%w: %s", err, stderrStr)
+		// Strip the "veloria: error: " prefix that Kong adds to stderr.
+		stderrStr = strings.TrimPrefix(stderrStr, "veloria: error: ")
+		return nil, fmt.Errorf("%s", stderrStr)
 	}
 
 	// Parse INDEX_READY:<path> and EXTRACT_STATS:<json> from stdout
