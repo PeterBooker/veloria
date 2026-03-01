@@ -1,3 +1,18 @@
+// Scrape Prometheus metrics from Veloria running on the host.
+prometheus.scrape "veloria" {
+  targets = [{
+    __address__ = "host.docker.internal:9071",
+  }]
+  forward_to      = [prometheus.remote_write.default.receiver]
+  scrape_interval = "15s"
+}
+
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
 // Receive OTLP traces and logs from Veloria.
 otelcol.receiver.otlp "default" {
   grpc {

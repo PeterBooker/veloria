@@ -32,4 +32,5 @@ type (
 	ReportsPageData        = ui.ReportsPageData
 	VisibilityToggleData   = ui.VisibilityToggleData
 	ExtensionData          = ui.ExtensionData
+	FailedIndexEvent       = ui.FailedIndexEvent
 )

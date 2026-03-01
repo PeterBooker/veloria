@@ -1,0 +1,96 @@
+package page
+
+templ docsSelfHostingSteps() {
+	<!-- Build -->
+	<div class="mb-6">
+		<h3 class="text-xl font-semibold text-neon-gold mb-3">2. Build Veloria</h3>
+		<p class="text-sm text-text-body leading-relaxed mb-3">Clone the repository and build the binary:</p>
+		<div class="docs-code mb-3">
+			<code>
+				@templ.Raw(`git clone https://github.com/PeterBooker/veloria.git
+cd veloria
+
+# Build frontend assets
+go generate ./assets/...
+
+# Build the binary
+CGO_ENABLED=0 go build -trimpath -o veloria ./cmd/veloria`)
+			</code>
+		</div>
+	</div>
+	<!-- Configure -->
+	<div class="mb-6">
+		<h3 class="text-xl font-semibold text-neon-gold mb-3">3. Configure</h3>
+		<p class="text-sm text-text-body leading-relaxed mb-3">Create a <code class="text-neon-cyan font-mono text-xs">.env</code> file alongside the binary. All configuration is via environment variables:</p>
+		<div class="docs-code mb-3">
+			<code>
+				@templ.Raw(`ENV=production
+PORT=9071
+DATA_DIR=/etc/veloria/data
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_DATABASE=veloria
+DB_USERNAME=veloria
+DB_PASSWORD=veloria
+DB_SSLMODE=disable
+
+# S3 / MinIO
+S3_ENDPOINT=localhost:9000
+S3_BUCKET=veloria-searches
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+
+# Session encryption (generate a random string)
+SESSION_SECRET=change-me-to-a-random-secret
+
+# Indexing
+INDEXER_CONCURRENCY=2
+SEARCH_CONCURRENCY=24`)
+			</code>
+		</div>
+		<p class="text-sm text-text-muted leading-relaxed">See the full <a href="https://github.com/PeterBooker/veloria/blob/main/docs/configuration.md" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">configuration reference</a> { "for" } all available environment variables.</p>
+	</div>
+	<!-- Run -->
+	<div class="mb-6">
+		<h3 class="text-xl font-semibold text-neon-gold mb-3">4. Run</h3>
+		<p class="text-sm text-text-body leading-relaxed mb-3">Run database migrations and start the server:</p>
+		<div class="docs-code mb-3">
+			<code>
+				@templ.Raw(`# Run database migrations
+./veloria migrate up
+
+# Start the server
+./veloria`)
+			</code>
+		</div>
+		<p class="text-sm text-text-body leading-relaxed">Veloria will start on port <code class="text-neon-cyan font-mono text-xs">9071</code> by default. The background indexer automatically discovers and indexes plugins, themes, and core releases.</p>
+	</div>
+	<!-- Optional Features -->
+	<div class="mb-6">
+		<h3 class="text-xl font-semibold text-neon-gold mb-3">Optional Features</h3>
+		<div class="space-y-3">
+			<div class="glass-inner rounded-xl p-4">
+				<h4 class="text-sm font-semibold text-text-bright mb-1">TLS with Let's Encrypt</h4>
+				<p class="text-sm text-text-body leading-relaxed">Set <code class="text-neon-cyan font-mono text-xs">APP_URL</code> to your domain, <code class="text-neon-cyan font-mono text-xs">ACME_EMAIL</code> to your email, and <code class="text-neon-cyan font-mono text-xs">CLOUDFLARE_API_TOKEN</code> { "for" } DNS-01 challenges. Veloria handles certificate issuance and renewal automatically.</p>
+			</div>
+			<div class="glass-inner rounded-xl p-4">
+				<h4 class="text-sm font-semibold text-text-bright mb-1">OAuth Login</h4>
+				<p class="text-sm text-text-body leading-relaxed">Enable user login via GitHub, GitLab, or Atlassian by setting their respective <code class="text-neon-cyan font-mono text-xs">CLIENT_ID</code> and <code class="text-neon-cyan font-mono text-xs">CLIENT_SECRET</code> environment variables, along with <code class="text-neon-cyan font-mono text-xs">OAUTH_BASE_URL</code>.</p>
+			</div>
+			<div class="glass-inner rounded-xl p-4">
+				<h4 class="text-sm font-semibold text-text-bright mb-1">Observability</h4>
+				<p class="text-sm text-text-body leading-relaxed">Veloria supports OpenTelemetry for traces, logs, and Prometheus metrics. Set <code class="text-neon-cyan font-mono text-xs">OTEL_EXPORTER_TYPE=otlp</code> and configure <code class="text-neon-cyan font-mono text-xs">OTEL_EXPORTER_OTLP_ENDPOINT</code> to send telemetry to your collector.</p>
+			</div>
+			<div class="glass-inner rounded-xl p-4">
+				<h4 class="text-sm font-semibold text-text-bright mb-1">MCP Server</h4>
+				<p class="text-sm text-text-body leading-relaxed">The MCP endpoint is enabled by default at <code class="text-neon-cyan font-mono text-xs">/mcp</code>. Set <code class="text-neon-cyan font-mono text-xs">MCP_ENABLED=false</code> to disable it.</p>
+			</div>
+		</div>
+	</div>
+	<!-- systemd tip -->
+	<div class="glass-inner rounded-xl p-4">
+		<p class="text-sm text-text-muted leading-relaxed"><strong class="text-neon-gold font-semibold">Tip:</strong> For production deployments, run Veloria as a systemd service so it starts automatically on boot and restarts on failure. Place the binary at <code class="text-neon-cyan font-mono text-xs">/opt/veloria/veloria</code> and create a unit file pointing to it.</p>
+	</div>
+}

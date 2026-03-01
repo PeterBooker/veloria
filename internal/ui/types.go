@@ -169,6 +169,13 @@ type LargestExtension struct {
 	FileCount int
 }
 
+// FailedIndexEvent represents a failed indexing attempt for display.
+type FailedIndexEvent struct {
+	Slug         string
+	ErrorMessage string
+	CreatedAt    time.Time
+}
+
 // RepoData contains data for a single repository view.
 type RepoData struct {
 	PageData
@@ -178,6 +185,7 @@ type RepoData struct {
 	FileSize           ChartData
 	LargestBySize      []LargestExtension
 	LargestByFileCount []LargestExtension
+	FailedEvents       []FailedIndexEvent
 }
 
 // FileStat represents a file with its size for display.
