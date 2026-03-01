@@ -6,7 +6,7 @@
 - **Node.js 22+ and npm** (for frontend assets)
 - **PostgreSQL 17+** (via Docker or native install)
 - **MinIO** (S3-compatible storage, via Docker)
-- **Migration binary** built from `./cmd/veloria-migrate` (example name: `veloria-migrations`)
+- **Veloria binary** built from `./cmd/veloria` (single binary with subcommands)
 
 ## Quick Start
 
@@ -45,11 +45,10 @@ In development mode (`ENV=development`), the `.env` file is loaded automatically
 ### 3. Run Migrations
 
 ```bash
-go build -o veloria-migrations ./cmd/veloria-migrate
-./veloria-migrations up
+go run ./cmd/veloria migrate up
 ```
 
-The migration binary loads your existing environment config (`.env` in development), builds the DB connection string, and runs migrations without manual DSN input.
+The migrate command loads your existing environment config (`.env` in development), builds the DB connection string, and runs migrations without manual DSN input.
 
 ### 4. Build and Run
 
@@ -69,28 +68,19 @@ APP_DEBUG=true go run ./cmd/veloria
 
 The server starts on port 9071 by default (configurable via `PORT` env var).
 
-### 5. Build the Indexer
-
-The server invokes `veloria-indexer` as a subprocess, so it must be on your `PATH` or in the working directory:
-
-```bash
-go build -o veloria-indexer ./cmd/veloria-indexer
-```
-
 ## Project Structure
 
 ```
 cmd/
-├── veloria/           # Main server binary
-├── veloria-indexer/   # CLI indexer subprocess
-├── veloria-migrate/   # Database migration source (build as veloria-migrations)
-└── veloria-converter/ # WPDirectory data converter (one-time use)
+└── veloria/           # Single binary with subcommands (serve, index, migrate, version)
 
 internal/              # All application packages (see architecture.md)
-migrations/            # SQL migration files used by veloria-migrations
+migrations/            # SQL migration files (embedded in binary)
 templates/             # Go html/template files (embedded via embed.FS)
 docs/                  # Developer documentation
 ```
+
+The server invokes itself as a subprocess (`veloria index`) for indexing, so there is no separate indexer binary to build or put on `PATH`.
 
 ## Common Tasks
 
@@ -99,7 +89,7 @@ docs/                  # Developer documentation
 Create a new migration file following the naming convention:
 
 ```bash
-./veloria-migrations create <description> sql
+go run ./cmd/veloria migrate create <description> sql
 ```
 
 This creates a file like `migrations/20260222000001_<description>.sql` with `-- +goose Up` and `-- +goose Down` sections.

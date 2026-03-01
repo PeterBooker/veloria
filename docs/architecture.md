@@ -2,14 +2,16 @@
 
 This document covers the high-level design of Veloria, a code search engine for WordPress extensions (plugins, themes, and cores).
 
-## Binaries
+## CLI Commands
 
-| Binary | Entry Point | Purpose |
-|---|---|---|
-| `veloria` | `cmd/veloria/` | Main server: HTTP API, web UI, background indexer |
-| `veloria-indexer` | `cmd/veloria-indexer/` | CLI tool that downloads a ZIP, extracts source, and builds a search index. Invoked as a subprocess by the server. |
-| `veloria-migrations` | `cmd/veloria-migrate/` | Project migration binary. Loads environment config and runs DB migrations. |
-| `veloria-converter` | `cmd/veloria-converter/` | One-time utility for migrating data from WPDirectory's BoltDB format |
+Veloria is a single binary (`cmd/veloria/`) with subcommands:
+
+| Command | Purpose |
+|---|---|
+| `veloria` or `veloria serve` | Main server: HTTP API, web UI, background indexer (default command) |
+| `veloria index` | Downloads a ZIP, extracts source, and builds a search index. Invoked as a subprocess by the server. |
+| `veloria migrate <command>` | Runs database migrations (up, down, status, etc.). |
+| `veloria version` | Prints version information. |
 
 ## Package Layout
 
@@ -197,7 +199,7 @@ The updater loop in `Manager.startUpdater()`:
 4. Drains any ad-hoc reindex requests from `adhocCh`
 5. Waits 5 minutes (`UpdateInterval`) or until an ad-hoc request arrives
 
-Each `IndexTask.Run()` closure handles the full pipeline: download ZIP, extract source, invoke `veloria-indexer` subprocess to build the index, and swap the new index into the store.
+Each `IndexTask.Run()` closure handles the full pipeline: download ZIP, extract source, invoke the `veloria index` subprocess to build the index, and swap the new index into the store.
 
 ### Search
 

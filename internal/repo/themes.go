@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -173,14 +174,14 @@ func (tr *ThemeStore) PrepareUpdates() ([]IndexTask, error) {
 // needsFullScan checks the datasources table to determine if a full discovery
 // scan is due. This survives server restarts, unlike the previous in-memory field.
 func (tr *ThemeStore) needsFullScan() bool {
-	var lastScan *time.Time
+	var lastScan sql.NullTime
 	err := tr.db.Table("datasources").
 		Where("repo_type = ?", string(TypeThemes)).
 		Pluck("last_full_scan_at", &lastScan).Error
-	if err != nil || lastScan == nil {
+	if err != nil || !lastScan.Valid {
 		return true
 	}
-	return time.Since(*lastScan) >= FullScanInterval
+	return time.Since(lastScan.Time) >= FullScanInterval
 }
 
 // recordFullScan writes the current time as the last full scan timestamp.

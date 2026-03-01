@@ -1,42 +1,22 @@
 package main
 
 import (
-	"context"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
-
-	"go.uber.org/zap"
-
-	"veloria/internal/app"
+	"github.com/alecthomas/kong"
 )
 
+var cli struct {
+	Serve   ServeCmd   `cmd:"" default:"withargs" help:"Start the HTTP server (default)."`
+	Index   IndexCmd   `cmd:"" help:"Download, extract, and index a single extension."`
+	Migrate MigrateCmd `cmd:"" help:"Run database migrations."`
+	Wipe    WipeCmd    `cmd:"" help:"Wipe data from the database and storage."`
+	Version VersionCmd `cmd:"" help:"Print version information."`
+}
+
 func main() {
-	a, err := app.New(context.Background())
-	if err != nil {
-		log.Fatalf("failed to initialize application: %v", err)
-	}
-
-	closed := make(chan struct{})
-	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
-		<-sigint
-
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), a.Config.HTTPShutdownTimeout)
-		defer cancel()
-
-		if err := a.Shutdown(shutdownCtx); err != nil {
-			a.Logger.Error("Shutdown failure", zap.Error(err))
-		}
-
-		close(closed)
-	}()
-
-	if err := a.Start(); err != nil {
-		a.Logger.Fatal("Server startup failure", zap.Error(err))
-	}
-
-	<-closed
+	ctx := kong.Parse(&cli,
+		kong.Name("veloria"),
+		kong.Description("Code search engine for the WordPress ecosystem."),
+		kong.UsageOnError(),
+	)
+	ctx.FatalIfErrorf(ctx.Run())
 }
