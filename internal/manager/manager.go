@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -282,11 +283,18 @@ func (m *Manager) runTasks(ctx context.Context, l *zap.Logger, sem chan struct{}
 			err := t.Run()
 			elapsed := time.Since(start)
 
-			// Record Prometheus metrics.
+			// Classify the outcome.
+			skipped := errors.Is(err, repo.ErrDownloadSkipped)
 			status := "success"
 			if err != nil {
-				status = "failed"
+				if skipped {
+					status = "skipped"
+				} else {
+					status = "failed"
+				}
 			}
+
+			// Record Prometheus metrics.
 			repoAttr := attribute.String("repo_type", string(t.ExtensionType))
 			statusAttr := attribute.String("status", status)
 			if telemetry.IndexingTasksTotal != nil {
@@ -303,16 +311,33 @@ func (m *Manager) runTasks(ctx context.Context, l *zap.Logger, sem chan struct{}
 					Slug:       t.Slug,
 					DurationMS: elapsed.Milliseconds(),
 				}
-				if err != nil {
+				switch {
+				case skipped:
+					event.Status = repo.IndexEventSkipped
+					event.ErrorMessage = err.Error()
+				case err != nil:
 					event.Status = repo.IndexEventFailed
 					event.ErrorMessage = err.Error()
-				} else {
+				default:
 					event.Status = repo.IndexEventSuccess
 				}
 				m.events.Record(event)
 			}
 
-			if err != nil {
+			// Update durable index state in DB.
+			if ds := m.sources[t.ExtensionType]; ds != nil {
+				switch {
+				case skipped:
+					// No state change for skipped tasks.
+				case err != nil:
+					ds.RecordIndexFailure(t.Slug)
+				default:
+					ds.RecordIndexSuccess(t.Slug)
+				}
+			}
+
+			// Only count real failures for retry — skipped tasks are not retryable.
+			if err != nil && !skipped {
 				mu.Lock()
 				failures = append(failures, failedTask{t})
 				mu.Unlock()

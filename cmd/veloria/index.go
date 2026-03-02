@@ -49,14 +49,18 @@ func (c *IndexCmd) Run() error {
 	}
 	defer cleanup()
 
-	// Extract text files into source/<slug> and collect stats.
+	// Extract files into source/<slug> and collect stats.
+	// Clear previous extraction to avoid stale files from older versions.
 	dest := filepath.Join(sourceDir, c.Slug)
+	if err := os.RemoveAll(dest); err != nil {
+		return fmt.Errorf("failed to remove old source dir %q: %w", dest, err)
+	}
 	if err := os.MkdirAll(dest, 0o750); err != nil {
 		return fmt.Errorf("failed to create destination dir %q: %w", dest, err)
 	}
-	stats, err := index.UnzipTextFilesWithStats(tmpZip, dest)
+	stats, err := index.UnzipWithStats(tmpZip, dest)
 	if err != nil {
-		return fmt.Errorf("failed to unzip text files into %q: %w", dest, err)
+		return fmt.Errorf("failed to unzip files into %q: %w", dest, err)
 	}
 
 	// Index to a temporary file, then atomically rename to final path.

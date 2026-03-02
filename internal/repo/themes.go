@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"html"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -56,6 +55,12 @@ type Theme struct {
 
 	// ClosedAt indicates when this theme was detected as closed (no download link available)
 	ClosedAt *time.Time `json:"closed_at,omitempty" gorm:"default:null"`
+
+	// Index state tracking (persisted for durable retry)
+	RetryCount   int        `json:"-" gorm:"default:0"`
+	LastAttemptAt *time.Time `json:"-" gorm:"default:null"`
+	IndexedAt    *time.Time `json:"-" gorm:"default:null"`
+	IndexStatus  string     `json:"-" gorm:"default:'pending'"`
 
 	LastUpdated time.Time `json:"-" gorm:"-"`
 }
@@ -137,7 +142,7 @@ func (tr *ThemeStore) PrepareUpdates() ([]IndexTask, error) {
 			return themes, nil
 		}
 
-		themes, err := FetchThemeUpdates(tr.ctx, tr.c, tr.api, tr.l)
+		themes, err := FetchThemeUpdates(tr.ctx, tr.c, tr.api, tr.l, tr.db)
 		if err != nil {
 			return nil, err
 		}
@@ -152,12 +157,15 @@ func (tr *ThemeStore) PrepareUpdates() ([]IndexTask, error) {
 	}
 
 	saveFn := func(db *gorm.DB, t *Theme) error {
-		t.ClosedAt = nil
+		// Only clear ClosedAt when the extension has an available download.
+		if t.DownloadLink != "" {
+			t.ClosedAt = nil
+		}
 
 		var existing Theme
 		if err := db.Where("slug = ? AND source = ?", t.Slug, t.Source).First(&existing).Error; err == nil {
 			t.ID = existing.ID
-			if existing.ClosedAt != nil {
+			if existing.ClosedAt != nil && t.ClosedAt == nil {
 				tr.l.Info("Theme is now available again", zap.String("slug", t.Slug))
 			}
 			return db.Save(t).Error
@@ -205,7 +213,7 @@ func (tr *ThemeStore) discoverNewThemes() ([]*Theme, error) {
 	tr.l.Info("Starting full theme discovery via API", zap.Int("known", len(known)))
 
 	var result []*Theme
-	var skipped int
+	var skipped, metadataUpdated int
 
 	for page := 1; ; page++ {
 		if tr.ctx.Err() != nil {
@@ -229,6 +237,17 @@ func (tr *ThemeStore) discoverNewThemes() ([]*Theme, error) {
 			}
 			fillWordPressDownloadLink(&t)
 			if _, ok := known[t.Slug]; ok {
+				tr.updateMetadata(t.Slug, t.Source, map[string]any{
+					"version":           t.Version,
+					"rating":            t.Rating,
+					"active_installs":   t.ActiveInstalls,
+					"downloaded":        t.Downloaded,
+					"short_description": t.ShortDescription,
+					"requires":          t.Requires,
+					"requires_php":      t.RequiresPHP,
+					"download_link":     t.DownloadLink,
+				})
+				metadataUpdated++
 				skipped++
 				continue
 			}
@@ -241,7 +260,7 @@ func (tr *ThemeStore) discoverNewThemes() ([]*Theme, error) {
 		}
 
 		if page%10 == 0 {
-			tr.l.Info("Theme discovery progress", zap.Int("page", page), zap.Int("totalPages", info.Pages), zap.Int("new", len(result)), zap.Int("skipped", skipped))
+			tr.l.Info("Theme discovery progress", zap.Int("page", page), zap.Int("totalPages", info.Pages), zap.Int("new", len(result)), zap.Int("skipped", skipped), zap.Int("metadata_updated", metadataUpdated))
 		}
 
 		if page >= info.Pages {
@@ -249,7 +268,7 @@ func (tr *ThemeStore) discoverNewThemes() ([]*Theme, error) {
 		}
 	}
 
-	tr.l.Info("Full theme discovery scan complete", zap.Int("known", len(known)), zap.Int("new", len(result)), zap.Int("skipped", skipped))
+	tr.l.Info("Full theme discovery scan complete", zap.Int("known", len(known)), zap.Int("new", len(result)), zap.Int("skipped", skipped), zap.Int("metadata_updated", metadataUpdated))
 
 	return result, nil
 }
@@ -359,17 +378,24 @@ func fillWordPressDownloadLink(t *Theme) {
 }
 
 // FetchThemeUpdates fetches theme updates based on environment.
-func FetchThemeUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zap.Logger) ([]Theme, error) {
+// Uses a persistent watermark to avoid missing updates after outages.
+func FetchThemeUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zap.Logger, db *gorm.DB) ([]Theme, error) {
 	if c.Env == "production" || c.Env == "staging" {
-		return FetchThemesUpdatedWithinLastHour(ctx, api, l)
+		watermark := readWatermark(db, TypeThemes)
+		themes, err := FetchThemesSince(ctx, api, l, watermark)
+		if err != nil {
+			return nil, err
+		}
+		writeWatermark(db, TypeThemes, l)
+		return themes, nil
 	}
 	return FetchLocalThemes(ctx, api)
 }
 
-// FetchThemesUpdatedWithinLastHour fetches pages of themes sorted by
-// update time and collects those updated within the last hour.
-func FetchThemesUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *zap.Logger) ([]Theme, error) {
-	threshold := time.Now().UTC().Add(-1 * time.Hour)
+// FetchThemesSince fetches pages of themes sorted by update time and
+// collects those updated since the given watermark (with a 2-hour overlap margin).
+func FetchThemesSince(ctx context.Context, api *APIClient, l *zap.Logger, since time.Time) ([]Theme, error) {
+	threshold := since.Add(-2 * time.Hour)
 
 	var all []Theme
 	var parseFailures int
@@ -391,17 +417,13 @@ func FetchThemesUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *za
 				t.Source = SourceWordPress
 			}
 			fillWordPressDownloadLink(&t)
-			s := strings.TrimSpace(t.LastUpdatedRaw)
-			ts, err := time.Parse("2006-01-02 3:04pm MST", s)
-			if err != nil {
-				ts, err = time.Parse("2006-01-02", s)
-			}
-			if err != nil {
+			ts, ok := parseLastUpdated(t.LastUpdatedRaw)
+			if !ok {
 				parseFailures++
-				l.Warn("Failed to parse theme last_updated time, skipping", zap.String("slug", t.Slug), zap.String("lastUpdatedRaw", s), zap.Error(err))
+				l.Warn("Failed to parse theme last_updated time, skipping", zap.String("slug", t.Slug), zap.String("lastUpdatedRaw", t.LastUpdatedRaw))
 				continue
 			}
-			t.LastUpdated = ts.UTC()
+			t.LastUpdated = ts
 			if t.LastUpdated.Before(threshold) {
 				if parseFailures > 0 {
 					l.Warn("Total theme time parse failures during update check", zap.Int("count", parseFailures))

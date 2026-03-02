@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"veloria/internal/codesearch/index"
 )
@@ -73,6 +74,7 @@ func IndexDir(indexDir string, indexSrc string, slug string) *index.IndexWriter 
 }
 
 // IndexDirToFile creates a trigram index from indexSrc and writes it to trigramsPath.
+// Only files with extensions in IndexableExtensions() are added to the index.
 func IndexDirToFile(indexSrc string, trigramsPath string) *index.IndexWriter {
 	// Ensure parent directory exists and "touch" the trigrams file.
 	if err := os.MkdirAll(filepath.Dir(trigramsPath), 0o750); err != nil {
@@ -91,6 +93,8 @@ func IndexDirToFile(indexSrc string, trigramsPath string) *index.IndexWriter {
 	ix := index.Create(trigramsPath)
 	ix.Verbose = false
 	ix.Zip = false
+
+	textExts := IndexableExtensions()
 
 	var roots []index.Path
 	roots = append(roots, index.MakePath(filepath.Join(indexSrc)))
@@ -114,6 +118,11 @@ func IndexDirToFile(indexSrc string, trigramsPath string) *index.IndexWriter {
 			}
 
 			if info != nil && info.Mode()&os.ModeType == 0 {
+				// Only index files with known text extensions.
+				ext := strings.ToLower(filepath.Ext(path))
+				if !textExts[ext] {
+					return nil
+				}
 				if err := ix.AddFile(path); err != nil {
 					return nil
 				}

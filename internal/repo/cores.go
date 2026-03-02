@@ -33,6 +33,12 @@ type Core struct {
 	FileCount    int                            `json:"-" gorm:"default:0"`
 	TotalSize    int64                          `json:"-" gorm:"default:0"`
 	LargestFiles datatypes.JSONSlice[*FileStat] `json:"-" gorm:"type:jsonb;default:'[]'::jsonb"`
+
+	// Index state tracking (persisted for durable retry)
+	RetryCount   int        `json:"-" gorm:"default:0"`
+	LastAttemptAt *time.Time `json:"-" gorm:"default:null"`
+	IndexedAt    *time.Time `json:"-" gorm:"default:null"`
+	IndexStatus  string     `json:"-" gorm:"default:'pending'"`
 }
 
 // Implement Extension interface

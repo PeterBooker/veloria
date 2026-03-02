@@ -146,7 +146,8 @@ func New(deps RouterDeps) *chi.Mux {
 			}
 		}
 		r.Post("/search", search.SubmitSearch(deps.WebDeps))
-		r.Get("/my-searches", search.MyListPage(deps.WebDeps))
+		r.Get("/searches/own", search.ListOwnPage(deps.WebDeps))
+		r.Get("/my-searches", search.MyListRedirect())
 
 		// Report a search (requires login)
 		if deps.Session != nil {

@@ -376,105 +376,94 @@ func renderSearchError(d *web.Deps, w http.ResponseWriter, r *http.Request, errM
 // ListPage renders the public searches list page.
 func ListPage(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil {
-			http.Error(w, "Searches are unavailable while the database is offline.", http.StatusServiceUnavailable)
-			return
-		}
-		const pageSize = 25
-		page := 1
-		if pageStr := r.URL.Query().Get("page"); pageStr != "" {
-			if parsed, err := strconv.Atoi(pageStr); err == nil && parsed > 0 {
-				page = parsed
-			}
-		}
-
-		var totalCount int64
-		d.DB.Model(&searchmodel.Search{}).Where("private = false").Count(&totalCount)
-		totalPages := int(math.Ceil(float64(totalCount) / float64(pageSize)))
-		if totalPages == 0 {
-			totalPages = 1
-		}
-		if page > totalPages {
-			page = totalPages
-		}
-
-		offset := (page - 1) * pageSize
-		var searches []searchmodel.Search
-		d.DB.Where("private = false").Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&searches)
-
-		summaries := make([]web.SearchSummary, len(searches))
-		for i, s := range searches {
-			summaries[i] = web.BuildSearchSummary(s)
-		}
-
-		pd := d.PageData(r)
-		pd.OG.Title = "Recent Searches - Veloria"
-		pd.OG.Description = "Browse recent WordPress code searches on Veloria."
-
-		data := web.SearchesData{
-			PageData:   pd,
-			Searches:   summaries,
-			Page:       page,
-			TotalPages: totalPages,
-		}
-
-		d.RenderComponent(w, r, uipage.Searches(data))
+		listSearches(d, w, r, "")
 	}
 }
 
-// MyListPage renders the current user's searches list page.
-func MyListPage(d *web.Deps) http.HandlerFunc {
+// ListOwnPage renders the current user's searches list page.
+func ListOwnPage(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil {
-			http.Error(w, "Searches are unavailable while the database is offline.", http.StatusServiceUnavailable)
-			return
-		}
-		currentUser := auth.UserFromContext(r.Context())
-		if currentUser == nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
+		listSearches(d, w, r, "own")
+	}
+}
 
-		const pageSize = 25
-		page := 1
+// MyListRedirect permanently redirects /my-searches to /searches/own.
+func MyListRedirect() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		target := "/searches/own"
 		if pageStr := r.URL.Query().Get("page"); pageStr != "" {
-			if parsed, err := strconv.Atoi(pageStr); err == nil && parsed > 0 {
-				page = parsed
-			}
+			target += "?page=" + pageStr
 		}
+		http.Redirect(w, r, target, http.StatusMovedPermanently)
+	}
+}
 
-		var totalCount int64
-		d.DB.Model(&searchmodel.Search{}).Where("user_id = ?", currentUser.ID).Count(&totalCount)
-		totalPages := int(math.Ceil(float64(totalCount) / float64(pageSize)))
-		if totalPages == 0 {
-			totalPages = 1
+func listSearches(d *web.Deps, w http.ResponseWriter, r *http.Request, view string) {
+	if d.DB == nil {
+		http.Error(w, "Searches are unavailable while the database is offline.", http.StatusServiceUnavailable)
+		return
+	}
+
+	currentUser := auth.UserFromContext(r.Context())
+
+	if view == "own" && currentUser == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	const pageSize = 25
+	page := 1
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if parsed, err := strconv.Atoi(pageStr); err == nil && parsed > 0 {
+			page = parsed
 		}
-		if page > totalPages {
-			page = totalPages
-		}
+	}
 
-		offset := (page - 1) * pageSize
-		var searches []searchmodel.Search
-		d.DB.Where("user_id = ?", currentUser.ID).Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&searches)
+	query := d.DB.Model(&searchmodel.Search{})
+	if view == "own" {
+		query = query.Where("user_id = ?", currentUser.ID)
+	} else {
+		query = query.Where("private = false")
+	}
 
-		summaries := make([]web.SearchSummary, len(searches))
-		for i, s := range searches {
-			summaries[i] = web.BuildSearchSummary(s)
-		}
+	var totalCount int64
+	query.Count(&totalCount)
+	totalPages := int(math.Ceil(float64(totalCount) / float64(pageSize)))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
 
-		pd := d.PageData(r)
+	offset := (page - 1) * pageSize
+	var searches []searchmodel.Search
+	query.Order("created_at DESC").Limit(pageSize).Offset(offset).Find(&searches)
+
+	summaries := make([]web.SearchSummary, len(searches))
+	for i, s := range searches {
+		summaries[i] = web.BuildSearchSummary(s)
+	}
+
+	pd := d.PageData(r)
+	if view == "own" {
 		pd.OG.Title = "My Searches - Veloria"
 		pd.OG.Description = "View and manage your WordPress code searches on Veloria."
-
-		data := web.MySearchesData{
-			PageData:   pd,
-			Searches:   summaries,
-			Page:       page,
-			TotalPages: totalPages,
-		}
-
-		d.RenderComponent(w, r, uipage.MySearches(data))
+	} else {
+		pd.OG.Title = "Recent Searches - Veloria"
+		pd.OG.Description = "Browse recent WordPress code searches on Veloria."
 	}
+
+	data := web.SearchesData{
+		PageData:   pd,
+		Searches:   summaries,
+		Page:       page,
+		TotalPages: totalPages,
+		View:       view,
+		LoggedIn:   currentUser != nil,
+	}
+
+	d.RenderComponent(w, r, uipage.Searches(data))
 }
 
 // ExtensionResultsPage renders the detailed match results for a single extension within a search.

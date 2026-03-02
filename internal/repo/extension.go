@@ -17,6 +17,7 @@ var (
 	ErrEmptySlug        = errors.New("extension has empty slug")
 	ErrIndexNotReady    = errors.New("index not ready")
 	ErrDownloadNotFound = errors.New("download not found")
+	ErrDownloadSkipped  = errors.New("download not found, extension skipped")
 )
 
 // Extension defines the data contract for all WordPress extension types.
@@ -168,7 +169,8 @@ type FileStat struct {
 
 // ExtractStats holds statistics collected during file extraction.
 type ExtractStats struct {
-	FileCount    int                            `json:"file_count"`
-	TotalSize    int64                          `json:"total_size"`
-	LargestFiles datatypes.JSONSlice[*FileStat] `json:"largest_files"`
+	FileCount     int                            `json:"file_count"`
+	TextFileCount int                            `json:"text_file_count"`
+	TotalSize     int64                          `json:"total_size"`
+	LargestFiles  datatypes.JSONSlice[*FileStat] `json:"largest_files"`
 }

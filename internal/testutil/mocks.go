@@ -87,6 +87,9 @@ func (f *FakeDataSource) ResolveSourceDir(slug string) (string, error) {
 	return "", nil
 }
 
+func (f *FakeDataSource) RecordIndexSuccess(_ string) {}
+func (f *FakeDataSource) RecordIndexFailure(_ string) {}
+
 // Compile-time interface check.
 var _ repo.DataSource = (*FakeDataSource)(nil)
 
