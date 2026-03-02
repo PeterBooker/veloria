@@ -73,6 +73,20 @@ func (r *IndexEventRecorder) RecentEvents(limit int) ([]IndexEvent, error) {
 	return events, err
 }
 
+// ClearFailures removes failed events for a specific slug+repo after a
+// successful re-index, so the failures table stays consistent with reality.
+func (r *IndexEventRecorder) ClearFailures(repoType, slug string) {
+	result := r.db.Where("repo_type = ? AND slug = ? AND status = ?", repoType, slug, IndexEventFailed).
+		Delete(&IndexEvent{})
+	if result.Error != nil {
+		r.l.Warn("Failed to clear old failure events",
+			zap.String("repo_type", repoType),
+			zap.String("slug", slug),
+			zap.Error(result.Error),
+		)
+	}
+}
+
 // CleanupOldEvents removes index events older than the given duration.
 // Intended to be called as a periodic background task.
 func CleanupOldEvents(db *gorm.DB, l *zap.Logger, maxAge time.Duration) func(context.Context) error {

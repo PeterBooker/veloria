@@ -120,6 +120,15 @@ func Percentage(a, b int) int {
 	return a * 100 / b
 }
 
+// FormatPercent formats a float percentage for display (e.g. "99.98%", "100%").
+// Whole numbers omit the decimal; others show up to 2 decimal places.
+func FormatPercent(p float64) string {
+	if p == float64(int(p)) {
+		return fmt.Sprintf("%d%%", int(p))
+	}
+	return fmt.Sprintf("%.2f%%", p)
+}
+
 func formatCompactNumber(value int) string {
 	switch {
 	case value >= 1_000_000_000:

@@ -50,7 +50,7 @@ type RepoSummary struct {
 	Title          string
 	Total          int
 	Indexed        int
-	IndexedPercent int
+	IndexedPercent float64
 }
 
 // HomeData contains data for the home page template.

@@ -320,6 +320,8 @@ func (m *Manager) runTasks(ctx context.Context, l *zap.Logger, sem chan struct{}
 					event.ErrorMessage = err.Error()
 				default:
 					event.Status = repo.IndexEventSuccess
+					// Clear stale failure events now that this slug succeeded.
+					m.events.ClearFailures(string(t.ExtensionType), t.Slug)
 				}
 				m.events.Record(event)
 			}
