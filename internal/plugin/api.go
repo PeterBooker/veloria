@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 
 	api "veloria/internal/api"
-	"veloria/internal/manager"
 	"veloria/internal/repo"
+	"veloria/internal/service"
 )
 
 type PluginListItem struct {
@@ -22,8 +22,9 @@ type PluginListItem struct {
 	Indexed   bool      `json:"indexed"`
 }
 
-func ViewPluginV1(db *gorm.DB) http.Handler {
+func ViewPluginV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		db := reg.DB()
 		if db == nil {
 			api.WriteJSON(w, api.ErrUnavailable("plugins are unavailable"))
 			return
@@ -49,8 +50,9 @@ func ViewPluginV1(db *gorm.DB) http.Handler {
 	})
 }
 
-func ListPluginsV1(db *gorm.DB, statsProvider manager.RepoStatsProvider) http.Handler {
+func ListPluginsV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		db := reg.DB()
 		if db == nil {
 			api.WriteJSON(w, api.ErrUnavailable("plugins are unavailable"))
 			return
@@ -81,8 +83,10 @@ func ListPluginsV1(db *gorm.DB, statsProvider manager.RepoStatsProvider) http.Ha
 		}
 
 		indexedBySlug := map[string]bool{}
-		if statsProvider != nil {
-			indexedBySlug = statsProvider.IndexStatus()
+		if m := reg.Manager(); m != nil {
+			if src := m.GetSource(repo.TypePlugins); src != nil {
+				indexedBySlug = src.IndexStatus()
+			}
 		}
 		for i := range items {
 			items[i].Indexed = indexedBySlug[items[i].Slug]

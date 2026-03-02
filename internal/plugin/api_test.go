@@ -10,10 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api "veloria/internal/api"
+	"veloria/internal/service"
 )
 
 func TestViewPluginV1_NilDB(t *testing.T) {
-	handler := ViewPluginV1(nil)
+	reg := &service.Registry{}
+	handler := ViewPluginV1(reg)
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/plugin/123", nil)
 	w := httptest.NewRecorder()
 
@@ -26,7 +28,8 @@ func TestViewPluginV1_NilDB(t *testing.T) {
 }
 
 func TestListPluginsV1_NilDB(t *testing.T) {
-	handler := ListPluginsV1(nil, nil)
+	reg := &service.Registry{}
+	handler := ListPluginsV1(reg)
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/plugins", nil)
 	w := httptest.NewRecorder()
 

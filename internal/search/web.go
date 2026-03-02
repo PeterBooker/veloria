@@ -28,7 +28,7 @@ import (
 // ViewPage renders a single search page with grouped results.
 func ViewPage(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil {
+		if d.DB() == nil {
 			http.Error(w, "Searches are unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
@@ -44,7 +44,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		var s searchmodel.Search
-		if err := d.DB.First(&s, "id = ?", id).Error; err != nil {
+		if err := d.DB().First(&s, "id = ?", id).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				http.Error(w, "search not found", http.StatusNotFound)
 				return
@@ -97,7 +97,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 // SearchExtensionsPartial renders the paginated, searchable extension list as an HTMX partial.
 func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil || d.S3 == nil {
+		if d.DB() == nil || d.S3() == nil {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -119,7 +119,7 @@ func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
 		}
 
 		var s searchmodel.Search
-		if err := d.DB.First(&s, "id = ?", id).Error; err != nil {
+		if err := d.DB().First(&s, "id = ?", id).Error; err != nil {
 			http.Error(w, "search not found", http.StatusNotFound)
 			return
 		}
@@ -141,7 +141,7 @@ func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
 		defer cancel()
 
 		var protoResults typespb.SearchResponse
-		if err := d.S3.DownloadResult(ctx, s.ID.String(), &protoResults); err != nil {
+		if err := d.S3().DownloadResult(ctx, s.ID.String(), &protoResults); err != nil {
 			http.Error(w, "failed to load results", http.StatusInternalServerError)
 			return
 		}
@@ -201,7 +201,7 @@ func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
 // ExportCSV streams the search results as a CSV download.
 func ExportCSV(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil || d.S3 == nil {
+		if d.DB() == nil || d.S3() == nil {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -214,7 +214,7 @@ func ExportCSV(d *web.Deps) http.HandlerFunc {
 		}
 
 		var s searchmodel.Search
-		if err := d.DB.First(&s, "id = ?", id).Error; err != nil {
+		if err := d.DB().First(&s, "id = ?", id).Error; err != nil {
 			http.Error(w, "search not found", http.StatusNotFound)
 			return
 		}
@@ -227,7 +227,7 @@ func ExportCSV(d *web.Deps) http.HandlerFunc {
 		defer cancel()
 
 		var protoResults typespb.SearchResponse
-		if err := d.S3.DownloadResult(ctx, s.ID.String(), &protoResults); err != nil {
+		if err := d.S3().DownloadResult(ctx, s.ID.String(), &protoResults); err != nil {
 			http.Error(w, "failed to load results", http.StatusInternalServerError)
 			return
 		}
@@ -267,8 +267,8 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 		if !d.SearchAvailable() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			reason := "Search is temporarily unavailable."
-			if d.SearchDisabledReason != "" {
-				reason = d.SearchDisabledReason
+			if r := d.Registry.SearchDisabledReason(); r != "" {
+				reason = r
 			}
 			renderSearchError(d, w, r, reason)
 			return
@@ -317,7 +317,7 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 		if currentUser != nil {
 			s.UserID = &currentUser.ID
 		}
-		if err := d.DB.Create(&s).Error; err != nil {
+		if err := d.DB().Create(&s).Error; err != nil {
 			renderSearchError(d, w, r, "Failed to create search")
 			return
 		}
@@ -330,10 +330,10 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 }
 
 func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excludeMatch string, caseInsensitive bool) {
-	d.DB.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusProcessing)
+	d.DB().Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusProcessing)
 	defer d.Progress.Delete(searchID)
 
-	results, err := d.Search.Search(repo, term, &manager.SearchParams{
+	results, err := d.Search().Search(repo, term, &manager.SearchParams{
 		FileMatch:        fileMatch,
 		ExcludeFileMatch: excludeMatch,
 		CaseInsensitive:  caseInsensitive,
@@ -342,7 +342,7 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 		},
 	})
 	if err != nil {
-		d.DB.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
+		d.DB().Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
 		return
 	}
 
@@ -352,15 +352,15 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 	defer cancel()
 
 	protoResults := searchmodel.SearchResponseToProto(results)
-	size, err := d.S3.UploadResult(ctx, searchID.String(), protoResults)
+	size, err := d.S3().UploadResult(ctx, searchID.String(), protoResults)
 	if err != nil {
-		d.DB.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
+		d.DB().Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
 		return
 	}
 
 	totalMatches := web.CountTotalMatches(results)
 
-	d.DB.Model(&searchmodel.Search{}).Where("id = ?", searchID).Updates(map[string]any{
+	d.DB().Model(&searchmodel.Search{}).Where("id = ?", searchID).Updates(map[string]any{
 		"status":           searchmodel.StatusCompleted,
 		"results_size":     size,
 		"completed_at":     now,
@@ -399,7 +399,7 @@ func MyListRedirect() http.HandlerFunc {
 }
 
 func listSearches(d *web.Deps, w http.ResponseWriter, r *http.Request, view string) {
-	if d.DB == nil {
+	if d.DB() == nil {
 		http.Error(w, "Searches are unavailable while the database is offline.", http.StatusServiceUnavailable)
 		return
 	}
@@ -419,7 +419,7 @@ func listSearches(d *web.Deps, w http.ResponseWriter, r *http.Request, view stri
 		}
 	}
 
-	query := d.DB.Model(&searchmodel.Search{})
+	query := d.DB().Model(&searchmodel.Search{})
 	if view == "own" {
 		query = query.Where("user_id = ?", currentUser.ID)
 	} else {
@@ -469,7 +469,7 @@ func listSearches(d *web.Deps, w http.ResponseWriter, r *http.Request, view stri
 // ExtensionResultsPage renders the detailed match results for a single extension within a search.
 func ExtensionResultsPage(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil || d.S3 == nil {
+		if d.DB() == nil || d.S3() == nil {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -491,7 +491,7 @@ func ExtensionResultsPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		var s searchmodel.Search
-		if err := d.DB.First(&s, "id = ?", id).Error; err != nil {
+		if err := d.DB().First(&s, "id = ?", id).Error; err != nil {
 			http.Error(w, "search not found", http.StatusNotFound)
 			return
 		}
@@ -504,7 +504,7 @@ func ExtensionResultsPage(d *web.Deps) http.HandlerFunc {
 		defer cancel()
 
 		var protoResults typespb.SearchResponse
-		if err := d.S3.DownloadResult(ctx, s.ID.String(), &protoResults); err != nil {
+		if err := d.S3().DownloadResult(ctx, s.ID.String(), &protoResults); err != nil {
 			http.Error(w, "failed to load results", http.StatusInternalServerError)
 			return
 		}
@@ -545,7 +545,7 @@ func ContextPage(d *web.Deps) http.HandlerFunc {
 			Slug:     slug,
 			Filename: filename,
 		}
-		if d.Sources == nil {
+		if d.Sources() == nil {
 			data.Error = "Search context is unavailable."
 			renderSearchContext(d, w, r, data)
 			return
@@ -595,5 +595,5 @@ func renderSearchContext(d *web.Deps, w http.ResponseWriter, r *http.Request, da
 }
 
 func resolveSourceDir(d *web.Deps, repoType string, slug string) (string, error) {
-	return d.Sources.ResolveSourceDir(repoType, slug)
+	return d.Sources().ResolveSourceDir(repoType, slug)
 }

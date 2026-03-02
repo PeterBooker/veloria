@@ -11,10 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api "veloria/internal/api"
+	"veloria/internal/service"
 )
 
 func TestViewSearchV1_NilDB(t *testing.T) {
-	handler := ViewSearchV1(nil, nil)
+	reg := &service.Registry{}
+	handler := ViewSearchV1(reg)
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/search/123", nil)
 	w := httptest.NewRecorder()
 
@@ -27,7 +29,8 @@ func TestViewSearchV1_NilDB(t *testing.T) {
 }
 
 func TestCreateSearchV1_NilDeps(t *testing.T) {
-	handler := CreateSearchV1(nil, nil, nil)
+	reg := &service.Registry{}
+	handler := CreateSearchV1(reg)
 	body := `{"term": "test", "repo": "plugins"}`
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/search", bytes.NewBufferString(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -39,7 +42,8 @@ func TestCreateSearchV1_NilDeps(t *testing.T) {
 }
 
 func TestListSearchesV1_NilDB(t *testing.T) {
-	handler := ListSearchesV1(nil)
+	reg := &service.Registry{}
+	handler := ListSearchesV1(reg)
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/searches", nil)
 	w := httptest.NewRecorder()
 

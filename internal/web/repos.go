@@ -18,13 +18,13 @@ import (
 // ReposPage renders the repositories listing page.
 func ReposPage(d *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.Stats == nil {
+		if d.Stats() == nil {
 			http.Error(w, "Repositories are unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
-		pluginTotal, pluginIndexed, _ := d.Stats.Stats("plugins")
-		themeTotal, themeIndexed, _ := d.Stats.Stats("themes")
-		coreTotal, coreIndexed, _ := d.Stats.Stats("cores")
+		pluginTotal, pluginIndexed, _ := d.Stats().Stats("plugins")
+		themeTotal, themeIndexed, _ := d.Stats().Stats("themes")
+		coreTotal, coreIndexed, _ := d.Stats().Stats("cores")
 
 		repoSummaries := []RepoSummary{
 			BuildRepoSummary("plugins", "Plugins", pluginTotal, pluginIndexed),
@@ -48,7 +48,7 @@ func ReposPage(d *Deps) http.HandlerFunc {
 // RepoPage renders a single repository view.
 func RepoPage(d *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.Stats == nil || d.DB == nil {
+		if d.Stats() == nil || d.DB() == nil {
 			http.Error(w, "Repository data is unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
@@ -62,21 +62,21 @@ func RepoPage(d *Deps) http.HandlerFunc {
 
 		switch repoType {
 		case "plugins":
-			total, indexed, _ = d.Stats.Stats("plugins")
+			total, indexed, _ = d.Stats().Stats("plugins")
 			title = "Plugins"
 			activeInstalls = fetchActiveInstallsChart(d, "plugins")
 			fileCount, fileSize = fetchFileStatsCharts(d, "plugins")
 			largestBySize = fetchLargestExtensions(d, "plugins", 25, "total_size")
 			largestByFileCount = fetchLargestExtensions(d, "plugins", 25, "file_count")
 		case "themes":
-			total, indexed, _ = d.Stats.Stats("themes")
+			total, indexed, _ = d.Stats().Stats("themes")
 			title = "Themes"
 			activeInstalls = fetchActiveInstallsChart(d, "themes")
 			fileCount, fileSize = fetchFileStatsCharts(d, "themes")
 			largestBySize = fetchLargestExtensions(d, "themes", 25, "total_size")
 			largestByFileCount = fetchLargestExtensions(d, "themes", 25, "file_count")
 		case "cores":
-			total, indexed, _ = d.Stats.Stats("cores")
+			total, indexed, _ = d.Stats().Stats("cores")
 			title = "Core"
 			fileCount, fileSize = fetchFileStatsCharts(d, "cores")
 			largestBySize = fetchLargestExtensions(d, "cores", 25, "total_size")
@@ -93,7 +93,7 @@ func RepoPage(d *Deps) http.HandlerFunc {
 		// Show only the most recent failure per slug, excluding slugs whose
 		// latest event is a success (i.e. they recovered since the failure).
 		var failedEvents []FailedIndexEvent
-		d.DB.Raw(`
+		d.DB().Raw(`
 			SELECT slug, error_message, created_at FROM (
 				SELECT DISTINCT ON (slug) slug, status, error_message, created_at
 				FROM index_events
@@ -122,7 +122,7 @@ func RepoPage(d *Deps) http.HandlerFunc {
 // RepoItemsPartial renders the paginated, searchable items list as an HTMX partial.
 func RepoItemsPartial(d *Deps, repoType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.Stats == nil || d.DB == nil {
+		if d.Stats() == nil || d.DB() == nil {
 			http.Error(w, "Repository data is unavailable.", http.StatusServiceUnavailable)
 			return
 		}
@@ -184,7 +184,7 @@ func fetchPluginItems(d *Deps, page int, pageSize int, search string) ([]RepoIte
 		TotalSize  int64
 	}
 
-	query := d.DB.Table("plugins").Where("deleted_at IS NULL")
+	query := d.DB().Table("plugins").Where("deleted_at IS NULL")
 	if search != "" {
 		like := "%" + search + "%"
 		query = query.Where("name ILIKE ? OR slug ILIKE ?", like, like)
@@ -202,7 +202,7 @@ func fetchPluginItems(d *Deps, page int, pageSize int, search string) ([]RepoIte
 		Offset(offset).
 		Scan(&rows)
 
-	indexStatus := d.Stats.IndexStatus("plugins")
+	indexStatus := d.Stats().IndexStatus("plugins")
 	items := make([]RepoItem, len(rows))
 	for i, row := range rows {
 		items[i] = RepoItem{
@@ -232,7 +232,7 @@ func fetchThemeItems(d *Deps, page int, pageSize int, search string) ([]RepoItem
 		TotalSize  int64
 	}
 
-	query := d.DB.Table("themes").Where("deleted_at IS NULL")
+	query := d.DB().Table("themes").Where("deleted_at IS NULL")
 	if search != "" {
 		like := "%" + search + "%"
 		query = query.Where("name ILIKE ? OR slug ILIKE ?", like, like)
@@ -250,7 +250,7 @@ func fetchThemeItems(d *Deps, page int, pageSize int, search string) ([]RepoItem
 		Offset(offset).
 		Scan(&rows)
 
-	indexStatus := d.Stats.IndexStatus("themes")
+	indexStatus := d.Stats().IndexStatus("themes")
 	items := make([]RepoItem, len(rows))
 	for i, row := range rows {
 		items[i] = RepoItem{
@@ -277,7 +277,7 @@ func fetchCoreItems(d *Deps, page int, pageSize int, search string) ([]RepoItem,
 		TotalSize int64
 	}
 
-	query := d.DB.Table("cores").Where("deleted_at IS NULL")
+	query := d.DB().Table("cores").Where("deleted_at IS NULL")
 	if search != "" {
 		like := "%" + search + "%"
 		query = query.Where("version ILIKE ?", like)
@@ -294,7 +294,7 @@ func fetchCoreItems(d *Deps, page int, pageSize int, search string) ([]RepoItem,
 		Offset(offset).
 		Scan(&rows)
 
-	indexStatus := d.Stats.IndexStatus("cores")
+	indexStatus := d.Stats().IndexStatus("cores")
 	items := make([]RepoItem, len(rows))
 	for i, row := range rows {
 		items[i] = RepoItem{
@@ -323,7 +323,7 @@ func fetchActiveInstallsChart(d *Deps, table string) ChartData {
 	}
 
 	var rows []row
-	d.DB.Table(table).
+	d.DB().Table(table).
 		Select("active_installs").
 		Where("deleted_at IS NULL").
 		Order("active_installs ASC").
@@ -352,7 +352,7 @@ func fetchFileStatsCharts(d *Deps, table string) (ChartData, ChartData) {
 
 	type sizeRow struct{ TotalSize int64 }
 	var sizeRows []sizeRow
-	d.DB.Table(table).
+	d.DB().Table(table).
 		Select("total_size").
 		Where("deleted_at IS NULL").
 		Order("total_size ASC").
@@ -365,7 +365,7 @@ func fetchFileStatsCharts(d *Deps, table string) (ChartData, ChartData) {
 
 	type countRow struct{ FileCount int64 }
 	var countRows []countRow
-	d.DB.Table(table).
+	d.DB().Table(table).
 		Select("file_count").
 		Where("deleted_at IS NULL").
 		Order("file_count ASC").
@@ -392,7 +392,7 @@ func fetchLargestExtensions(d *Deps, table string, limit int, orderCol string) [
 	}
 
 	var extensions []LargestExtension
-	d.DB.Table(table).
+	d.DB().Table(table).
 		Select(slugCol+" AS slug, "+nameCol+" AS name, total_size, file_count").
 		Where("deleted_at IS NULL AND "+orderCol+" > 0").
 		Order(orderCol + " DESC").

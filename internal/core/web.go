@@ -15,7 +15,7 @@ import (
 // ViewPage renders a single core version detail page.
 func ViewPage(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil {
+		if d.DB() == nil {
 			http.Error(w, "Core data is unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
@@ -31,7 +31,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		var row coreRow
-		err := d.DB.Table("cores").
+		err := d.DB().Table("cores").
 			Select("id, name, version, file_count, total_size, largest_files").
 			Where("version = ? AND deleted_at IS NULL", version).
 			Scan(&row).Error
@@ -42,8 +42,8 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		indexStatus := map[string]bool{}
-		if d.Stats != nil {
-			indexStatus = d.Stats.IndexStatus("cores")
+		if d.Stats() != nil {
+			indexStatus = d.Stats().IndexStatus("cores")
 		}
 
 		pd := d.PageData(r)

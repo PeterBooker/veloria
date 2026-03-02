@@ -2,11 +2,12 @@ package app
 
 import (
 	"context"
-	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
+	"net"
 	"os"
+	"path/filepath"
 	"time"
 
 	"go.uber.org/zap"
@@ -25,6 +26,7 @@ import (
 	"veloria/internal/repo"
 	"veloria/internal/router"
 	"veloria/internal/server"
+	"veloria/internal/service"
 	"veloria/internal/storage"
 	"veloria/internal/tasks"
 	"veloria/internal/telemetry"
@@ -35,21 +37,16 @@ const fmtDBString = "host=%s user=%s password=%s dbname=%s port=%d sslmode=%s Ti
 
 // App encapsulates the entire application lifecycle.
 type App struct {
-	Config       *config.Config
-	Logger       *zap.Logger
-	Telemetry    *telemetry.Telemetry
-	DB           *gorm.DB
-	SqlDB        *sql.DB
-	S3           storage.ResultStorage
-	Cache        cache.Cache
-	Manager      *manager.Manager
-	Tasks        *tasks.Tasks
-	Server       *server.Server
-	SessionStore *auth.SessionStore
-	AuthHandler  *auth.Handler
+	Config    *config.Config
+	Logger    *zap.Logger
+	Telemetry *telemetry.Telemetry
+	Cache     cache.Cache
+	Server    *server.Server
+	Registry  *service.Registry
 
-	apiClient     *repo.APIClient
 	cancelWorkers context.CancelFunc
+	workerCtx     context.Context
+	ctlListener   net.Listener // Unix socket for maintenance CLI
 }
 
 // New creates and initializes a new App with all dependencies.
@@ -68,20 +65,23 @@ func New(ctx context.Context) (*App, error) {
 	}
 	l := tel.Logger
 
+	reg := &service.Registry{}
+
 	a := &App{
 		Config:    c,
 		Logger:    l,
 		Telemetry: tel,
+		Registry:  reg,
 	}
 
 	// Initialize database
 	if err := a.initDB(); err != nil {
-		l.Error("DB initialization failed; running in no-search mode", zap.Error(err))
+		l.Error("DB initialization failed; running in degraded mode", zap.Error(err))
 	}
 
 	// Initialize S3
 	if err := a.initS3(); err != nil {
-		l.Error("S3 initialization failed; running in no-search mode", zap.Error(err))
+		l.Error("S3 initialization failed; running in degraded mode", zap.Error(err))
 	}
 
 	// Initialize cache
@@ -94,68 +94,21 @@ func New(ctx context.Context) (*App, error) {
 	// Background workers context
 	workerCtx, cancelWorkers := context.WithCancel(ctx)
 	a.cancelWorkers = cancelWorkers
+	a.workerCtx = workerCtx
 
-	// Initialize manager and tasks if DB is available
-	if a.DB != nil {
-		a.Tasks = tasks.New(workerCtx)
-		_ = a.Tasks.AddJob(workerCtx, "search-cleanup", tasks.CleanupStuckSearches(a.DB, l), tasks.SearchCleanupInterval)
-		a.Tasks.Start()
-
-		apiClient := repo.NewAPIClient(c.AspireCloudAPIKey, l, repo.ThrottleConfig{
-			RequestsPerSecond: c.APIThrottleRPS,
-			Burst:             c.APIThrottleBurst,
-			MaxRetries:        c.APIThrottleMaxRetries,
-			DefaultRetryDelay: c.APIThrottleRetryDelay,
-		})
-		a.apiClient = apiClient
-
-		eventRecorder := repo.NewIndexEventRecorder(a.DB, l)
-		_ = a.Tasks.AddJob(workerCtx, "index-event-cleanup", repo.CleanupOldEvents(a.DB, l, 30*24*time.Hour), 1*time.Hour)
-
-		pr := repo.NewPluginStore(workerCtx, a.DB, c, l, appCache, apiClient)
-		tr := repo.NewThemeStore(workerCtx, a.DB, c, l, appCache, apiClient)
-		cr := repo.NewCoreStore(workerCtx, a.DB, c, l, appCache, apiClient)
-
-		m, err := manager.NewManager(workerCtx, l, []repo.DataSource{pr, tr, cr}, c.IndexerConcurrency, eventRecorder, apiClient)
-		if err != nil {
-			l.Error("Failed to load repositories; running in no-search mode", zap.Error(err))
-		} else {
-			a.Manager = m
-		}
+	// Initialize DB-dependent services (manager, tasks, session, auth, MCP)
+	if reg.DB() != nil {
+		a.initDBDependents(workerCtx, appCache)
 	}
 
-	// Setup OAuth
+	// Setup OAuth providers (does not require DB)
 	auth.SetupProviders(c)
 
-	// Initialize session store and auth handler
-	if a.DB != nil {
-		if c.Env != "development" && c.SessionSecret == "" {
-			l.Error("SESSION_SECRET not set; continuing without auth")
-		} else {
-			sessionStore, err := auth.NewSessionStore(a.SqlDB, a.DB, c)
-			if err != nil {
-				l.Error("Failed to create session store; continuing without auth", zap.Error(err))
-			} else {
-				a.SessionStore = sessionStore
-				a.AuthHandler = auth.NewHandler(a.DB, sessionStore, l)
-			}
-		}
+	if !reg.SearchEnabled() {
+		l.Warn("Search disabled", zap.String("reason", reg.SearchDisabledReason()))
 	}
 
-	searchEnabled := a.DB != nil && a.S3 != nil && a.Manager != nil
-	searchDisabledReason := ""
-	if !searchEnabled {
-		switch {
-		case a.DB == nil:
-			searchDisabledReason = "Database connection is unavailable."
-		case a.S3 == nil:
-			searchDisabledReason = "Search storage is unavailable."
-		default:
-			searchDisabledReason = "Search index is not ready."
-		}
-		l.Warn("Search disabled", zap.String("reason", searchDisabledReason))
-	}
-	deps := web.NewDeps(a.DB, a.Manager, a.Manager, a.Manager, a.Manager, a.S3, appCache, c, searchEnabled, searchDisabledReason)
+	deps := web.NewDeps(reg, appCache, c)
 
 	// Initialize OG image generator
 	ogGen, err := ogimage.New(assets.FS)
@@ -163,49 +116,23 @@ func New(ctx context.Context) (*App, error) {
 		l.Error("Failed to initialize OG image generator; OG images disabled", zap.Error(err))
 	}
 
-	// Build per-type stats map for the router's API list handlers.
-	var statsMap map[string]manager.RepoStatsProvider
-	if a.Manager != nil {
-		statsMap = map[string]manager.RepoStatsProvider{
-			"plugins": a.Manager.GetSource(repo.TypePlugins),
-			"themes":  a.Manager.GetSource(repo.TypeThemes),
-			"cores":   a.Manager.GetSource(repo.TypeCores),
-		}
-	}
-
-	// Initialize MCP server
-	var mcpHandler http.Handler
-	if c.MCPEnabled && a.Manager != nil && a.DB != nil && a.S3 != nil {
-		mcpSvc := veloriamc.NewDirectService(a.Manager, a.DB, a.S3)
-		mcpServer := veloriamc.NewMCPServer(c.Name, config.Version, mcpSvc)
-		mcpHandler = veloriamc.NewHTTPHandler(mcpServer)
-		l.Info("MCP server enabled at /mcp")
-	}
-
 	// Health checker
 	healthChecker := &health.Checker{
-		DB:      a.SqlDB,
-		Manager: a.Manager,
+		Registry: reg,
 	}
 
 	r := router.New(router.RouterDeps{
-		DB:                a.DB,
-		Search:            a.Manager,
-		Stats:             statsMap,
-		S3:                a.S3,
+		Registry:          reg,
 		WebDeps:           deps,
-		Session:           a.SessionStore,
-		Auth:              a.AuthHandler,
 		OGGen:             ogGen,
-		MCP:               mcpHandler,
 		PrometheusHandler: tel.PrometheusHandler,
 		HealthHandler:     health.Handler(healthChecker),
 		Options: router.Options{
 			HandlerTimeout:   c.HTTPHandlerTimeout,
-			SearchEnabled:    searchEnabled,
 			RateLimitEnabled: c.HTTPRateLimitEnabled,
 			AppURL:           c.AppURL,
 			RedirectDomains:  c.RedirectDomains,
+			MCPEnabled:       c.MCPEnabled,
 		},
 	})
 
@@ -215,7 +142,74 @@ func New(ctx context.Context) (*App, error) {
 	}
 	a.Server = srv
 
+	// Start background reconnection loop if any service failed to connect
+	if reg.DB() == nil || reg.S3() == nil {
+		go a.reconnectLoop(workerCtx)
+	}
+
+	// Start Unix control socket for maintenance CLI
+	if err := a.startControlSocket(); err != nil {
+		l.Error("Failed to start control socket; CLI maintenance commands unavailable", zap.Error(err))
+	}
+
 	return a, nil
+}
+
+// initDBDependents initializes all services that depend on the database:
+// tasks, API client, data stores, manager, session store, auth handler, and MCP.
+func (a *App) initDBDependents(ctx context.Context, appCache cache.Cache) {
+	c := a.Config
+	l := a.Logger
+	reg := a.Registry
+	db := reg.DB()
+
+	t := tasks.New(ctx)
+	_ = t.AddJob(ctx, "search-cleanup", tasks.CleanupStuckSearches(db, l), tasks.SearchCleanupInterval)
+	t.Start()
+	reg.SetTasks(t)
+
+	apiClient := repo.NewAPIClient(c.AspireCloudAPIKey, l, repo.ThrottleConfig{
+		RequestsPerSecond: c.APIThrottleRPS,
+		Burst:             c.APIThrottleBurst,
+		MaxRetries:        c.APIThrottleMaxRetries,
+		DefaultRetryDelay: c.APIThrottleRetryDelay,
+	})
+	reg.SetAPIClient(apiClient)
+
+	eventRecorder := repo.NewIndexEventRecorder(db, l)
+	_ = t.AddJob(ctx, "index-event-cleanup", repo.CleanupOldEvents(db, l, 30*24*time.Hour), 1*time.Hour)
+
+	pr := repo.NewPluginStore(ctx, db, c, l, appCache, apiClient)
+	tr := repo.NewThemeStore(ctx, db, c, l, appCache, apiClient)
+	cr := repo.NewCoreStore(ctx, db, c, l, appCache, apiClient)
+
+	m, err := manager.NewManager(ctx, l, []repo.DataSource{pr, tr, cr}, c.IndexerConcurrency, eventRecorder, apiClient)
+	if err != nil {
+		l.Error("Failed to load repositories; running in degraded mode", zap.Error(err))
+	} else {
+		reg.SetManager(m)
+	}
+
+	// Session store and auth handler
+	if c.Env != "development" && c.SessionSecret == "" {
+		l.Error("SESSION_SECRET not set; continuing without auth")
+	} else {
+		sessionStore, err := auth.NewSessionStore(reg.SqlDB(), db, c)
+		if err != nil {
+			l.Error("Failed to create session store; continuing without auth", zap.Error(err))
+		} else {
+			reg.SetSession(sessionStore)
+			reg.SetAuth(auth.NewHandler(db, sessionStore, l))
+		}
+	}
+
+	// MCP server
+	if c.MCPEnabled && reg.Manager() != nil && reg.S3() != nil {
+		mcpSvc := veloriamc.NewDirectService(reg.Manager(), db, reg.S3())
+		mcpServer := veloriamc.NewMCPServer(c.Name, config.Version, mcpSvc)
+		reg.SetMCPHandler(veloriamc.NewHTTPHandler(mcpServer))
+		l.Info("MCP server enabled at /mcp")
+	}
 }
 
 // Start starts the HTTP server. This blocks until the server stops.
@@ -227,21 +221,26 @@ func (a *App) Start() error {
 func (a *App) Shutdown(ctx context.Context) error {
 	a.Logger.Info("Shutting down application")
 
+	// Close control socket
+	if a.ctlListener != nil {
+		_ = a.ctlListener.Close()
+	}
+
 	// Cancel background workers first
 	if a.cancelWorkers != nil {
 		a.cancelWorkers()
 	}
 
 	// Stop scheduled tasks
-	if a.Tasks != nil {
-		a.Tasks.Stop()
+	if t := a.Registry.Tasks(); t != nil {
+		t.Stop()
 	}
 
 	// Wait for the manager's updater goroutine to finish (with deadline).
-	if a.Manager != nil {
+	if m := a.Registry.Manager(); m != nil {
 		done := make(chan struct{})
 		go func() {
-			a.Manager.Wait()
+			m.Wait()
 			close(done)
 		}()
 		select {
@@ -252,8 +251,8 @@ func (a *App) Shutdown(ctx context.Context) error {
 	}
 
 	// Stop API client rate limiter
-	if a.apiClient != nil {
-		a.apiClient.Close()
+	if c := a.Registry.APIClient(); c != nil {
+		c.Close()
 	}
 
 	// Shutdown HTTP servers
@@ -262,8 +261,8 @@ func (a *App) Shutdown(ctx context.Context) error {
 	}
 
 	// Close session store
-	if a.SessionStore != nil {
-		a.SessionStore.Close()
+	if s := a.Registry.Session(); s != nil {
+		s.Close()
 	}
 
 	// Close cache
@@ -272,8 +271,8 @@ func (a *App) Shutdown(ctx context.Context) error {
 	}
 
 	// Close database
-	if a.SqlDB != nil {
-		if err := a.SqlDB.Close(); err != nil {
+	if sqlDB := a.Registry.SqlDB(); sqlDB != nil {
+		if err := sqlDB.Close(); err != nil {
 			a.Logger.Error("DB connection closing failure", zap.Error(err))
 		}
 	}
@@ -287,6 +286,57 @@ func (a *App) Shutdown(ctx context.Context) error {
 
 	a.Logger.Info("Application shutdown complete")
 	return nil
+}
+
+// reconnectLoop periodically attempts to reconnect failed services.
+func (a *App) reconnectLoop(ctx context.Context) {
+	ticker := time.NewTicker(a.Config.ReconnectInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if a.tryReconnect(ctx) {
+				return
+			}
+		}
+	}
+}
+
+// tryReconnect attempts to connect any missing services. Returns true when
+// all services are connected and the reconnection loop can stop.
+func (a *App) tryReconnect(ctx context.Context) bool {
+	reg := a.Registry
+
+	if reg.DB() == nil {
+		a.Logger.Info("Attempting to reconnect to database...")
+		if err := a.initDB(); err != nil {
+			a.Logger.Warn("DB reconnection failed", zap.Error(err))
+		} else {
+			a.Logger.Info("DB reconnection successful")
+			a.initDBDependents(a.workerCtx, a.Cache)
+		}
+	}
+
+	if reg.S3() == nil {
+		a.Logger.Info("Attempting to reconnect to S3...")
+		if err := a.initS3(); err != nil {
+			a.Logger.Warn("S3 reconnection failed", zap.Error(err))
+		} else {
+			a.Logger.Info("S3 reconnection successful")
+			// If MCP was waiting on S3, try to initialize it now
+			if a.Config.MCPEnabled && reg.MCPHandler() == nil && reg.Manager() != nil && reg.DB() != nil {
+				mcpSvc := veloriamc.NewDirectService(reg.Manager(), reg.DB(), reg.S3())
+				mcpServer := veloriamc.NewMCPServer(a.Config.Name, config.Version, mcpSvc)
+				reg.SetMCPHandler(veloriamc.NewHTTPHandler(mcpServer))
+				a.Logger.Info("MCP server enabled after S3 reconnection")
+			}
+		}
+	}
+
+	return reg.DB() != nil && reg.S3() != nil
 }
 
 func (a *App) initDB() error {
@@ -328,8 +378,7 @@ func (a *App) initDB() error {
 		return fmt.Errorf("DB ping failed: %w", err)
 	}
 
-	a.DB = db
-	a.SqlDB = sqlDB
+	a.Registry.SetDB(db, sqlDB)
 	return nil
 }
 
@@ -348,6 +397,76 @@ func (a *App) initS3() error {
 		return fmt.Errorf("failed to ensure S3 bucket exists: %w", err)
 	}
 
-	a.S3 = s3
+	a.Registry.SetS3(s3)
 	return nil
+}
+
+// controlSocketPath returns the path for the Unix control socket.
+func (a *App) controlSocketPath() string {
+	return filepath.Join(a.Config.DataDir, "veloria.sock")
+}
+
+// ctlRequest is the JSON payload for control socket commands.
+type ctlRequest struct {
+	Action  string `json:"action"`
+	Enabled bool   `json:"enabled"`
+}
+
+// ctlResponse is the JSON response from control socket commands.
+type ctlResponse struct {
+	OK      bool   `json:"ok"`
+	Message string `json:"message"`
+}
+
+func (a *App) startControlSocket() error {
+	sockPath := a.controlSocketPath()
+	// Remove stale socket file from previous run
+	_ = os.Remove(sockPath)
+
+	ln, err := net.Listen("unix", sockPath)
+	if err != nil {
+		return fmt.Errorf("failed to listen on control socket %s: %w", sockPath, err)
+	}
+	a.ctlListener = ln
+
+	go a.serveControlSocket(ln)
+	a.Logger.Info("Control socket listening", zap.String("path", sockPath))
+	return nil
+}
+
+func (a *App) serveControlSocket(ln net.Listener) {
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return // listener closed
+		}
+		go a.handleControlConn(conn)
+	}
+}
+
+func (a *App) handleControlConn(conn net.Conn) {
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+
+	var req ctlRequest
+	if err := json.NewDecoder(conn).Decode(&req); err != nil {
+		_ = json.NewEncoder(conn).Encode(ctlResponse{Message: "invalid request"})
+		return
+	}
+
+	var resp ctlResponse
+	switch req.Action {
+	case "maintenance":
+		a.Registry.SetMaintenance(req.Enabled)
+		state := "off"
+		if req.Enabled {
+			state = "on"
+		}
+		resp = ctlResponse{OK: true, Message: fmt.Sprintf("Maintenance mode %s", state)}
+		a.Logger.Info("Maintenance mode changed via CLI", zap.Bool("enabled", req.Enabled))
+	default:
+		resp = ctlResponse{Message: fmt.Sprintf("unknown action: %s", req.Action)}
+	}
+
+	_ = json.NewEncoder(conn).Encode(resp)
 }

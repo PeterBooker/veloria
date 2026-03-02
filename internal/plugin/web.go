@@ -14,7 +14,7 @@ import (
 // ViewPage renders a single plugin detail page.
 func ViewPage(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil {
+		if d.DB() == nil {
 			http.Error(w, "Plugin data is unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
@@ -41,7 +41,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		var row pluginRow
-		err := d.DB.Table("plugins").
+		err := d.DB().Table("plugins").
 			Select("id, name, slug, source, version, short_description, requires, tested, requires_php, rating, active_installs, downloaded, download_link, tags, file_count, total_size, largest_files").
 			Where("slug = ? AND deleted_at IS NULL", slug).
 			Scan(&row).Error
@@ -52,8 +52,8 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		indexStatus := map[string]bool{}
-		if d.Stats != nil {
-			indexStatus = d.Stats.IndexStatus("plugins")
+		if d.Stats() != nil {
+			indexStatus = d.Stats().IndexStatus("plugins")
 		}
 
 		pd := d.PageData(r)

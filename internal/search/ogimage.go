@@ -32,13 +32,13 @@ func OGImage(d *web.Deps, gen *ogimage.Generator) http.HandlerFunc {
 			}
 		}
 
-		if d.DB == nil {
+		if d.DB() == nil {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return
 		}
 
 		var s searchmodel.Search
-		if err := d.DB.First(&s, "id = ?", id).Error; err != nil {
+		if err := d.DB().First(&s, "id = ?", id).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				http.Error(w, "search not found", http.StatusNotFound)
 				return

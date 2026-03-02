@@ -10,10 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api "veloria/internal/api"
+	"veloria/internal/service"
 )
 
 func TestViewThemeV1_NilDB(t *testing.T) {
-	handler := ViewThemeV1(nil)
+	reg := &service.Registry{}
+	handler := ViewThemeV1(reg)
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/theme/123", nil)
 	w := httptest.NewRecorder()
 
@@ -26,7 +28,8 @@ func TestViewThemeV1_NilDB(t *testing.T) {
 }
 
 func TestListThemesV1_NilDB(t *testing.T) {
-	handler := ListThemesV1(nil, nil)
+	reg := &service.Registry{}
+	handler := ListThemesV1(reg)
 	r := httptest.NewRequest(http.MethodGet, "/api/v1/themes", nil)
 	w := httptest.NewRecorder()
 

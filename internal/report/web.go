@@ -38,7 +38,7 @@ func SubmitReport(d *web.Deps) http.HandlerFunc {
 		}
 
 		var s searchmodel.Search
-		if err := d.DB.First(&s, "id = ?", searchID).Error; err != nil {
+		if err := d.DB().First(&s, "id = ?", searchID).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				http.Error(w, "search not found", http.StatusNotFound)
 				return
@@ -61,7 +61,7 @@ func SubmitReport(d *web.Deps) http.HandlerFunc {
 			Reason:   reason,
 		}
 
-		result := d.DB.Create(&report)
+		result := d.DB().Create(&report)
 		if result.Error != nil {
 			if strings.Contains(result.Error.Error(), "duplicate key") ||
 				strings.Contains(result.Error.Error(), "UNIQUE constraint") {
@@ -93,7 +93,7 @@ type reportRow struct {
 // ReportsPage renders GET /admin/reports.
 func ReportsPage(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil {
+		if d.DB() == nil {
 			http.Error(w, "Database unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -107,7 +107,7 @@ func ReportsPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		var totalCount int64
-		d.DB.Model(&SearchReport{}).Where("resolved = false").Count(&totalCount)
+		d.DB().Model(&SearchReport{}).Where("resolved = false").Count(&totalCount)
 		totalPages := int(math.Ceil(float64(totalCount) / float64(pageSize)))
 		if totalPages == 0 {
 			totalPages = 1
@@ -118,7 +118,7 @@ func ReportsPage(d *web.Deps) http.HandlerFunc {
 
 		offset := (page - 1) * pageSize
 		var rows []reportRow
-		d.DB.Raw(`
+		d.DB().Raw(`
 			SELECT sr.id as report_id, sr.search_id, s.term as search_term, s.repo as search_repo,
 			       s.private as search_private, u.name as reporter_name, sr.reason, sr.created_at as reported_at
 			FROM search_reports sr
@@ -171,7 +171,7 @@ func ResolveReport(d *web.Deps) http.HandlerFunc {
 		}
 
 		now := time.Now()
-		result := d.DB.Model(&SearchReport{}).Where("id = ?", reportID).Updates(map[string]any{
+		result := d.DB().Model(&SearchReport{}).Where("id = ?", reportID).Updates(map[string]any{
 			"resolved":    true,
 			"resolved_by": currentUser.ID,
 			"resolved_at": now,

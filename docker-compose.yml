@@ -133,7 +133,6 @@ networks:
 volumes:
   veloria-postgres:
     driver: local
-  veloria-redis:
-    driver: local
+
   veloria-minio:
     driver: local
