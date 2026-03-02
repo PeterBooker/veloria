@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 
 	api "veloria/internal/api"
-	"veloria/internal/manager"
 	"veloria/internal/repo"
+	"veloria/internal/service"
 )
 
 type ThemeListItem struct {
@@ -22,8 +22,9 @@ type ThemeListItem struct {
 	Indexed   bool      `json:"indexed"`
 }
 
-func ViewThemeV1(db *gorm.DB) http.Handler {
+func ViewThemeV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		db := reg.DB()
 		if db == nil {
 			api.WriteJSON(w, api.ErrUnavailable("themes are unavailable"))
 			return
@@ -49,8 +50,9 @@ func ViewThemeV1(db *gorm.DB) http.Handler {
 	})
 }
 
-func ListThemesV1(db *gorm.DB, statsProvider manager.RepoStatsProvider) http.Handler {
+func ListThemesV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		db := reg.DB()
 		if db == nil {
 			api.WriteJSON(w, api.ErrUnavailable("themes are unavailable"))
 			return
@@ -81,8 +83,10 @@ func ListThemesV1(db *gorm.DB, statsProvider manager.RepoStatsProvider) http.Han
 		}
 
 		indexedBySlug := map[string]bool{}
-		if statsProvider != nil {
-			indexedBySlug = statsProvider.IndexStatus()
+		if m := reg.Manager(); m != nil {
+			if src := m.GetSource(repo.TypeThemes); src != nil {
+				indexedBySlug = src.IndexStatus()
+			}
 		}
 		for i := range items {
 			items[i].Indexed = indexedBySlug[items[i].Slug]

@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 
 	api "veloria/internal/api"
-	"veloria/internal/manager"
 	"veloria/internal/repo"
+	"veloria/internal/service"
 )
 
 type CoreListItem struct {
@@ -29,8 +29,9 @@ type coreRow struct {
 	UpdatedAt time.Time
 }
 
-func ViewCoreV1(db *gorm.DB) http.Handler {
+func ViewCoreV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		db := reg.DB()
 		if db == nil {
 			api.WriteJSON(w, api.ErrUnavailable("cores are unavailable"))
 			return
@@ -56,8 +57,9 @@ func ViewCoreV1(db *gorm.DB) http.Handler {
 	})
 }
 
-func ListCoresV1(db *gorm.DB, statsProvider manager.RepoStatsProvider) http.Handler {
+func ListCoresV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		db := reg.DB()
 		if db == nil {
 			api.WriteJSON(w, api.ErrUnavailable("cores are unavailable"))
 			return
@@ -88,8 +90,10 @@ func ListCoresV1(db *gorm.DB, statsProvider manager.RepoStatsProvider) http.Hand
 		}
 
 		indexedBySlug := map[string]bool{}
-		if statsProvider != nil {
-			indexedBySlug = statsProvider.IndexStatus()
+		if m := reg.Manager(); m != nil {
+			if src := m.GetSource(repo.TypeCores); src != nil {
+				indexedBySlug = src.IndexStatus()
+			}
 		}
 
 		items := make([]CoreListItem, len(rows))

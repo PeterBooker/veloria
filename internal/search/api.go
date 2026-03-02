@@ -15,6 +15,7 @@ import (
 	api "veloria/internal/api"
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
+	"veloria/internal/service"
 	"veloria/internal/storage"
 	"veloria/internal/telemetry"
 	typespb "veloria/internal/types"
@@ -45,8 +46,9 @@ func releaseSearchSlot() {
 	<-searchSem
 }
 
-func ViewSearchV1(db *gorm.DB, s3 storage.ResultStorage) http.Handler {
+func ViewSearchV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		db := reg.DB()
 		if db == nil {
 			api.WriteJSON(w, api.ErrUnavailable("searches are unavailable"))
 			return
@@ -68,13 +70,15 @@ func ViewSearchV1(db *gorm.DB, s3 storage.ResultStorage) http.Handler {
 			return
 		}
 
-		if s.Status == searchmodel.StatusCompleted && s3 != nil {
-			ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-			defer cancel()
+		if s.Status == searchmodel.StatusCompleted {
+			if s3 := reg.S3(); s3 != nil {
+				ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+				defer cancel()
 
-			var protoResults typespb.SearchResponse
-			if err := s3.DownloadResult(ctx, s.ID.String(), &protoResults); err == nil {
-				s.Results = searchmodel.SearchResponseFromProto(&protoResults)
+				var protoResults typespb.SearchResponse
+				if err := s3.DownloadResult(ctx, s.ID.String(), &protoResults); err == nil {
+					s.Results = searchmodel.SearchResponseFromProto(&protoResults)
+				}
 			}
 		}
 
@@ -82,8 +86,11 @@ func ViewSearchV1(db *gorm.DB, s3 storage.ResultStorage) http.Handler {
 	})
 }
 
-func CreateSearchV1(db *gorm.DB, m manager.Searcher, s3 storage.ResultStorage) http.Handler {
+func CreateSearchV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		db := reg.DB()
+		m := reg.Manager()
+		s3 := reg.S3()
 		if db == nil || m == nil || s3 == nil {
 			api.WriteJSON(w, api.ErrUnavailable("search is temporarily unavailable"))
 			return
@@ -210,8 +217,9 @@ type SearchListItem struct {
 	UserID      *uuid.UUID `json:"user_id,omitempty"`
 }
 
-func ListSearchesV1(db *gorm.DB) http.Handler {
+func ListSearchesV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		db := reg.DB()
 		if db == nil {
 			api.WriteJSON(w, api.ErrUnavailable("searches are unavailable"))
 			return

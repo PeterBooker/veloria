@@ -10,42 +10,29 @@ import (
 	"veloria/internal/auth"
 	"veloria/internal/cache"
 	"veloria/internal/config"
+	"veloria/internal/service"
 	"veloria/internal/storage"
 )
 
 // Deps holds shared dependencies for all web handlers.
 // Manager capabilities are exposed through narrow interfaces (SearchService,
 // ReindexService, SourceResolver, StatsProvider) defined in interfaces.go.
+// Service availability is resolved dynamically via the Registry so that
+// handlers see reconnected services without requiring a restart.
 type Deps struct {
-	DB                   *gorm.DB
-	Search               SearchService
-	Reindex              ReindexService
-	Sources              SourceResolver
-	Stats                StatsProvider
-	S3                   storage.ResultStorage
-	Cache                cache.Cache
-	Config               *config.Config
-	Progress             *ProgressStore
-	SearchEnabled        bool
-	SearchDisabledReason string
+	Registry *service.Registry
+	Cache    cache.Cache
+	Config   *config.Config
+	Progress *ProgressStore
 }
 
 // NewDeps creates a new shared dependency container for web handlers.
-// All four interface parameters (search, reindex, sources, stats) may be nil
-// when the manager is unavailable (e.g. no database).
-func NewDeps(db *gorm.DB, search SearchService, reindex ReindexService, sources SourceResolver, stats StatsProvider, s3 storage.ResultStorage, ch cache.Cache, cfg *config.Config, searchEnabled bool, searchDisabledReason string) *Deps {
+func NewDeps(reg *service.Registry, ch cache.Cache, cfg *config.Config) *Deps {
 	return &Deps{
-		DB:                   db,
-		Search:               search,
-		Reindex:              reindex,
-		Sources:              sources,
-		Stats:                stats,
-		S3:                   s3,
-		Cache:                ch,
-		Config:               cfg,
-		Progress:             &ProgressStore{},
-		SearchEnabled:        searchEnabled,
-		SearchDisabledReason: searchDisabledReason,
+		Registry: reg,
+		Cache:    ch,
+		Config:   cfg,
+		Progress: &ProgressStore{},
 	}
 }
 
@@ -56,8 +43,8 @@ func (d *Deps) PageData(r *http.Request) PageData {
 
 	return PageData{
 		User:                 auth.UserFromContext(r.Context()),
-		SearchEnabled:        d.SearchEnabled,
-		SearchDisabledReason: d.SearchDisabledReason,
+		SearchEnabled:        d.Registry.SearchEnabled(),
+		SearchDisabledReason: d.Registry.SearchDisabledReason(),
 		CurrentPath:          r.URL.Path,
 		Version:              config.Version,
 		RequestStart:         time.Now(),
@@ -81,5 +68,44 @@ func (d *Deps) RenderComponent(w http.ResponseWriter, r *http.Request, c templ.C
 
 // SearchAvailable returns whether the search feature is fully operational.
 func (d *Deps) SearchAvailable() bool {
-	return d.SearchEnabled && d.DB != nil && d.Search != nil && d.S3 != nil
+	return d.Registry.SearchEnabled()
+}
+
+// DB returns the current database connection, or nil if unavailable.
+func (d *Deps) DB() *gorm.DB { return d.Registry.DB() }
+
+// S3 returns the current result storage, or nil if unavailable.
+func (d *Deps) S3() storage.ResultStorage { return d.Registry.S3() }
+
+// Search returns the search service, or nil if the manager is unavailable.
+// The explicit nil check avoids returning a non-nil interface with a nil value.
+func (d *Deps) Search() SearchService {
+	if m := d.Registry.Manager(); m != nil {
+		return m
+	}
+	return nil
+}
+
+// Reindex returns the reindex service, or nil if the manager is unavailable.
+func (d *Deps) Reindex() ReindexService {
+	if m := d.Registry.Manager(); m != nil {
+		return m
+	}
+	return nil
+}
+
+// Sources returns the source resolver, or nil if the manager is unavailable.
+func (d *Deps) Sources() SourceResolver {
+	if m := d.Registry.Manager(); m != nil {
+		return m
+	}
+	return nil
+}
+
+// Stats returns the stats provider, or nil if the manager is unavailable.
+func (d *Deps) Stats() StatsProvider {
+	if m := d.Registry.Manager(); m != nil {
+		return m
+	}
+	return nil
 }

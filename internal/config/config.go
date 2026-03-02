@@ -83,6 +83,9 @@ type Config struct {
 	// Debug mode: controls informational (non-error/warning) log output
 	AppDebug bool `env:"APP_DEBUG" envDefault:"false"`
 
+	// Reconnect interval: how often to retry failed service connections
+	ReconnectInterval time.Duration `env:"RECONNECT_INTERVAL" envDefault:"30s"`
+
 	// OpenTelemetry Configuration
 	OTelExporterType     string        `env:"OTEL_EXPORTER_TYPE" envDefault:"none"`
 	OTLPEndpoint         string        `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:"localhost:4317"`

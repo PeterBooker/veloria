@@ -9,19 +9,16 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
-	"gorm.io/gorm"
 
 	"veloria/assets"
 	"veloria/internal/admin"
 	api "veloria/internal/api"
-	"veloria/internal/auth"
 	"veloria/internal/core"
 	ogimage "veloria/internal/image"
-	"veloria/internal/manager"
 	"veloria/internal/plugin"
 	"veloria/internal/report"
 	"veloria/internal/search"
-	"veloria/internal/storage"
+	"veloria/internal/service"
 	"veloria/internal/theme"
 	"veloria/internal/web"
 )
@@ -29,24 +26,18 @@ import (
 // Options holds runtime configuration for the router.
 type Options struct {
 	HandlerTimeout   time.Duration
-	SearchEnabled    bool
 	RateLimitEnabled bool
 	AppURL           string   // Target URL for legacy domain redirects (e.g., "https://veloria.dev")
 	RedirectDomains  []string // Legacy domains to redirect (e.g., ["wpdirectory.net", "www.wpdirectory.net"])
+	MCPEnabled       bool
 }
 
 // RouterDeps holds all dependencies needed to construct the router.
 // Optional fields may be nil when the corresponding subsystem is unavailable.
 type RouterDeps struct {
-	DB                *gorm.DB
-	Search            manager.Searcher                     // for API search endpoint; or nil
-	Stats             map[string]manager.RepoStatsProvider // per-type stats for API list endpoints; or nil
-	S3                storage.ResultStorage
+	Registry          *service.Registry
 	WebDeps           *web.Deps
-	Session           *auth.SessionStore
-	Auth              *auth.Handler
 	OGGen             *ogimage.Generator // OG image generator; or nil
-	MCP               http.Handler       // MCP streamable HTTP handler; or nil
 	PrometheusHandler http.Handler       // Prometheus metrics handler; or nil
 	HealthHandler     http.HandlerFunc   // Health readiness endpoint; or nil
 	Options           Options
@@ -56,6 +47,10 @@ func New(deps RouterDeps) *chi.Mux {
 	r := chi.NewRouter()
 
 	opts := deps.Options
+	reg := deps.Registry
+
+	// Maintenance middleware — must be first so it intercepts all requests.
+	r.Use(maintenanceMiddleware(reg))
 
 	// Redirect legacy domains
 	if opts.AppURL != "" && len(opts.RedirectDomains) > 0 {
@@ -75,10 +70,8 @@ func New(deps RouterDeps) *chi.Mux {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.StripSlashes)
 
-	// Auth middleware - injects user into context if logged in
-	if deps.Session != nil {
-		r.Use(deps.Session.AuthMiddleware)
-	}
+	// Auth middleware - dynamically resolved from registry
+	r.Use(dynamicAuthMiddleware(reg))
 
 	// Liveness check
 	r.Get("/up", func(w http.ResponseWriter, _ *http.Request) {
@@ -95,15 +88,13 @@ func New(deps RouterDeps) *chi.Mux {
 		r.Handle("/metrics", deps.PrometheusHandler)
 	}
 
-	// Auth routes
-	if deps.Auth != nil {
-		r.Get("/login", web.LoginPage(deps.WebDeps))
-		r.Get("/logout", deps.Auth.Logout)
-		r.Route("/auth", func(r chi.Router) {
-			r.Get("/{provider}", deps.Auth.BeginAuth)
-			r.Get("/{provider}/callback", deps.Auth.Callback)
-		})
-	}
+	// Auth routes - dynamically resolved
+	r.Get("/login", dynamicLoginHandler(reg, deps.WebDeps))
+	r.Get("/logout", dynamicLogoutHandler(reg))
+	r.Route("/auth", func(r chi.Router) {
+		r.Get("/{provider}", dynamicBeginAuth(reg))
+		r.Get("/{provider}/callback", dynamicAuthCallback(reg))
+	})
 
 	// Static assets (CSS, JS, fonts)
 	staticFS, _ := fs.Sub(assets.FS, "static")
@@ -149,45 +140,33 @@ func New(deps RouterDeps) *chi.Mux {
 		r.Get("/searches/own", search.ListOwnPage(deps.WebDeps))
 		r.Get("/my-searches", search.MyListRedirect())
 
-		// Report a search (requires login)
-		if deps.Session != nil {
-			r.With(deps.Session.RequireAuth).Post("/search/{uuid}/report", report.SubmitReport(deps.WebDeps))
-		}
+		// Report a search (requires login - dynamically checked)
+		r.With(dynamicRequireAuth(reg)).Post("/search/{uuid}/report", report.SubmitReport(deps.WebDeps))
 
 		// Admin routes
-		if deps.Session != nil {
-			r.Route("/admin", func(r chi.Router) {
-				r.Use(deps.Session.RequireAuth)
-				r.Use(deps.Session.RequireAdmin)
+		r.Route("/admin", func(r chi.Router) {
+			r.Use(dynamicRequireAuth(reg))
+			r.Use(dynamicRequireAdmin(reg))
 
-				r.Get("/reports", report.ReportsPage(deps.WebDeps))
-				r.Post("/reports/{id}/resolve", report.ResolveReport(deps.WebDeps))
-				r.Post("/search/{uuid}/visibility", search.ToggleVisibility(deps.WebDeps))
-				r.Post("/reindex", admin.ReindexExtension(deps.WebDeps))
-			})
-		}
+			r.Get("/reports", report.ReportsPage(deps.WebDeps))
+			r.Post("/reports/{id}/resolve", report.ResolveReport(deps.WebDeps))
+			r.Post("/search/{uuid}/visibility", search.ToggleVisibility(deps.WebDeps))
+			r.Post("/reindex", admin.ReindexExtension(deps.WebDeps))
+			r.Post("/maintenance", admin.ToggleMaintenance(reg))
+		})
 	}
 
-	// Helper to get per-type stats provider (nil-safe).
-	statsFor := func(repoType string) manager.RepoStatsProvider {
-		if deps.Stats != nil {
-			return deps.Stats[repoType]
-		}
-		return nil
-	}
-
-	// MCP (Model Context Protocol) endpoint
-	if deps.MCP != nil {
+	// MCP (Model Context Protocol) endpoint - dynamically resolved
+	if opts.MCPEnabled {
+		mcpHandler := dynamicMCPHandler(reg)
 		if opts.RateLimitEnabled {
-			r.With(httprate.LimitByIP(100, time.Minute)).Mount("/mcp", deps.MCP)
+			r.With(httprate.LimitByIP(100, time.Minute)).Mount("/mcp", mcpHandler)
 		} else {
-			r.Mount("/mcp", deps.MCP)
+			r.Mount("/mcp", mcpHandler)
 		}
 	}
 
-	db := deps.DB
-
-	// JSON API routes
+	// JSON API routes - use registry for dynamic resolution
 	r.Route("/api", func(r chi.Router) {
 		r.Use(middleware.AllowContentType("application/json"))
 		r.Use(api.JSONRecoverer)
@@ -197,45 +176,189 @@ func New(deps RouterDeps) *chi.Mux {
 
 		r.Route("/v1", func(r chi.Router) {
 			r.Route("/plugin", func(r chi.Router) {
-				r.Method(http.MethodGet, "/{id}", plugin.ViewPluginV1(db))
+				r.Method(http.MethodGet, "/{id}", plugin.ViewPluginV1(reg))
 			})
 
 			r.Route("/plugins", func(r chi.Router) {
-				r.Method(http.MethodGet, "/", plugin.ListPluginsV1(db, statsFor("plugins")))
+				r.Method(http.MethodGet, "/", plugin.ListPluginsV1(reg))
 			})
 
 			r.Route("/theme", func(r chi.Router) {
-				r.Method(http.MethodGet, "/{id}", theme.ViewThemeV1(db))
+				r.Method(http.MethodGet, "/{id}", theme.ViewThemeV1(reg))
 			})
 
 			r.Route("/themes", func(r chi.Router) {
-				r.Method(http.MethodGet, "/", theme.ListThemesV1(db, statsFor("themes")))
+				r.Method(http.MethodGet, "/", theme.ListThemesV1(reg))
 			})
 
 			r.Route("/core", func(r chi.Router) {
-				r.Method(http.MethodGet, "/{id}", core.ViewCoreV1(db))
+				r.Method(http.MethodGet, "/{id}", core.ViewCoreV1(reg))
 			})
 
 			r.Route("/cores", func(r chi.Router) {
-				r.Method(http.MethodGet, "/", core.ListCoresV1(db, statsFor("cores")))
+				r.Method(http.MethodGet, "/", core.ListCoresV1(reg))
 			})
 
 			r.Route("/search", func(r chi.Router) {
 				if opts.RateLimitEnabled {
 					r.Use(httprate.LimitByIP(10, time.Minute))
 				}
-				r.Method(http.MethodPost, "/", search.CreateSearchV1(db, deps.Search, deps.S3))
-				r.Method(http.MethodGet, "/{id}", search.ViewSearchV1(db, deps.S3))
+				r.Method(http.MethodPost, "/", search.CreateSearchV1(reg))
+				r.Method(http.MethodGet, "/{id}", search.ViewSearchV1(reg))
 			})
 
 			r.Route("/searches", func(r chi.Router) {
-				r.Method(http.MethodGet, "/", search.ListSearchesV1(db))
+				r.Method(http.MethodGet, "/", search.ListSearchesV1(reg))
 			})
 		})
 	})
 
 	return r
 }
+
+// maintenanceMiddleware returns 503 for all requests (except health/liveness)
+// when maintenance mode is active.
+func maintenanceMiddleware(reg *service.Registry) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !reg.InMaintenance() {
+				next.ServeHTTP(w, r)
+				return
+			}
+			// Allow health/liveness/admin endpoints through
+			switch {
+			case r.URL.Path == "/up", r.URL.Path == "/health", r.URL.Path == "/metrics":
+				next.ServeHTTP(w, r)
+			case strings.HasPrefix(r.URL.Path, "/admin/"):
+				next.ServeHTTP(w, r)
+			case strings.HasPrefix(r.URL.Path, "/static/"),
+				r.URL.Path == "/favicon.ico",
+				r.URL.Path == "/favicon.svg":
+				next.ServeHTTP(w, r)
+			case strings.HasPrefix(r.URL.Path, "/api/"), strings.HasPrefix(r.URL.Path, "/mcp"):
+				api.WriteJSON(w, api.ErrUnavailable("Service is undergoing maintenance"))
+			default:
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Header().Set("Retry-After", "300")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write(maintenanceHTML)
+			}
+		})
+	}
+}
+
+// dynamicAuthMiddleware injects user into context if session store is available.
+func dynamicAuthMiddleware(reg *service.Registry) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if s := reg.Session(); s != nil {
+				s.AuthMiddleware(next).ServeHTTP(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// dynamicRequireAuth returns middleware that requires authentication,
+// resolving the session store from the registry at request time.
+func dynamicRequireAuth(reg *service.Registry) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if s := reg.Session(); s != nil {
+				s.RequireAuth(next).ServeHTTP(w, r)
+				return
+			}
+			http.Error(w, "Authentication unavailable", http.StatusServiceUnavailable)
+		})
+	}
+}
+
+// dynamicRequireAdmin returns middleware that requires admin role,
+// resolving the session store from the registry at request time.
+func dynamicRequireAdmin(reg *service.Registry) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if s := reg.Session(); s != nil {
+				s.RequireAdmin(next).ServeHTTP(w, r)
+				return
+			}
+			http.Error(w, "Authentication unavailable", http.StatusServiceUnavailable)
+		})
+	}
+}
+
+func dynamicLoginHandler(reg *service.Registry, d *web.Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if reg.Auth() == nil {
+			http.Error(w, "Authentication unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		web.LoginPage(d)(w, r)
+	}
+}
+
+func dynamicLogoutHandler(reg *service.Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h := reg.Auth(); h != nil {
+			h.Logout(w, r)
+			return
+		}
+		http.Redirect(w, r, "/", http.StatusFound)
+	}
+}
+
+func dynamicBeginAuth(reg *service.Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h := reg.Auth(); h != nil {
+			h.BeginAuth(w, r)
+			return
+		}
+		http.Error(w, "Authentication unavailable", http.StatusServiceUnavailable)
+	}
+}
+
+func dynamicAuthCallback(reg *service.Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if h := reg.Auth(); h != nil {
+			h.Callback(w, r)
+			return
+		}
+		http.Error(w, "Authentication unavailable", http.StatusServiceUnavailable)
+	}
+}
+
+func dynamicMCPHandler(reg *service.Registry) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h := reg.MCPHandler(); h != nil {
+			h.ServeHTTP(w, r)
+			return
+		}
+		api.WriteJSON(w, api.ErrUnavailable("MCP unavailable"))
+	})
+}
+
+// maintenanceHTML is the static HTML served during maintenance mode.
+var maintenanceHTML = []byte(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maintenance - Veloria</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;color:#334155}
+.box{text-align:center;max-width:480px;padding:2rem}
+h1{font-size:1.5rem;margin-bottom:.5rem}
+p{color:#64748b;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="box">
+<h1>We'll be right back</h1>
+<p>Veloria is undergoing scheduled maintenance. Please check back shortly.</p>
+</div>
+</body>
+</html>`)
 
 // cacheStatic wraps a handler with long-lived cache headers for static assets.
 func cacheStatic(h http.Handler) http.Handler {

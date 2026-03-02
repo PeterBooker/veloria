@@ -15,6 +15,7 @@ import (
 	"veloria/assets"
 	"veloria/internal/config"
 	ogimage "veloria/internal/image"
+	"veloria/internal/service"
 	"veloria/internal/web"
 )
 
@@ -28,7 +29,7 @@ func newTestOGGen(t *testing.T) *ogimage.Generator {
 func newMinimalDeps(t *testing.T) *web.Deps {
 	t.Helper()
 	c := &config.Config{AppURL: "https://test.example.com"}
-	return &web.Deps{Config: c}
+	return &web.Deps{Registry: &service.Registry{}, Config: c}
 }
 
 // fakeCache is a synchronous in-memory cache for testing.

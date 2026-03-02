@@ -14,7 +14,7 @@ import (
 // ViewPage renders a single theme detail page.
 func ViewPage(d *web.Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if d.DB == nil {
+		if d.DB() == nil {
 			http.Error(w, "Theme data is unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
@@ -41,7 +41,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		var row themeRow
-		err := d.DB.Table("themes").
+		err := d.DB().Table("themes").
 			Select("id, name, slug, source, version, short_description, requires, tested, requires_php, rating, active_installs, downloaded, download_link, tags, file_count, total_size, largest_files").
 			Where("slug = ? AND deleted_at IS NULL", slug).
 			Scan(&row).Error
@@ -52,8 +52,8 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		indexStatus := map[string]bool{}
-		if d.Stats != nil {
-			indexStatus = d.Stats.IndexStatus("themes")
+		if d.Stats() != nil {
+			indexStatus = d.Stats().IndexStatus("themes")
 		}
 
 		pd := d.PageData(r)

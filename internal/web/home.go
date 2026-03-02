@@ -12,8 +12,8 @@ import (
 func HomePage(d *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var recentSearches []searchmodel.Search
-		if d.DB != nil {
-			d.DB.Where("status = ? AND private = false", searchmodel.StatusCompleted).
+		if d.DB() != nil {
+			d.DB().Where("status = ? AND private = false", searchmodel.StatusCompleted).
 				Order("created_at DESC").
 				Limit(5).
 				Find(&recentSearches)
