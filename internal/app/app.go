@@ -48,6 +48,7 @@ type App struct {
 	SessionStore *auth.SessionStore
 	AuthHandler  *auth.Handler
 
+	apiClient     *repo.APIClient
 	cancelWorkers context.CancelFunc
 }
 
@@ -100,7 +101,13 @@ func New(ctx context.Context) (*App, error) {
 		_ = a.Tasks.AddJob(workerCtx, "search-cleanup", tasks.CleanupStuckSearches(a.DB, l), tasks.SearchCleanupInterval)
 		a.Tasks.Start()
 
-		apiClient := repo.NewAPIClient(c.AspireCloudAPIKey, l)
+		apiClient := repo.NewAPIClient(c.AspireCloudAPIKey, l, repo.ThrottleConfig{
+			RequestsPerSecond: c.APIThrottleRPS,
+			Burst:             c.APIThrottleBurst,
+			MaxRetries:        c.APIThrottleMaxRetries,
+			DefaultRetryDelay: c.APIThrottleRetryDelay,
+		})
+		a.apiClient = apiClient
 
 		eventRecorder := repo.NewIndexEventRecorder(a.DB, l)
 		_ = a.Tasks.AddJob(workerCtx, "index-event-cleanup", repo.CleanupOldEvents(a.DB, l, 30*24*time.Hour), 1*time.Hour)
@@ -242,6 +249,11 @@ func (a *App) Shutdown(ctx context.Context) error {
 		case <-time.After(5 * time.Second):
 			a.Logger.Warn("Timed out waiting for manager updater to stop")
 		}
+	}
+
+	// Stop API client rate limiter
+	if a.apiClient != nil {
+		a.apiClient.Close()
 	}
 
 	// Shutdown HTTP servers

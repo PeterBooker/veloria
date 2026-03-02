@@ -71,6 +71,12 @@ type Config struct {
 	// AspireCloud API
 	AspireCloudAPIKey string `env:"ASPIRE_CLOUD_API_KEY" envDefault:""`
 
+	// Outbound API throttling
+	APIThrottleRPS        float64       `env:"API_THROTTLE_RPS" envDefault:"10"`
+	APIThrottleBurst      int           `env:"API_THROTTLE_BURST" envDefault:"5" validate:"min=1"`
+	APIThrottleMaxRetries int           `env:"API_THROTTLE_MAX_RETRIES" envDefault:"3" validate:"min=0,max=10"`
+	APIThrottleRetryDelay time.Duration `env:"API_THROTTLE_RETRY_DELAY" envDefault:"5s"`
+
 	// MCP: enable the remote MCP server endpoint
 	MCPEnabled bool `env:"MCP_ENABLED" envDefault:"true"`
 
