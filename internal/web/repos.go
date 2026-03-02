@@ -90,13 +90,19 @@ func RepoPage(d *Deps) http.HandlerFunc {
 		pd.OG.Title = fmt.Sprintf("%s Repository - Veloria", title)
 		pd.OG.Description = fmt.Sprintf("Browse %d %s (%d indexed) in the Veloria code search index.", total, repoType, indexed)
 
+		// Show only the most recent failure per slug, excluding slugs whose
+		// latest event is a success (i.e. they recovered since the failure).
 		var failedEvents []FailedIndexEvent
-		d.DB.Table("index_events").
-			Select("slug, error_message, created_at").
-			Where("repo_type = ? AND status = ?", repoType, "failed").
-			Order("created_at DESC").
-			Limit(50).
-			Scan(&failedEvents)
+		d.DB.Raw(`
+			SELECT slug, error_message, created_at FROM (
+				SELECT DISTINCT ON (slug) slug, status, error_message, created_at
+				FROM index_events
+				WHERE repo_type = ?
+				ORDER BY slug, created_at DESC
+			) latest
+			WHERE status = 'failed'
+			ORDER BY created_at DESC
+			LIMIT 50`, repoType).Scan(&failedEvents)
 
 		data := RepoData{
 			PageData:           pd,
