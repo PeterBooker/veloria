@@ -38,6 +38,7 @@ go.work.sum
 
 # Build output
 /dist
+/veloria
 node_modules
 
 # Generated frontend assets (built via go generate)
