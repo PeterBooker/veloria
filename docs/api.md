@@ -199,7 +199,7 @@ These serve the HTML web interface:
 | GET | `/searches` | Public search list |
 | GET | `/search/{uuid}` | Search result page |
 | POST | `/search` | Submit search (web form) |
-| GET | `/my-searches` | Current user's searches |
+| GET | `/searches/own` | Current user's searches |
 | GET | `/login` | OAuth login page |
 | GET | `/logout` | Logout |
 

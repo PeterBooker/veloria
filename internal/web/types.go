@@ -12,7 +12,6 @@ type (
 	RepoSummary            = ui.RepoSummary
 	HomeData               = ui.HomeData
 	SearchesData           = ui.SearchesData
-	MySearchesData         = ui.MySearchesData
 	SearchResultsData      = ui.SearchResultsData
 	SearchViewData         = ui.SearchViewData
 	SearchExtensionsData   = ui.SearchExtensionsData

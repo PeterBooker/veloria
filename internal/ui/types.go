@@ -65,14 +65,8 @@ type SearchesData struct {
 	Searches   []SearchSummary
 	Page       int
 	TotalPages int
-}
-
-// MySearchesData contains data for the my searches page template.
-type MySearchesData struct {
-	PageData
-	Searches   []SearchSummary
-	Page       int
-	TotalPages int
+	View       string // "" (all/public) or "own" (user's own)
+	LoggedIn   bool   // whether to show the toggle
 }
 
 // SearchResultsData contains data for search results partial.

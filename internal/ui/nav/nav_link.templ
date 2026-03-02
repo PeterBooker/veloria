@@ -18,7 +18,6 @@ func BuildNavItems(currentPath string, loggedIn, isAdmin bool) []NavItem {
 		{Href: "/data-sources", Label: "Data Sources", Active: strings.HasPrefix(currentPath, "/data-sources")},
 		{Href: "/docs", Label: "Docs", Active: currentPath == "/docs"},
 		{Href: "/about", Label: "About", Active: currentPath == "/about"},
-		{Href: "/my-searches", Label: "My Searches", Active: currentPath == "/my-searches", AuthOnly: true},
 		{Href: "/admin/reports", Label: "Reports", Active: strings.HasPrefix(currentPath, "/admin/reports"), AdminOnly: true},
 	}
 

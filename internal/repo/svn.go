@@ -105,6 +105,11 @@ func fetchSVNSlugs(ctx context.Context, svnURL string) ([]string, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"), 30*time.Second)
+		return nil, fmt.Errorf("SVN server returned 429 (retry after %s) from %s", retryAfter, svnURL)
+	}
+
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return nil, fmt.Errorf("unexpected status %s from SVN listing %s", resp.Status, svnURL)
 	}

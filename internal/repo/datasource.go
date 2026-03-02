@@ -17,4 +17,6 @@ type DataSource interface {
 	GetExtension(slug string) (Extension, bool)
 	MakeReindexTaskBySlug(slug string) (IndexTask, bool)
 	ResolveSourceDir(slug string) (string, error)
+	RecordIndexSuccess(slug string)
+	RecordIndexFailure(slug string)
 }

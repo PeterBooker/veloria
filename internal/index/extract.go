@@ -23,9 +23,10 @@ type FileStat struct {
 
 // ExtractStats holds statistics collected during file extraction.
 type ExtractStats struct {
-	FileCount    int         `json:"file_count"`
-	TotalSize    int64       `json:"total_size"`
-	LargestFiles []*FileStat `json:"largest_files"`
+	FileCount     int         `json:"file_count"`
+	TextFileCount int         `json:"text_file_count"`
+	TotalSize     int64       `json:"total_size"`
+	LargestFiles  []*FileStat `json:"largest_files"`
 }
 
 // minHeap implements a min-heap for tracking largest files.
@@ -52,46 +53,48 @@ func Unzip(src, dest string) error {
 	return unzipWithFilter(src, dest, nil)
 }
 
-// UnzipTextFiles extracts only "text" files (by extension) from src into dest.
-// You can tweak the extensions list as needed for your trigram indexing.
+// UnzipTextFiles extracts all files from src into dest.
 func UnzipTextFiles(src, dest string) error {
-	_, err := UnzipTextFilesWithStats(src, dest)
+	_, err := UnzipWithStats(src, dest)
 	return err
 }
 
-// textExtensions returns the set of file extensions considered as text files.
-func textExtensions() map[string]bool {
+// IndexableExtensions returns the set of file extensions that should be included
+// in the trigram search index. Used during index building (not extraction) to
+// filter which files get trigram-indexed.
+func IndexableExtensions() map[string]bool {
 	return map[string]bool{
-		".txt":  true,
-		".md":   true,
-		".html": true,
-		".xml":  true,
-		".json": true,
-		".yaml": true,
-		".yml":  true,
-		".php":  true,
-		".js":   true,
-		".jsx":  true,
-		".css":  true,
-		".ts":   true,
-		".tsx":  true,
+		".txt":      true,
+		".md":       true,
+		".html":     true,
+		".xml":      true,
+		".json":     true,
+		".yaml":     true,
+		".yml":      true,
+		".php":      true,
+		".js":       true,
+		".jsx":      true,
+		".css":      true,
+		".ts":       true,
+		".tsx":      true,
+		".sql":      true,
+		".pot":      true,
+		".twig":     true,
+		".mustache": true,
+		".svg":      true,
+		".less":     true,
+		".scss":     true,
+		".sass":     true,
+		".vue":      true,
+		".svelte":   true,
 	}
 }
 
-// UnzipTextFilesWithStats extracts text files and returns extraction statistics
+// UnzipWithStats extracts all files from the ZIP and returns extraction statistics
 // including file count, total size, and the top 100 largest files.
-func UnzipTextFilesWithStats(src, dest string) (*ExtractStats, error) {
-	textExts := textExtensions()
-
-	filter := func(f *zip.File) bool {
-		if f.FileInfo().IsDir() {
-			return true
-		}
-		ext := strings.ToLower(filepath.Ext(f.Name))
-		return textExts[ext]
-	}
-
-	return unzipWithFilterAndStats(src, dest, filter, 100)
+// TextFileCount tracks files matching IndexableExtensions() for index coverage reporting.
+func UnzipWithStats(src, dest string) (*ExtractStats, error) {
+	return unzipWithFilterAndStats(src, dest, nil, 100)
 }
 
 // unzipWithFilterAndStats extracts files and collects statistics.
@@ -110,6 +113,7 @@ func unzipWithFilterAndStats(src, dest string, filter func(*zip.File) bool, topN
 	cleanDest := filepath.Clean(dest) + string(os.PathSeparator)
 
 	stats = &ExtractStats{}
+	textExts := IndexableExtensions()
 	h := &minHeap{}
 	heap.Init(h)
 
@@ -151,6 +155,9 @@ func unzipWithFilterAndStats(src, dest string, filter func(*zip.File) bool, topN
 		// Collect stats
 		stats.FileCount++
 		stats.TotalSize += written
+		if textExts[strings.ToLower(filepath.Ext(name))] {
+			stats.TextFileCount++
+		}
 
 		// Track top N largest files using min-heap
 		fs := &FileStat{Path: name, Size: written}

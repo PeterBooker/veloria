@@ -16,8 +16,24 @@ templ Searches(data ui.SearchesData) {
 	@layout.Base(data.PageData) {
 		<!-- Heading -->
 		<div class="mb-6 pt-8 lg:pt-10">
-			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Recent Searches</h1>
-			<p class="text-sm text-text-body">View and revisit previous code searches.</p>
+			if data.View == "own" {
+				<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">My Searches</h1>
+				<p class="text-sm text-text-body">Your personal search history, including private searches.</p>
+			} else {
+				<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Recent Searches</h1>
+				<p class="text-sm text-text-body">View and revisit previous code searches.</p>
+			}
+			if data.LoggedIn {
+				<div class="flex items-center gap-1 mt-4">
+					if data.View == "own" {
+						<a href="/searches" class="px-3 py-1.5 text-sm rounded-lg text-text-muted hover:text-text-body hover:bg-white/5 transition">All Searches</a>
+						<span class="px-3 py-1.5 text-sm rounded-lg font-semibold text-text-bright bg-white/10">My Searches</span>
+					} else {
+						<span class="px-3 py-1.5 text-sm rounded-lg font-semibold text-text-bright bg-white/10">All Searches</span>
+						<a href="/searches/own" class="px-3 py-1.5 text-sm rounded-lg text-text-muted hover:text-text-body hover:bg-white/5 transition">My Searches</a>
+					}
+				</div>
+			}
 		</div>
 		if len(data.Searches) > 0 {
 			<div class="glass-inner overflow-hidden">
@@ -39,7 +55,22 @@ templ Searches(data ui.SearchesData) {
 								{ searchRowAttrs(s.Search.ID.String())... }
 							>
 								<td class="px-5 py-4">
-									<code class="font-mono text-sm text-text-body bg-brand-100 px-2 py-1 rounded">{ s.Search.Term }</code>
+									if data.View == "own" {
+										<div class="flex items-center gap-2">
+											<code class="font-mono text-sm text-brand-600 bg-brand-100 px-2 py-1 rounded">{ s.Search.Term }</code>
+											if s.Search.Private {
+												<span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-md bg-white/5 text-text-muted border-l-2 border-white/20">
+													<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+														<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+														<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+													</svg>
+													Private
+												</span>
+											}
+										</div>
+									} else {
+										<code class="font-mono text-sm text-text-body bg-brand-100 px-2 py-1 rounded">{ s.Search.Term }</code>
+									}
 								</td>
 								<td class="px-5 py-4">
 									<span class="inline-flex items-center gap-1.5 text-sm text-text-body capitalize">
@@ -67,7 +98,11 @@ templ Searches(data ui.SearchesData) {
 					</tbody>
 				</table>
 			</div>
-			@shared.LinkPagination("/searches", data.Page, data.TotalPages)
+			if data.View == "own" {
+				@shared.LinkPagination("/searches/own", data.Page, data.TotalPages)
+			} else {
+				@shared.LinkPagination("/searches", data.Page, data.TotalPages)
+			}
 		} else {
 			<!-- Empty State -->
 			<div class="glass-inner text-center py-16">
@@ -77,7 +112,11 @@ templ Searches(data ui.SearchesData) {
 					</span>
 				</div>
 				<h3 class="text-2xl text-text-body mb-2">No searches yet</h3>
-				<p class="text-text-muted mb-6">Start exploring WordPress source code with powerful regex patterns.</p>
+				if data.View == "own" {
+					<p class="text-text-muted mb-6">You haven't performed any searches yet. Start exploring WordPress source code!</p>
+				} else {
+					<p class="text-text-muted mb-6">Start exploring WordPress source code with powerful regex patterns.</p>
+				}
 				if data.SearchEnabled {
 					<a href="/" class="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-neon-cyan/40 focus:ring-offset-2 hover:shadow-lg hover:shadow-neon-pink/25" style="background: linear-gradient(135deg, #ff2d7b, #b44dff);">
 						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

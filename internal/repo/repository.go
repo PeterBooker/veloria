@@ -552,7 +552,8 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 							r.l.Warn("Download not found, skipping", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 							r.Unlist(taskSlug)
 						}
-						return nil // graceful degradation, not a retryable error
+						r.markClosed(taskSlug, taskSource)
+						return ErrDownloadSkipped
 					}
 					r.l.Error("Indexer failed", zap.String("slug", taskSlug), zap.Error(err))
 					return err
@@ -658,6 +659,86 @@ func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*IndexerResul
 	return result, nil
 }
 
+// markClosed sets ClosedAt for an extension whose download has disappeared.
+func (r *ExtensionStore[T]) markClosed(slug, source string) {
+	tableName := string(r.repoType)
+	identifierCol := "slug"
+	if r.repoType == TypeCores {
+		identifierCol = "version"
+	}
+
+	now := time.Now()
+	query := r.db.Table(tableName).Where(identifierCol+" = ?", slug)
+	if r.repoType != TypeCores {
+		query = query.Where("source = ?", source)
+	}
+	if err := query.Update("closed_at", now).Error; err != nil {
+		r.l.Warn("Failed to mark extension as closed", zap.String("slug", slug), zap.Error(err))
+	}
+}
+
+// RecordIndexSuccess marks an extension as successfully indexed in the database.
+func (r *ExtensionStore[T]) RecordIndexSuccess(slug string) {
+	tableName := string(r.repoType)
+	identifierCol := "slug"
+	if r.repoType == TypeCores {
+		identifierCol = "version"
+	}
+
+	now := time.Now()
+	err := r.db.Table(tableName).
+		Where(identifierCol+" = ?", slug).
+		Updates(map[string]any{
+			"index_status":   "indexed",
+			"indexed_at":     now,
+			"retry_count":    0,
+			"last_attempt_at": now,
+		}).Error
+	if err != nil {
+		r.l.Warn("Failed to record index success", zap.String("slug", slug), zap.Error(err))
+	}
+}
+
+// RecordIndexFailure increments the retry count and marks an extension as failed.
+func (r *ExtensionStore[T]) RecordIndexFailure(slug string) {
+	tableName := string(r.repoType)
+	identifierCol := "slug"
+	if r.repoType == TypeCores {
+		identifierCol = "version"
+	}
+
+	now := time.Now()
+	err := r.db.Table(tableName).
+		Where(identifierCol+" = ?", slug).
+		Updates(map[string]any{
+			"index_status":    "failed",
+			"last_attempt_at": now,
+			"retry_count":     gorm.Expr("retry_count + 1"),
+		}).Error
+	if err != nil {
+		r.l.Warn("Failed to record index failure", zap.String("slug", slug), zap.Error(err))
+	}
+}
+
+// updateMetadata updates selected metadata columns for a known extension in the database.
+// Used during full scans to refresh metadata without re-indexing.
+func (r *ExtensionStore[T]) updateMetadata(slug, source string, updates map[string]any) {
+	tableName := string(r.repoType)
+	identifierCol := "slug"
+	if r.repoType == TypeCores {
+		identifierCol = "version"
+	}
+
+	query := r.db.Table(tableName).Where(identifierCol+" = ?", slug)
+	if r.repoType != TypeCores {
+		query = query.Where("source = ?", source)
+	}
+
+	if err := query.Updates(updates).Error; err != nil {
+		r.l.Warn("Failed to update extension metadata", zap.String("slug", slug), zap.Error(err))
+	}
+}
+
 // saveExtractStats saves extraction statistics to the database for the given extension.
 func (r *ExtensionStore[T]) saveExtractStats(slug, source, name string, stats *ExtractStats) {
 	tableName := string(r.repoType)
@@ -719,18 +800,45 @@ func (r *ExtensionStore[T]) saveLargestRepoFiles(slug, name string, files []*Fil
 }
 
 // ResumeUnindexed returns IndexTasks for extensions that are in memory (loaded
-// from DB) but don't have an index on disk. This handles the case where the
-// server was restarted mid-indexing.
+// from DB) but don't have an index on disk, plus extensions that previously
+// failed indexing and are due for a retry.
 func (r *ExtensionStore[T]) ResumeUnindexed() []IndexTask {
 	r.mu.RLock()
+	seen := make(map[string]bool)
 	var unindexed []T
 	for _, ext := range r.List {
 		ie := ext.GetIndexedExtension()
 		if (ie == nil || !ie.HasIndex()) && ext.GetDownloadLink() != "" {
 			unindexed = append(unindexed, ext)
+			seen[ext.GetSlug()] = true
 		}
 	}
 	r.mu.RUnlock()
+
+	// Also resume stale failures from DB: extensions that exceeded maxRetries
+	// but whose last attempt was more than 24 hours ago.
+	var staleFailedSlugs []string
+	identifierCol := "slug"
+	if r.repoType == TypeCores {
+		identifierCol = "version"
+	}
+	r.db.Table(string(r.repoType)).
+		Where("index_status = ? AND retry_count >= ? AND last_attempt_at < ?",
+			"failed", 3, time.Now().Add(-24*time.Hour)).
+		Pluck(identifierCol, &staleFailedSlugs)
+
+	for _, slug := range staleFailedSlugs {
+		if seen[slug] {
+			continue
+		}
+		r.mu.RLock()
+		ext, ok := r.List[slug]
+		r.mu.RUnlock()
+		if ok && ext.GetDownloadLink() != "" {
+			unindexed = append(unindexed, ext)
+			seen[slug] = true
+		}
+	}
 
 	if len(unindexed) == 0 {
 		return nil

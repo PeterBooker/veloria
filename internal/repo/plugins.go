@@ -10,7 +10,6 @@ import (
 	"math"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,6 +60,12 @@ type Plugin struct {
 
 	// ClosedAt indicates when this plugin was detected as closed (no download link available)
 	ClosedAt *time.Time `json:"closed_at,omitempty" gorm:"default:null"`
+
+	// Index state tracking (persisted for durable retry)
+	RetryCount   int        `json:"-" gorm:"default:0"`
+	LastAttemptAt *time.Time `json:"-" gorm:"default:null"`
+	IndexedAt    *time.Time `json:"-" gorm:"default:null"`
+	IndexStatus  string     `json:"-" gorm:"default:'pending'"`
 
 	LastUpdated time.Time `json:"-" gorm:"-"`
 }
@@ -142,7 +147,7 @@ func (pr *PluginStore) PrepareUpdates() ([]IndexTask, error) {
 			return plugins, nil
 		}
 
-		plugins, err := FetchPluginUpdates(pr.ctx, pr.c, pr.api, pr.l)
+		plugins, err := FetchPluginUpdates(pr.ctx, pr.c, pr.api, pr.l, pr.db)
 		if err != nil {
 			return nil, err
 		}
@@ -157,12 +162,15 @@ func (pr *PluginStore) PrepareUpdates() ([]IndexTask, error) {
 	}
 
 	saveFn := func(db *gorm.DB, p *Plugin) error {
-		p.ClosedAt = nil
+		// Only clear ClosedAt when the extension has an available download.
+		if p.DownloadLink != "" {
+			p.ClosedAt = nil
+		}
 
 		var existing Plugin
 		if err := db.Where("slug = ? AND source = ?", p.Slug, p.Source).First(&existing).Error; err == nil {
 			p.ID = existing.ID
-			if existing.ClosedAt != nil {
+			if existing.ClosedAt != nil && p.ClosedAt == nil {
 				pr.l.Info("Plugin is now available again", zap.String("slug", p.Slug))
 			}
 			return db.Save(p).Error
@@ -210,7 +218,7 @@ func (pr *PluginStore) discoverNewPlugins() ([]*Plugin, error) {
 	pr.l.Info("Starting full plugin discovery via API", zap.Int("known", len(known)))
 
 	var result []*Plugin
-	var skipped int
+	var skipped, metadataUpdated int
 
 	for page := 1; ; page++ {
 		if pr.ctx.Err() != nil {
@@ -233,6 +241,18 @@ func (pr *PluginStore) discoverNewPlugins() ([]*Plugin, error) {
 				p.Source = SourceWordPress
 			}
 			if _, ok := known[p.Slug]; ok {
+				pr.updateMetadata(p.Slug, p.Source, map[string]any{
+					"version":           p.Version,
+					"rating":            p.Rating,
+					"active_installs":   p.ActiveInstalls,
+					"downloaded":        p.Downloaded,
+					"short_description": p.ShortDescription,
+					"requires":          p.Requires,
+					"tested":            p.Tested,
+					"requires_php":      p.RequiresPHP,
+					"download_link":     p.DownloadLink,
+				})
+				metadataUpdated++
 				skipped++
 				continue
 			}
@@ -245,7 +265,7 @@ func (pr *PluginStore) discoverNewPlugins() ([]*Plugin, error) {
 		}
 
 		if page%10 == 0 {
-			pr.l.Info("Plugin discovery progress", zap.Int("page", page), zap.Int("totalPages", info.Pages), zap.Int("new", len(result)), zap.Int("skipped", skipped))
+			pr.l.Info("Plugin discovery progress", zap.Int("page", page), zap.Int("totalPages", info.Pages), zap.Int("new", len(result)), zap.Int("skipped", skipped), zap.Int("metadata_updated", metadataUpdated))
 		}
 
 		if page >= info.Pages {
@@ -253,7 +273,7 @@ func (pr *PluginStore) discoverNewPlugins() ([]*Plugin, error) {
 		}
 	}
 
-	pr.l.Info("Full plugin discovery scan complete", zap.Int("known", len(known)), zap.Int("new", len(result)), zap.Int("skipped", skipped))
+	pr.l.Info("Full plugin discovery scan complete", zap.Int("known", len(known)), zap.Int("new", len(result)), zap.Int("skipped", skipped), zap.Int("metadata_updated", metadataUpdated))
 
 	return result, nil
 }
@@ -340,17 +360,24 @@ func (p *Plugin) UnmarshalJSON(data []byte) error {
 }
 
 // FetchPluginUpdates fetches plugin updates based on environment.
-func FetchPluginUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zap.Logger) ([]Plugin, error) {
+// Uses a persistent watermark to avoid missing updates after outages.
+func FetchPluginUpdates(ctx context.Context, c *config.Config, api *APIClient, l *zap.Logger, db *gorm.DB) ([]Plugin, error) {
 	if c.Env == "production" || c.Env == "staging" {
-		return FetchPluginsUpdatedWithinLastHour(ctx, api, l)
+		watermark := readWatermark(db, TypePlugins)
+		plugins, err := FetchPluginsSince(ctx, api, l, watermark)
+		if err != nil {
+			return nil, err
+		}
+		writeWatermark(db, TypePlugins, l)
+		return plugins, nil
 	}
 	return FetchLocalPlugins(ctx, api)
 }
 
-// FetchPluginsUpdatedWithinLastHour fetches pages of plugins sorted by
-// update time and collects those updated within the last hour.
-func FetchPluginsUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *zap.Logger) ([]Plugin, error) {
-	threshold := time.Now().UTC().Add(-1 * time.Hour)
+// FetchPluginsSince fetches pages of plugins sorted by update time and
+// collects those updated since the given watermark (with a 2-hour overlap margin).
+func FetchPluginsSince(ctx context.Context, api *APIClient, l *zap.Logger, since time.Time) ([]Plugin, error) {
+	threshold := since.Add(-2 * time.Hour)
 
 	var all []Plugin
 	var parseFailures int
@@ -371,17 +398,13 @@ func FetchPluginsUpdatedWithinLastHour(ctx context.Context, api *APIClient, l *z
 			if p.Source == "" {
 				p.Source = SourceWordPress
 			}
-			s := strings.TrimSpace(p.LastUpdatedRaw)
-			ts, err := time.Parse("2006-01-02 3:04pm MST", s)
-			if err != nil {
-				ts, err = time.Parse("2006-01-02", s)
-			}
-			if err != nil {
+			ts, ok := parseLastUpdated(p.LastUpdatedRaw)
+			if !ok {
 				parseFailures++
-				l.Warn("Failed to parse plugin last_updated time, skipping", zap.String("slug", p.Slug), zap.String("lastUpdatedRaw", s), zap.Error(err))
+				l.Warn("Failed to parse plugin last_updated time, skipping", zap.String("slug", p.Slug), zap.String("lastUpdatedRaw", p.LastUpdatedRaw))
 				continue
 			}
-			p.LastUpdated = ts.UTC()
+			p.LastUpdated = ts
 			if p.LastUpdated.Before(threshold) {
 				if parseFailures > 0 {
 					l.Warn("Total plugin time parse failures during update check", zap.Int("count", parseFailures))
