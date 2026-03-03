@@ -82,12 +82,17 @@ func (ie *IndexedExtension) UnlockUpdates() {
 }
 
 // Search searches the extension's index for the given term.
+// If the extension is currently being re-indexed, it returns nil to avoid
+// blocking the search on a long-running indexer subprocess.
 func (ie *IndexedExtension) Search(term string, opt *index.SearchOptions) (*index.SearchResponse, error) {
-	ie.updateMu.RLock()
+	if !ie.updateMu.TryRLock() {
+		return nil, nil // extension is being re-indexed, skip
+	}
+	defer ie.updateMu.RUnlock()
+
 	ie.mu.RLock()
 	idx := ie.idx
 	ie.mu.RUnlock()
-	ie.updateMu.RUnlock()
 
 	if idx == nil {
 		return nil, ErrNoIndex
@@ -97,14 +102,18 @@ func (ie *IndexedExtension) Search(term string, opt *index.SearchOptions) (*inde
 }
 
 // SearchCompiled searches the extension's index using pre-compiled patterns.
-// Locks are held only long enough to read the index pointer; the actual search
-// runs lock-free so it never blocks the indexer or other search workers.
+// Uses TryRLock to avoid blocking on extensions being re-indexed — if the
+// update lock is held, the extension is skipped rather than stalling the
+// entire search worker pool.
 func (ie *IndexedExtension) SearchCompiled(cs *index.CompiledSearch) (*index.SearchResponse, error) {
-	ie.updateMu.RLock()
+	if !ie.updateMu.TryRLock() {
+		return nil, nil // extension is being re-indexed, skip
+	}
+	defer ie.updateMu.RUnlock()
+
 	ie.mu.RLock()
 	idx := ie.idx
 	ie.mu.RUnlock()
-	ie.updateMu.RUnlock()
 
 	if idx == nil {
 		return nil, ErrNoIndex
