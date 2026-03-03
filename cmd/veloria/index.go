@@ -158,14 +158,14 @@ func downloadZip(u string) (string, func(), error) {
 		}
 
 		if isPermanentHTTPFailure(resp.StatusCode) {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			cleanup()
 			return "", func() {}, &exitError{code: 2, msg: fmt.Sprintf("download unavailable (%d): %s", resp.StatusCode, u)}
 		}
 
 		if resp.StatusCode == http.StatusTooManyRequests {
 			wait := parseRetryAfterHeader(resp.Header.Get("Retry-After"))
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			lastErr = fmt.Errorf("unexpected HTTP status: %s", resp.Status)
 			if attempt < downloadMaxRetries-1 {
 				log.Printf("rate limited (429), waiting %s before retry %d/%d", wait, attempt+2, downloadMaxRetries)
@@ -175,17 +175,17 @@ func downloadZip(u string) (string, func(), error) {
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			cleanup()
 			return "", func() {}, fmt.Errorf("unexpected HTTP status: %s url: %s", resp.Status, u)
 		}
 
 		if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			cleanup()
 			return "", func() {}, err
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err := tmpFile.Close(); err != nil {
 			cleanup()
 			return "", func() {}, err
@@ -209,7 +209,7 @@ func downloadZip(u string) (string, func(), error) {
 
 // validateZipMagic checks that the file starts with the zip magic bytes (PK\x03\x04).
 func validateZipMagic(path string) error {
-	f, err := os.Open(path)
+	f, err := os.Open(path) // #nosec G304 -- path is always a temp file we just created via os.CreateTemp
 	if err != nil {
 		return err
 	}
