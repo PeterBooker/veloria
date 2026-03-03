@@ -22,8 +22,14 @@ func FormatSearchSummary(resp *SearchResponse, searchID, query, repo string) str
 		return b.String()
 	}
 
+	const maxSummaryExtensions = 50
+
 	b.WriteString("\nResults by extension:\n")
-	for _, ext := range resp.Extensions {
+	for i, ext := range resp.Extensions {
+		if i >= maxSummaryExtensions {
+			fmt.Fprintf(&b, "  ... and %d more extensions\n", len(resp.Extensions)-maxSummaryExtensions)
+			break
+		}
 		if ext.ActiveInstalls > 0 {
 			fmt.Fprintf(&b, "  %s (%s) v%s — %d matches, %s active installs\n",
 				ext.Name, ext.Slug, ext.Version, ext.TotalMatches, formatNumber(ext.ActiveInstalls))
@@ -219,6 +225,40 @@ func FormatReadFile(resp *ReadFileResponse) string {
 
 	if resp.EndLine < resp.TotalLines {
 		fmt.Fprintf(&b, "\nMore lines available. Use start_line=%d to continue reading.", resp.EndLine+1)
+	}
+
+	return b.String()
+}
+
+// FormatGrepFile formats grep results as human-readable text.
+func FormatGrepFile(resp *GrepFileResponse) string {
+	var b strings.Builder
+
+	fmt.Fprintf(&b, "%s/%s — grep %q\n", resp.Repo, resp.Slug, resp.Query)
+	fmt.Fprintf(&b, "%d matches across %d files\n", resp.TotalMatches, len(resp.Files))
+
+	if len(resp.Files) == 0 {
+		return b.String()
+	}
+
+	b.WriteString("\n")
+
+	for _, f := range resp.Files {
+		fmt.Fprintf(&b, "— %s (%d matches)\n", f.Path, len(f.Matches))
+		for _, m := range f.Matches {
+			for _, line := range m.Before {
+				fmt.Fprintf(&b, "  | %s\n", line)
+			}
+			fmt.Fprintf(&b, "  > %d: %s\n", m.Line, m.Content)
+			for _, line := range m.After {
+				fmt.Fprintf(&b, "  | %s\n", line)
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	if resp.TotalMatches >= maxGrepMatches {
+		b.WriteString("Results capped at 1,000 matches. Narrow your search with file_match or a more specific query.\n")
 	}
 
 	return b.String()

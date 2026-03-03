@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -19,10 +20,12 @@ const (
 	maxContext   = 5
 )
 
-// NewMCPServer creates a configured MCP server with all tools registered.
+// NewMCPServer creates a configured MCP server with all tools, resources, and prompts registered.
 func NewMCPServer(name, version string, svc SearchService) *server.MCPServer {
 	s := server.NewMCPServer(name, version,
 		server.WithToolCapabilities(false),
+		server.WithResourceCapabilities(false, false),
+		server.WithPromptCapabilities(false),
 		server.WithRecovery(),
 	)
 
@@ -33,16 +36,23 @@ func NewMCPServer(name, version string, svc SearchService) *server.MCPServer {
 		getRepoStatsTool(svc),
 		listFilesTool(svc),
 		readFileTool(svc),
+		grepFileTool(svc),
 	)
+
+	registerResources(s, svc)
+	registerPrompts(s)
 
 	return s
 }
 
 func searchCodeTool(svc SearchService) server.ServerTool {
 	tool := mcp.NewTool("search_code",
+		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDescription("Search WordPress extension source code (plugins, themes, or core releases). "+
 			"Returns a summary of matches on the first call. The summary includes a search_id — pass it "+
-			"with offset/limit to paginate through detailed match results without re-running the search."),
+			"with offset/limit to paginate through detailed match results without re-running the search. "+
+			"Useful for security research (e.g. searching for SQL injection, XSS, or unsafe function patterns), "+
+			"vulnerability auditing, and troubleshooting plugin or theme issues."),
 		mcp.WithString("query",
 			mcp.Required(),
 			mcp.Description("Search term (regex supported)"),
@@ -145,6 +155,7 @@ func handleSearchCode(svc SearchService) server.ToolHandlerFunc {
 
 func listExtensionsTool(svc SearchService) server.ServerTool {
 	tool := mcp.NewTool("list_extensions",
+		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDescription("List available WordPress extensions (plugins, themes, or core releases). "+
 			"Use this to discover valid slugs before searching."),
 		mcp.WithString("repo",
@@ -203,6 +214,7 @@ func handleListExtensions(svc SearchService) server.ToolHandlerFunc {
 
 func getExtensionDetailsTool(svc SearchService) server.ServerTool {
 	tool := mcp.NewTool("get_extension_details",
+		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDescription("Get detailed metadata for a specific WordPress extension (plugin, theme, or core release). "+
 			"Returns version, description, requirements, ratings, install counts, and index status."),
 		mcp.WithString("repo",
@@ -237,6 +249,7 @@ func getExtensionDetailsTool(svc SearchService) server.ServerTool {
 
 func getRepoStatsTool(svc SearchService) server.ServerTool {
 	tool := mcp.NewTool("get_repo_stats",
+		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDescription("Get index statistics for WordPress extension repositories. "+
 			"Shows total extensions, indexed count, and coverage percentage. "+
 			"Omit repo to get stats for all repository types."),
@@ -263,6 +276,7 @@ func getRepoStatsTool(svc SearchService) server.ServerTool {
 
 func listFilesTool(svc SearchService) server.ServerTool {
 	tool := mcp.NewTool("list_files",
+		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDescription("List files in a WordPress extension's source tree. "+
 			"Requires the extension to be indexed. Use an optional glob pattern to filter by filename."),
 		mcp.WithString("repo",
@@ -302,6 +316,7 @@ func listFilesTool(svc SearchService) server.ServerTool {
 
 func readFileTool(svc SearchService) server.ServerTool {
 	tool := mcp.NewTool("read_file",
+		mcp.WithReadOnlyHintAnnotation(true),
 		mcp.WithDescription("Read the contents of a file from a WordPress extension's source tree. "+
 			"Requires the extension to be indexed. Returns numbered lines for easy reference. "+
 			"Use start_line and max_lines to read specific sections of large files."),
@@ -367,6 +382,147 @@ func instrumentedHandler(toolName string, h server.ToolHandlerFunc) server.ToolH
 
 		return result, err
 	}
+}
+
+func grepFileTool(svc SearchService) server.ServerTool {
+	tool := mcp.NewTool("grep_file",
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDescription("Search within a single extension's source files using regex. "+
+			"Bypasses the cross-repo trigram search engine for fast, targeted searches. "+
+			"Useful when you already know which plugin or theme to audit."),
+		mcp.WithString("repo",
+			mcp.Required(),
+			mcp.Description("Repository type: plugins, themes, or cores"),
+			mcp.Enum("plugins", "themes", "cores"),
+		),
+		mcp.WithString("slug",
+			mcp.Required(),
+			mcp.Description("Extension slug (or version number for cores)"),
+		),
+		mcp.WithString("query",
+			mcp.Required(),
+			mcp.Description("Regex pattern to search for"),
+		),
+		mcp.WithString("file_match",
+			mcp.Description("Glob pattern to filter files (e.g. \"*.php\", \"*.js\"). Matches against the base filename only."),
+		),
+		mcp.WithBoolean("case_sensitive",
+			mcp.Description("Enable case-sensitive search"),
+			mcp.DefaultBool(false),
+		),
+		mcp.WithNumber("context_lines",
+			mcp.Description("Lines of context before and after each match (0-5)"),
+			mcp.DefaultNumber(0),
+			mcp.Min(0),
+			mcp.Max(float64(maxContext)),
+		),
+	)
+
+	return server.ServerTool{
+		Tool:    tool,
+		Handler: instrumentedHandler("grep_file", handleGrepFile(svc)),
+	}
+}
+
+func handleGrepFile(svc SearchService) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		repo := request.GetString("repo", "")
+		slug := request.GetString("slug", "")
+		query := request.GetString("query", "")
+		if repo == "" || slug == "" || query == "" {
+			return mcp.NewToolResultError("repo, slug, and query are required"), nil
+		}
+
+		if !isValidRepo(repo) {
+			return mcp.NewToolResultError("repo must be one of: plugins, themes, cores"), nil
+		}
+
+		params := GrepFileParams{
+			Repo:          repo,
+			Slug:          slug,
+			Query:         query,
+			FileMatch:     request.GetString("file_match", ""),
+			CaseSensitive: request.GetBool("case_sensitive", false),
+			ContextLines:  clampInt(request.GetInt("context_lines", 0), 0, maxContext),
+		}
+
+		resp, err := svc.GrepFile(ctx, params)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+
+		return mcp.NewToolResultText(FormatGrepFile(resp)), nil
+	}
+}
+
+// registerResources adds MCP resources to the server.
+func registerResources(s *server.MCPServer, svc SearchService) {
+	// Static resource: repository statistics.
+	s.AddResource(
+		mcp.NewResource("veloria://stats", "Repository Statistics",
+			mcp.WithResourceDescription("Current index statistics for all WordPress extension repositories"),
+			mcp.WithMIMEType("text/plain"),
+		),
+		func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+			stats, err := svc.GetRepoStats(ctx, "")
+			if err != nil {
+				return nil, err
+			}
+			return []mcp.ResourceContents{
+				mcp.TextResourceContents{
+					URI:      "veloria://stats",
+					MIMEType: "text/plain",
+					Text:     FormatRepoStats(stats),
+				},
+			}, nil
+		},
+	)
+
+	// Resource template: extension details by repo/slug.
+	s.AddResourceTemplate(
+		mcp.NewResourceTemplate("veloria://{repo}/{slug}/info", "Extension Details",
+			mcp.WithTemplateDescription("Detailed metadata for a specific WordPress extension (plugin, theme, or core release)"),
+			mcp.WithTemplateMIMEType("text/plain"),
+		),
+		func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
+			repo, slug, err := parseExtensionURI(request.Params.URI)
+			if err != nil {
+				return nil, err
+			}
+
+			details, err := svc.GetExtensionDetails(ctx, repo, slug)
+			if err != nil {
+				return nil, err
+			}
+
+			return []mcp.ResourceContents{
+				mcp.TextResourceContents{
+					URI:      request.Params.URI,
+					MIMEType: "text/plain",
+					Text:     FormatExtensionDetails(details),
+				},
+			}, nil
+		},
+	)
+}
+
+// parseExtensionURI extracts repo and slug from a "veloria://{repo}/{slug}/info" URI.
+func parseExtensionURI(uri string) (repo, slug string, err error) {
+	const prefix = "veloria://"
+	if !strings.HasPrefix(uri, prefix) {
+		return "", "", fmt.Errorf("invalid URI: %s", uri)
+	}
+	rest := strings.TrimPrefix(uri, prefix)
+	parts := strings.SplitN(rest, "/", 3)
+	if len(parts) < 3 || parts[2] != "info" {
+		return "", "", fmt.Errorf("invalid URI format: %s", uri)
+	}
+	repo = parts[0]
+	slug = parts[1]
+	if !isValidRepo(repo) || slug == "" {
+		return "", "", fmt.Errorf("invalid repo or slug in URI: %s", uri)
+	}
+	return repo, slug, nil
 }
 
 // clampInt constrains v to [min, max].

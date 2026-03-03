@@ -27,7 +27,7 @@ testutil.SamplePlugin()  // *repo.Plugin with realistic defaults
 testutil.SampleTheme()   // *repo.Theme
 testutil.SampleCore()    // *repo.Core
 testutil.SampleConfig()  // *config.Config with test-friendly values
-testutil.NopLogger()     // *zerolog.Logger that discards output
+testutil.NopLogger()     // *zap.Logger that discards output
 ```
 
 ### Hand-Written Fakes (`internal/testutil/mocks.go`)
@@ -60,11 +60,13 @@ Available function fields:
 | `StatsFunc` | `func() (int, int)` |
 | `IndexStatusFunc` | `func() map[string]bool` |
 | `SearchFunc` | `func(term string, opt *index.SearchOptions, fn func(int, int)) ([]*repo.SearchResult, error)` |
-| `PrepareUpdatesFunc` | `func() []repo.IndexTask` |
+| `PrepareUpdatesFunc` | `func() ([]repo.IndexTask, error)` |
 | `ResumeUnindexedFunc` | `func() []repo.IndexTask` |
 | `GetExtensionFunc` | `func(slug string) (repo.Extension, bool)` |
 | `MakeReindexTaskFunc` | `func(slug string) (repo.IndexTask, bool)` |
 | `ResolveSourceDirFunc` | `func(slug string) (string, error)` |
+
+`RecordIndexSuccess` and `RecordIndexFailure` are implemented as no-ops.
 
 #### Web Interface Fakes
 
@@ -80,7 +82,7 @@ svc := &testutil.FakeSearchService{
 
 // FakeReindexService implements web.ReindexService
 reindex := &testutil.FakeReindexService{
-    SubmitReindexFunc: func(repoType, slug string) bool { return true },
+    SubmitReindexFunc: func(repoType, slug string) error { return nil },
 }
 
 // FakeSourceResolver implements web.SourceResolver
@@ -154,7 +156,7 @@ func TestSearch_SortsByActiveInstalls(t *testing.T) {
 
 ### Testing API Handlers
 
-API handlers accept their dependencies as parameters, making them straightforward to test with `httptest`:
+API handlers accept their dependencies via the service registry, making them straightforward to test with `httptest`:
 
 ```go
 func TestViewPluginV1_NotFound(t *testing.T) {
@@ -163,7 +165,7 @@ func TestViewPluginV1_NotFound(t *testing.T) {
     req := httptest.NewRequest("GET", "/api/v1/plugin/"+uuid.New().String(), nil)
     rr := httptest.NewRecorder()
 
-    handler := plugin.ViewPluginV1(db)
+    handler := plugin.ViewPluginV1(reg)
     handler.ServeHTTP(rr, req)
 
     if rr.Code != http.StatusOK { // API returns 200 with error payload
@@ -179,11 +181,9 @@ Web handlers take `*web.Deps`, so you can inject fakes for any capability:
 
 ```go
 deps := &web.Deps{
-    Search:  &testutil.FakeSearchService{...},
-    Reindex: &testutil.FakeReindexService{...},
-    Stats:   &testutil.FakeStatsProvider{...},
-    Sources: &testutil.FakeSourceResolver{...},
-    // ...
+    Registry: reg,  // service.Registry with test services registered
+    Cache:    testCache,
+    Config:   testutil.SampleConfig(),
 }
 ```
 

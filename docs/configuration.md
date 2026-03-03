@@ -28,7 +28,6 @@ Configuration is parsed using [caarlos0/env/v10](https://github.com/caarlos0/env
 | `HTTP_IDLE_TIMEOUT` | `60s` | Max idle time for keep-alive connections |
 | `HTTP_SHUTDOWN_TIMEOUT` | `10s` | Max time for graceful shutdown |
 | `HTTP_RATE_LIMIT_ENABLED` | `true` | Enable rate limiting on API routes |
-| `HTTP_LOGGING_ENABLED` | `true` | Enable access logging |
 
 ## Database (PostgreSQL)
 
@@ -40,7 +39,7 @@ Configuration is parsed using [caarlos0/env/v10](https://github.com/caarlos0/env
 | `DB_USERNAME` | `root` | Database user |
 | `DB_PASSWORD` | (empty) | Database password |
 | `DB_SSLMODE` | (auto) | SSL mode. In development defaults to `disable`, otherwise `require`. Accepts: `disable`, `require`, `verify-full`, `verify-ca`, `prefer`, `allow` |
-| `DB_TIMEZONE` | `UTC` | Database timezone |
+| `DB_TIMEZONE` | (empty) | Database timezone (defaults to `UTC` if unset) |
 | `DB_CONNECT_TIMEOUT` | `5` | Connection timeout in seconds |
 | `DB_PING_TIMEOUT` | `3s` | Ping timeout after connection |
 | `DB_MAX_IDLE_CONNS` | `10` | Max idle connections in pool |
@@ -87,13 +86,37 @@ Configuration is parsed using [caarlos0/env/v10](https://github.com/caarlos0/env
 |---|---|---|
 | `ASPIRE_CLOUD_API_KEY` | (empty) | Bearer token for AspireCloud/WordPress API calls |
 
-## Sentry (Error Tracking)
+## API Throttling
 
 | Variable | Default | Description |
 |---|---|---|
-| `SENTRY_DSN` | (empty) | Sentry DSN (disabled when empty) |
-| `SENTRY_SAMPLE_RATE` | `0.0` | Error sample rate (0.0 to 1.0) |
-| `SENTRY_TRACES_SAMPLE_RATE` | `0.0` | Performance trace sample rate |
+| `API_THROTTLE_RPS` | `10` | Outbound API requests per second |
+| `API_THROTTLE_BURST` | `5` | Max burst size for outbound API requests |
+| `API_THROTTLE_MAX_RETRIES` | `3` | Max retries for throttled API calls |
+| `API_THROTTLE_RETRY_DELAY` | `5s` | Delay between retries |
+
+## MCP (Model Context Protocol)
+
+| Variable | Default | Description |
+|---|---|---|
+| `MCP_ENABLED` | `true` | Enable the remote MCP server endpoint at `/mcp` |
+
+## OpenTelemetry
+
+| Variable | Default | Description |
+|---|---|---|
+| `OTEL_EXPORTER_TYPE` | `none` | Exporter type (`none`, `otlp`, etc.) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | OTLP collector endpoint |
+| `OTEL_EXPORTER_OTLP_INSECURE` | `true` | Use insecure connection to OTLP endpoint |
+| `OTEL_TRACE_BATCH_TIMEOUT` | `5s` | Batch timeout for trace export |
+| `OTEL_LOG_BATCH_TIMEOUT` | `5s` | Batch timeout for log export |
+| `OTEL_ENABLE_RUNTIME_METRICS` | `true` | Collect Go runtime metrics |
+
+## Reconnection
+
+| Variable | Default | Description |
+|---|---|---|
+| `RECONNECT_INTERVAL` | `30s` | How often to retry failed service connections |
 
 ## TLS (Production)
 

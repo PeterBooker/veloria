@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -48,6 +49,11 @@ type SearchService interface {
 
 	// ReadFile returns lines from a file in an extension's source tree.
 	ReadFile(ctx context.Context, repo, slug, path string, startLine, maxLines int) (*ReadFileResponse, error)
+
+	// GrepFile searches within a single extension's source files using regex.
+	// Unlike Search, this bypasses the trigram engine and does not acquire
+	// the search semaphore.
+	GrepFile(ctx context.Context, params GrepFileParams) (*GrepFileResponse, error)
 }
 
 // searchSem limits concurrent MCP searches to 1 to prevent concurrent
@@ -349,8 +355,12 @@ func (s *DirectService) ListFiles(_ context.Context, repoType, slug, pattern str
 		return nil, fmt.Errorf("extension not found or not indexed: %s", slug)
 	}
 
+	// ResolveSourceDir returns the parent (e.g. /data/plugins/source/);
+	// scope to the slug-specific subdirectory.
+	slugDir := filepath.Join(sourceDir, slug)
+
 	var files []FileEntry
-	err = filepath.WalkDir(sourceDir, func(path string, d os.DirEntry, walkErr error) error {
+	err = filepath.WalkDir(slugDir, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -358,7 +368,7 @@ func (s *DirectService) ListFiles(_ context.Context, repoType, slug, pattern str
 			return nil
 		}
 
-		relPath, relErr := filepath.Rel(sourceDir, path)
+		relPath, relErr := filepath.Rel(slugDir, path)
 		if relErr != nil {
 			return relErr
 		}
@@ -408,7 +418,11 @@ func (s *DirectService) ReadFile(_ context.Context, repoType, slug, filePath str
 		return nil, fmt.Errorf("extension not found or not indexed: %s", slug)
 	}
 
-	fullPath, err := web.SafeJoin(sourceDir, filePath)
+	// ResolveSourceDir returns the parent (e.g. /data/plugins/source/);
+	// scope to the slug-specific subdirectory.
+	slugDir := filepath.Join(sourceDir, slug)
+
+	fullPath, err := web.SafeJoin(slugDir, filePath)
 	if err != nil {
 		return nil, fmt.Errorf("invalid file path")
 	}
@@ -554,9 +568,15 @@ func convertManagerResponse(results *manager.SearchResponse) *SearchResponse {
 		}
 
 		for _, fm := range r.Matches {
+			// The index stores filenames with a slug prefix (e.g. "woocommerce/file.php").
+			// Strip it so paths are relative to the extension root and consistent with read_file.
+			filename := fm.Filename
+			if _, after, ok := strings.Cut(filename, "/"); ok {
+				filename = after
+			}
 			for _, m := range fm.Matches {
 				ext.Matches = append(ext.Matches, MatchDetail{
-					File:    fm.Filename,
+					File:    filename,
 					Line:    m.LineNumber,
 					Content: m.Line,
 					Before:  m.Before,
@@ -589,4 +609,156 @@ func escapeLike(s string) string {
 	s = strings.ReplaceAll(s, `%`, `\%`)
 	s = strings.ReplaceAll(s, `_`, `\_`)
 	return s
+}
+
+const maxGrepMatches = 1000
+
+func (s *DirectService) GrepFile(_ context.Context, params GrepFileParams) (*GrepFileResponse, error) {
+	if !isValidRepo(params.Repo) {
+		return nil, fmt.Errorf("unknown repo: %s", params.Repo)
+	}
+
+	sourceDir, err := s.manager.ResolveSourceDir(params.Repo, params.Slug)
+	if err != nil {
+		return nil, fmt.Errorf("extension not found or not indexed: %s", params.Slug)
+	}
+	slugDir := filepath.Join(sourceDir, params.Slug)
+
+	pattern := params.Query
+	if !params.CaseSensitive {
+		pattern = "(?i)" + pattern
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid regex: %w", err)
+	}
+
+	contextLines := clampInt(params.ContextLines, 0, maxContext)
+
+	resp := &GrepFileResponse{
+		Slug:  params.Slug,
+		Repo:  params.Repo,
+		Query: params.Query,
+	}
+
+	err = filepath.WalkDir(slugDir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil || d.IsDir() {
+			return walkErr
+		}
+		if resp.TotalMatches >= maxGrepMatches {
+			return filepath.SkipAll
+		}
+
+		relPath, _ := filepath.Rel(slugDir, path)
+		relPath = strings.TrimSuffix(relPath, ".gz")
+
+		if params.FileMatch != "" {
+			matched, matchErr := filepath.Match(params.FileMatch, filepath.Base(relPath))
+			if matchErr != nil {
+				return fmt.Errorf("invalid glob: %w", matchErr)
+			}
+			if !matched {
+				return nil
+			}
+		}
+
+		matches, grepErr := grepSingleFile(path, re, contextLines)
+		if grepErr != nil {
+			return nil // skip unreadable files
+		}
+		if len(matches) == 0 {
+			return nil
+		}
+
+		// Enforce global cap.
+		remaining := maxGrepMatches - resp.TotalMatches
+		if len(matches) > remaining {
+			matches = matches[:remaining]
+		}
+
+		resp.Files = append(resp.Files, GrepFileMatch{
+			Path:    relPath,
+			Matches: matches,
+		})
+		resp.TotalMatches += len(matches)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("grep failed: %w", err)
+	}
+
+	return resp, nil
+}
+
+// grepSingleFile searches a file for regex matches, transparently handling
+// gzip-compressed sources. Returns matches with optional context lines.
+func grepSingleFile(path string, re *regexp.Regexp, contextLines int) ([]GrepLineMatch, error) {
+	file, err := os.Open(path) // #nosec G304 -- path from WalkDir within validated slugDir
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var r io.Reader = file
+
+	// Detect gzip by magic bytes.
+	var header [2]byte
+	n, _ := io.ReadFull(file, header[:])
+	isGzip := n == len(header) && bytes.Equal(header[:], gzipMagicHeader[:])
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	if isGzip {
+		gz, err := gzip.NewReader(file)
+		if err != nil {
+			return nil, err
+		}
+		defer gz.Close()
+		r = gz
+	}
+
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	var allLines []string
+	for scanner.Scan() {
+		allLines = append(allLines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	var matches []GrepLineMatch
+	for i, line := range allLines {
+		if !re.MatchString(line) {
+			continue
+		}
+
+		m := GrepLineMatch{
+			Line:    i + 1,
+			Content: line,
+		}
+
+		if contextLines > 0 {
+			start := i - contextLines
+			if start < 0 {
+				start = 0
+			}
+			if start < i {
+				m.Before = allLines[start:i]
+			}
+
+			end := i + 1 + contextLines
+			if end > len(allLines) {
+				end = len(allLines)
+			}
+			if i+1 < end {
+				m.After = allLines[i+1 : end]
+			}
+		}
+
+		matches = append(matches, m)
+	}
+
+	return matches, nil
 }

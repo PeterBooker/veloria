@@ -110,3 +110,36 @@ type ReadFileResponse struct {
 	EndLine    int    `json:"end_line"`
 	Content    string `json:"content"`
 }
+
+// GrepFileParams holds the parameters for a grep_file request.
+type GrepFileParams struct {
+	Repo          string
+	Slug          string
+	Query         string
+	FileMatch     string
+	CaseSensitive bool
+	ContextLines  int
+}
+
+// GrepFileResponse holds the results of a grep_file operation.
+type GrepFileResponse struct {
+	Slug         string          `json:"slug"`
+	Repo         string          `json:"repo"`
+	Query        string          `json:"query"`
+	TotalMatches int             `json:"total_matches"`
+	Files        []GrepFileMatch `json:"files"`
+}
+
+// GrepFileMatch holds matches within a single file.
+type GrepFileMatch struct {
+	Path    string          `json:"path"`
+	Matches []GrepLineMatch `json:"matches"`
+}
+
+// GrepLineMatch holds a single line match with optional context.
+type GrepLineMatch struct {
+	Line    int      `json:"line"`
+	Content string   `json:"content"`
+	Before  []string `json:"before,omitempty"`
+	After   []string `json:"after,omitempty"`
+}
