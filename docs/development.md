@@ -76,7 +76,6 @@ cmd/
 
 internal/              # All application packages (see architecture.md)
 migrations/            # SQL migration files (embedded in binary)
-templates/             # Go html/template files (embedded via embed.FS)
 docs/                  # Developer documentation
 ```
 

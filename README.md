@@ -77,30 +77,31 @@ The core component exposes a REST API, which is used by the frontend.
 | [API Reference](docs/api.md) | Complete API endpoint documentation |
 | [Configuration](docs/configuration.md) | Environment variables and settings |
 | [Development Guide](docs/development.md) | Setup, building, testing, and debugging |
-| [Contributing](CONTRIBUTING.md) | Contribution workflow and PR requirements |
-| [Security Policy](SECURITY.md) | Vulnerability reporting and response policy |
-| [Support](SUPPORT.md) | Where to get help |
-| [Code of Conduct](CODE_OF_CONDUCT.md) | Community behavior standards |
-| [Governance](GOVERNANCE.md) | Project decision model |
+| [Testing](docs/testing.md) | Test infrastructure, fakes, and patterns |
+| [Contributing](.github/CONTRIBUTING.md) | Contribution workflow and PR requirements |
+| [Security Policy](.github/SECURITY.md) | Vulnerability reporting and response policy |
+| [Code of Conduct](.github/CODE_OF_CONDUCT.md) | Community behavior standards |
 
 ## Project Structure
 
 ```
 veloria/
 ├── cmd/
-│   └── veloria/            # Single binary (subcommands: serve, index, migrate, version)
+│   └── veloria/            # Single binary (subcommands: serve, index, migrate, wipe, maintenance, version)
 ├── internal/
 │   ├── api/               # HTTP handlers
 │   ├── config/            # Configuration
 │   ├── index/             # Trigram indexing
 │   ├── manager/           # Repository orchestration
 │   ├── repo/              # Data repositories (generic)
-│   └── router/            # HTTP routing
+│   ├── router/            # HTTP routing
+│   ├── service/           # Service registry for dynamic dependency resolution
+│   ├── ui/                # Templ components (layouts, pages, partials)
+│   └── web/               # Shared web deps and interfaces
 ├── assets/                # Embedded static assets (go:embed)
 │   └── static/            # CSS, JS, fonts (generated — do not edit)
 ├── frontend/              # Frontend build (Tailwind v4, npm)
 │   └── css/main.css       # Tailwind input + theme tokens
-├── templates/             # HTML templates (Go html/template)
 └── docs/                  # Documentation
 ```
 
@@ -150,11 +151,12 @@ See [Development Guide](docs/development.md) for complete instructions.
 - **Search**: google/codesearch (trigram indexing)
 - **HTTP Router**: chi
 - **ORM**: GORM
-- **Monitoring**: Prometheus metrics, Sentry error tracking
+- **Templating**: templ
+- **Monitoring**: Prometheus metrics, OpenTelemetry
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Contributions are welcome. Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) before opening a pull request.
 
 ## Sponsorship
 

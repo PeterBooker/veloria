@@ -71,7 +71,7 @@ func New(deps RouterDeps) *chi.Mux {
 	if opts.HandlerTimeout > 0 {
 		handlerTimeout = opts.HandlerTimeout
 	}
-	r.Use(middleware.Timeout(handlerTimeout))
+	r.Use(handlerTimeoutSkipMCP(handlerTimeout))
 	r.Use(middleware.StripSlashes)
 
 	// Auth middleware - dynamically resolved from registry
@@ -160,13 +160,14 @@ func New(deps RouterDeps) *chi.Mux {
 		})
 	}
 
-	// MCP (Model Context Protocol) endpoint - dynamically resolved
+	// MCP (Model Context Protocol) endpoint - dynamically resolved.
+	// Exempt from handler timeout (streaming transport) with extended write deadline.
 	if opts.MCPEnabled {
 		mcpHandler := dynamicMCPHandler(reg)
 		if opts.RateLimitEnabled {
-			r.With(httprate.LimitByIP(100, time.Minute)).Mount("/mcp", mcpHandler)
+			r.With(mcpWriteDeadline, httprate.LimitByIP(100, time.Minute)).Mount("/mcp", mcpHandler)
 		} else {
-			r.Mount("/mcp", mcpHandler)
+			r.With(mcpWriteDeadline).Mount("/mcp", mcpHandler)
 		}
 	}
 
@@ -403,4 +404,30 @@ func legacyDomainRedirect(appURL string, domains []string) func(http.Handler) ht
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// handlerTimeoutSkipMCP applies chi's Timeout middleware to all routes except
+// /mcp, which uses a streaming transport that requires long-lived connections.
+func handlerTimeoutSkipMCP(timeout time.Duration) func(http.Handler) http.Handler {
+	tm := middleware.Timeout(timeout)
+	return func(next http.Handler) http.Handler {
+		withTimeout := tm(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/mcp") {
+				next.ServeHTTP(w, r)
+				return
+			}
+			withTimeout.ServeHTTP(w, r)
+		})
+	}
+}
+
+// mcpWriteDeadline extends the server's WriteTimeout for MCP requests.
+// The default WriteTimeout is too short for streaming MCP tool calls.
+func mcpWriteDeadline(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rc := http.NewResponseController(w)
+		_ = rc.SetWriteDeadline(time.Now().Add(5 * time.Minute))
+		next.ServeHTTP(w, r)
+	})
 }

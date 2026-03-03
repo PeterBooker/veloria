@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -33,6 +34,30 @@ func TestFormatSearchSummary(t *testing.T) {
 	// Extension with 0 active installs should not show install count
 	if !strings.Contains(text, "My Plugin (my-plugin) v1.0.0 — 7 matches\n") {
 		t.Errorf("should not show active installs for extensions with 0 installs, got:\n%s", text)
+	}
+}
+
+func TestFormatSearchSummary_Cap(t *testing.T) {
+	var exts []ExtensionResult
+	for i := range 60 {
+		exts = append(exts, ExtensionResult{
+			Slug: fmt.Sprintf("plugin-%d", i), Name: fmt.Sprintf("Plugin %d", i),
+			Version: "1.0", TotalMatches: 1,
+		})
+	}
+	resp := &SearchResponse{TotalMatches: 60, TotalExtensions: 60, Extensions: exts}
+	text := FormatSearchSummary(resp, "id", "test", "plugins")
+
+	if !strings.Contains(text, "... and 10 more extensions") {
+		t.Errorf("should cap and show remainder, got:\n%s", text)
+	}
+	// Should not contain plugin-50 (beyond cap)
+	if strings.Contains(text, "plugin-50") {
+		t.Errorf("should not list extensions beyond cap, got:\n%s", text)
+	}
+	// Should contain plugin-49 (last before cap)
+	if !strings.Contains(text, "plugin-49") {
+		t.Errorf("should list extensions up to cap, got:\n%s", text)
 	}
 }
 
@@ -381,5 +406,88 @@ func TestFormatNumber(t *testing.T) {
 		if got != tt.expected {
 			t.Errorf("formatNumber(%d) = %q, want %q", tt.input, got, tt.expected)
 		}
+	}
+}
+
+func TestFormatGrepFile(t *testing.T) {
+	resp := &GrepFileResponse{
+		Slug:         "woocommerce",
+		Repo:         "plugins",
+		Query:        "wpdb->query",
+		TotalMatches: 3,
+		Files: []GrepFileMatch{
+			{
+				Path: "includes/class-wc.php",
+				Matches: []GrepLineMatch{
+					{Line: 42, Content: "$wpdb->query($sql);"},
+					{
+						Line:    100,
+						Content: "$wpdb->query($update);",
+						Before:  []string{"// Update record"},
+						After:   []string{"return true;"},
+					},
+				},
+			},
+			{
+				Path: "includes/admin.php",
+				Matches: []GrepLineMatch{
+					{Line: 10, Content: "$wpdb->query('DELETE FROM ...');"},
+				},
+			},
+		},
+	}
+
+	text := FormatGrepFile(resp)
+
+	checks := []string{
+		`plugins/woocommerce — grep "wpdb->query"`,
+		"3 matches across 2 files",
+		"includes/class-wc.php (2 matches)",
+		"> 42: $wpdb->query($sql);",
+		"| // Update record",
+		"> 100: $wpdb->query($update);",
+		"| return true;",
+		"includes/admin.php (1 matches)",
+	}
+	for _, want := range checks {
+		if !strings.Contains(text, want) {
+			t.Errorf("should contain %q, got:\n%s", want, text)
+		}
+	}
+
+	if strings.Contains(text, "Results capped") {
+		t.Errorf("should not show cap warning, got:\n%s", text)
+	}
+}
+
+func TestFormatGrepFile_Empty(t *testing.T) {
+	resp := &GrepFileResponse{
+		Slug:  "tiny",
+		Repo:  "plugins",
+		Query: "nonexistent",
+	}
+
+	text := FormatGrepFile(resp)
+
+	if !strings.Contains(text, "0 matches across 0 files") {
+		t.Errorf("should show 0 matches, got:\n%s", text)
+	}
+}
+
+func TestFormatGrepFile_Capped(t *testing.T) {
+	resp := &GrepFileResponse{
+		Slug:         "big",
+		Repo:         "plugins",
+		Query:        "echo",
+		TotalMatches: maxGrepMatches,
+		Files: []GrepFileMatch{
+			{Path: "a.php", Matches: []GrepLineMatch{{Line: 1, Content: "echo 'hi';"}}},
+		},
+	}
+
+	text := FormatGrepFile(resp)
+
+	if !strings.Contains(text, "Results capped at 1,000 matches") {
+		t.Errorf("should show cap warning, got:\n%s", text)
 	}
 }

@@ -171,17 +171,25 @@ Search status values: `queued`, `in_progress`, `completed`, `failed`.
 
 List recent searches with pagination. Same pagination parameters as other list endpoints.
 
-## Health Check
+## Health & Monitoring
 
 ### GET /up
 
-Returns `200 OK` with an empty body. No authentication or content-type required.
+Liveness check. Returns `200 OK` with an empty body. No authentication or content-type required.
 
-## Metrics
+### GET /health
+
+Readiness check. Returns health status of dependent services (database, S3, etc.).
 
 ### GET /metrics
 
 Prometheus-format metrics endpoint.
+
+## MCP (Model Context Protocol)
+
+### /mcp
+
+Streamable HTTP endpoint for the Model Context Protocol. Provides code search tools for AI agents. Rate limited to 100 requests/minute when rate limiting is enabled.
 
 ## Web Routes
 
@@ -191,17 +199,30 @@ These serve the HTML web interface:
 |---|---|---|
 | GET | `/` | Home page |
 | GET | `/about` | About page |
+| GET | `/privacy` | Privacy policy |
+| GET | `/terms` | Terms of service |
+| GET | `/docs` | Documentation page |
 | GET | `/data-sources` | Data sources overview |
 | GET | `/data-sources/{type}` | Data source detail (plugins/themes/cores) |
+| GET | `/data-sources/{type}/items` | Paginated items partial (htmx) |
 | GET | `/data-sources/plugins/{slug}` | Plugin detail page |
 | GET | `/data-sources/themes/{slug}` | Theme detail page |
 | GET | `/data-sources/cores/{version}` | Core detail page |
 | GET | `/searches` | Public search list |
 | GET | `/search/{uuid}` | Search result page |
+| GET | `/search/{uuid}/context` | Search context page |
+| GET | `/search/{uuid}/extensions` | Search extensions partial (htmx) |
+| GET | `/search/{uuid}/extension/{slug}` | Extension-specific results page |
+| GET | `/search/{uuid}/export` | Export search results as CSV |
+| GET | `/search/{uuid}/og.png` | OG image for search (rate limited) |
 | POST | `/search` | Submit search (web form) |
 | GET | `/searches/own` | Current user's searches |
+| GET | `/my-searches` | Redirect to `/searches/own` |
+| POST | `/search/{uuid}/report` | Report a search (requires login) |
 | GET | `/login` | OAuth login page |
 | GET | `/logout` | Logout |
+| GET | `/auth/{provider}` | Begin OAuth flow |
+| GET | `/auth/{provider}/callback` | OAuth callback |
 
 ## Admin Routes (Require Authentication + Admin Role)
 
@@ -211,3 +232,4 @@ These serve the HTML web interface:
 | POST | `/admin/reports/{id}/resolve` | Resolve a report |
 | POST | `/admin/search/{uuid}/visibility` | Toggle search visibility |
 | POST | `/admin/reindex` | Queue ad-hoc reindex (form: `repo_type`, `slug`) |
+| POST | `/admin/maintenance` | Toggle maintenance mode |

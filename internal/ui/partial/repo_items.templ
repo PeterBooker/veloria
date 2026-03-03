@@ -6,7 +6,6 @@ import (
 
 	"veloria/internal/ui"
 	"veloria/internal/ui/badge"
-	"veloria/internal/ui/icon"
 )
 
 func repoItemsURL(repo string, page int, search string) string {
@@ -23,17 +22,6 @@ templ RepoItems(data ui.RepoItemsData) {
 			for _, item := range data.Items {
 				<a href={ templ.SafeURL("/data-sources/" + data.Repo + "/" + item.Slug) } class="px-6 py-4 flex items-center justify-between hover:bg-white/[0.08] transition-colors block" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
 					<div class="flex items-center gap-4">
-						<div class="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
-							if item.Indexed {
-								<span class="text-green-500">
-									@icon.Check(20)
-								</span>
-							} else {
-								<span class="text-text-subtle">
-									@icon.Info(20)
-								</span>
-							}
-						</div>
 						<div>
 							<h3 class="text-text-bright font-medium">{ item.Name }</h3>
 							<p class="text-sm text-text-subtle">{ item.Slug }</p>

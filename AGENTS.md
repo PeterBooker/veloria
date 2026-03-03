@@ -20,7 +20,7 @@ You are working on a **production code search engine** that indexes and searches
 - Idiomatic Go code following standard conventions
 - Thread-safe operations (this is a highly concurrent system)
 - Graceful degradation under load
-- Comprehensive error handling with Sentry integration
+- Comprehensive error handling with OpenTelemetry integration
 
 **Never:**
 - Block search operations during index updates
@@ -42,7 +42,6 @@ You are working on a **production code search engine** that indexes and searches
 - [docs/development.md](docs/development.md) - Local setup and debugging
 
 **For database work:**
-- [docs/migrations.md](docs/migrations.md) - Migration procedures
 - Review existing migrations in `migrations/` directory
 
 **Use Task tool with Explore agent** when you need to:
@@ -175,9 +174,9 @@ Veloria provides:
 | Search Engine | google/codesearch (trigram) |
 | Object Storage | MinIO/S3 |
 | Cache | Ristretto |
-| Logging | zerolog |
+| Logging | zap |
 | Metrics | Prometheus |
-| Error Tracking | Sentry |
+| Telemetry | OpenTelemetry |
 | Auth | goth (OAuth) |
 | Migrations | goose |
 
@@ -188,11 +187,15 @@ Veloria provides:
 | `internal/manager` | Orchestrates repositories, aggregates search |
 | `internal/repo` | Thread-safe repository with index management |
 | `internal/index` | Trigram index wrapper (google/codesearch) |
-| `internal/api/*` | HTTP handlers for search, plugins, themes, core |
+| `internal/plugin`, `theme`, `core`, `search` | HTTP handlers per domain |
+| `internal/service` | Service registry for dynamic dependency resolution |
 | `internal/storage` | S3 result storage with compression |
 | `internal/cache` | Ristretto cache wrapper |
 | `internal/tasks` | Background scheduled tasks |
 | `internal/config` | Environment configuration |
+| `internal/telemetry` | OpenTelemetry setup (metrics, tracing, logging) |
+| `internal/mcp` | MCP (Model Context Protocol) service |
+| `internal/ui` | Templ components (layouts, pages, partials) |
 
 ### Concurrency Model
 
@@ -200,7 +203,7 @@ Veloria provides:
 ┌─────────────────────────────────────────────────────────────┐
 │                    Request Handling                          │
 ├─────────────────────────────────────────────────────────────┤
-│  Search Semaphore: Max 4 concurrent searches                 │
+│  Search fan-out: SEARCH_CONCURRENCY workers (default 24)       │
 │  RWMutex per Repository: Many readers, exclusive writers     │
 │  UpdateMutex: Prevents search during hot-swap                │
 └─────────────────────────────────────────────────────────────┘
@@ -220,45 +223,48 @@ Veloria provides:
 
 ```
 veloria/
-├── cmd/                           # Entry points (3 binaries)
-│   ├── veloria/                   # Main API server
-│   ├── veloria-indexer/           # CLI indexing utility
-│   └── veloria-migrate/           # Database migrations
+├── cmd/                           # Entry points
+│   ├── veloria/                   # Single binary (serve, index, migrate, wipe, maintenance, version)
+│   └── veloria-converter/         # One-off converter utility
 │
 ├── internal/                      # Core application code
-│   ├── api/                       # HTTP handlers
-│   │   ├── search/               # Search operations
-│   │   ├── plugin/               # Plugin endpoints
-│   │   ├── theme/                # Theme endpoints
-│   │   ├── core/                 # Core release endpoints
-│   │   ├── user/                 # User endpoints
-│   │   └── common/               # Shared utilities
+│   ├── admin/                     # Admin web handlers (reindex, maintenance)
+│   ├── api/                       # Shared JSON response helpers
+│   ├── app/                       # Application lifecycle (New, Start, Shutdown)
 │   ├── auth/                      # OAuth and sessions
 │   ├── cache/                     # Ristretto wrapper
 │   ├── client/                    # HTTP client setup
+│   ├── codesearch/                # Low-level regexp search
 │   ├── config/                    # Environment config
+│   ├── core/                      # Core web + API handlers
+│   ├── health/                    # Health/readiness endpoint
+│   ├── image/                     # OG image generation
 │   ├── index/                     # Trigram indexing
-│   ├── logger/                    # Zerolog setup
+│   ├── log/                       # Zap logger setup
 │   ├── manager/                   # Repository orchestration
-│   ├── metrics/                   # Prometheus metrics
+│   ├── mcp/                       # MCP (Model Context Protocol) service
+│   ├── middleware/                 # Custom HTTP middleware
+│   ├── plugin/                    # Plugin web + API handlers
 │   ├── repo/                      # Data repositories
+│   ├── report/                    # Search report (flagging) handlers
 │   ├── router/                    # chi HTTP routing
-│   ├── sentry/                    # Error tracking
+│   ├── search/                    # Search web + API handlers
+│   ├── server/                    # HTTP server with TLS
+│   ├── service/                   # Service registry for dynamic deps
 │   ├── storage/                   # S3/MinIO storage
 │   ├── tasks/                     # Background tasks
+│   ├── telemetry/                 # OpenTelemetry (metrics, tracing, logging)
+│   ├── testutil/                  # Test fixtures, hand-written fakes
+│   ├── theme/                     # Theme web + API handlers
 │   ├── types/                     # Protobuf types
-│   └── web/                       # Web UI handlers
+│   ├── ui/                        # Templ components (layouts, pages, partials)
+│   ├── user/                      # User model
+│   └── web/                       # Shared web deps, interfaces
 │
 ├── migrations/                    # SQL migrations (goose)
-├── templates/                     # HTML templates
-│   ├── layouts/                  # Base layout
-│   ├── pages/                    # Page templates
-│   └── partials/                 # Reusable components
-│
 ├── testdata/                      # Test data and sample indexes
 ├── docs/                          # Documentation
 ├── .github/workflows/             # CI/CD pipelines
-├── Dockerfile                     # Multi-stage build
 ├── docker-compose.yml             # Development environment
 ├── go.mod                         # Dependencies
 └── types.proto                    # Protobuf definitions
@@ -357,7 +363,7 @@ DB_CONN_MAX_LIFETIME=1h
 
 **Current Limits:**
 - Handler timeout: 30 seconds
-- Concurrent searches: 4 max (semaphore)
+- Search fan-out: 24 workers (SEARCH_CONCURRENCY)
 - Connection keepalive: 30 seconds
 
 **When Adding Endpoints:**
@@ -378,7 +384,7 @@ The Web UI uses **Tailwind CSS v4** with htmx and ECharts. All frontend assets a
 ```
 frontend/css/main.css          ─── Tailwind input (theme + custom CSS)
         │
-        ▼  (tailwindcss CLI, scans templates/ for class usage)
+        ▼  (tailwindcss CLI, scans internal/ui/ for class usage)
 assets/static/css/styles.css   ─── Minified output (embedded)
 assets/static/js/htmx.min.js   ─── Copied from node_modules (embedded)
 assets/static/js/echarts.min.js ─── Copied from node_modules (embedded)
@@ -395,7 +401,7 @@ The `//go:generate` directive in `assets/embed.go` runs `npm install` + `npm run
 | `assets/embed.go` | `go:generate` directive + `go:embed` for all static assets |
 | `assets/static/css/styles.css` | Generated output — **do not edit directly** |
 | `assets/static/js/` | Vendor JS — **do not edit directly** (copied by postbuild) |
-| `templates/` | HTML templates — Tailwind scans these for class usage via `@source` |
+| `internal/ui/` | Templ components — Tailwind scans these for class usage via `@source` |
 
 ### Building Assets
 
@@ -417,14 +423,14 @@ cd frontend && npm run watch
 There is **no `tailwind.config.js`** — Tailwind v4 uses CSS-native configuration:
 
 - **`@import "tailwindcss"`** — loads the framework
-- **`@source "../../templates"`** — tells Tailwind to scan `templates/` for class usage
+- **`@source "../../internal/ui/**/*.templ"`** — tells Tailwind to scan templ components for class usage
 - **`@theme { ... }`** — defines custom design tokens (colors, fonts, sizes) inline
 
 When adding new Tailwind classes in templates, they are automatically picked up by the `@source` directive. No config file changes needed.
 
 ### When Working on the UI
 
-1. **Adding/changing Tailwind classes in templates**: Run `go generate ./assets/...` (or use `npm run watch` during development) to regenerate `styles.css`
+1. **Adding/changing Tailwind classes in templ components**: Run `go generate ./assets/...` (or use `npm run watch` during development) to regenerate `styles.css`
 2. **Adding custom CSS**: Edit `frontend/css/main.css`, then rebuild
 3. **Updating JS vendor libraries**: Update versions in `frontend/package.json`, then run `go generate ./assets/...`
 4. **Testing changes**: After rebuilding assets, run `go run ./cmd/veloria` — assets are embedded at compile time
@@ -445,14 +451,11 @@ go generate ./assets/...
 # Run the server
 go run ./cmd/veloria
 
-# Run with experimental features
-GOEXPERIMENT=jsonv2,greenteagc go run ./cmd/veloria
-
-# Run indexer
-go run ./cmd/veloria-indexer -type=plugin -slug=akismet
+# Index a single extension (subprocess mode)
+go run ./cmd/veloria index --type=plugin --slug=akismet
 
 # Run migrations
-go run ./cmd/veloria-migrate up
+go run ./cmd/veloria migrate up
 ```
 
 ### Building
@@ -461,16 +464,12 @@ go run ./cmd/veloria-migrate up
 # Build frontend assets first (if CSS/JS changed)
 go generate ./assets/...
 
-# Build all binaries
+# Build the binary
 go build ./cmd/veloria
-go build ./cmd/veloria-indexer
-go build ./cmd/veloria-migrate
 
 # Build with optimizations
 go build -ldflags "-w -s" ./cmd/veloria
 
-# Build for Docker
-docker build -t veloria .
 ```
 
 ### Testing
@@ -502,7 +501,7 @@ golangci-lint run
 gosec ./...
 
 # Generate protobuf types
-protoc --go_out=. types.proto
+protoc --go_out=internal/types --go_opt=paths=source_relative types.proto
 ```
 
 ### Profiling (Performance Investigation)
@@ -527,7 +526,7 @@ import _ "net/http/pprof"
 
 ### New API Endpoint
 
-1. **Create handler** in appropriate `internal/api/` subpackage:
+1. **Create handler** in the appropriate package (`internal/plugin/`, `internal/theme/`, `internal/core/`, `internal/search/`):
    ```go
    func (h *Handler) GetSomething(w http.ResponseWriter, r *http.Request) {
        ctx := r.Context()
@@ -603,7 +602,7 @@ import _ "net/http/pprof"
 - **Formatting:** `gofmt` / `goimports`
 - **Linting:** golangci-lint configuration
 - **Error handling:** Wrap errors with context (`fmt.Errorf("doing X: %w", err)`)
-- **Logging:** Use zerolog with structured fields
+- **Logging:** Use zap with structured fields
 - **Context:** Pass context as first parameter, respect cancellation
 
 ### Naming
@@ -631,7 +630,7 @@ if err != nil {
 
 // CORRECT: Log and continue for non-fatal errors
 if err != nil {
-    logger.Warn().Err(err).Str("slug", slug).Msg("failed to update, will retry")
+    logger.Warn("failed to update, will retry", zap.Error(err), zap.String("slug", slug))
     continue
 }
 
@@ -656,13 +655,13 @@ if err != nil {
 
 ```bash
 # Create new migration
-goose -dir migrations create add_new_table sql
+go run ./cmd/veloria migrate create add_new_table sql
 
 # Run migrations
-go run ./cmd/veloria-migrate up
+go run ./cmd/veloria migrate up
 
 # Rollback
-go run ./cmd/veloria-migrate down
+go run ./cmd/veloria migrate down
 ```
 
 **Migration Rules:**
@@ -699,19 +698,16 @@ Available at `/metrics`:
 - `searches_completed_total` - Completed searches counter
 - `plugins_count`, `themes_count`, `cores_count` - Repository sizes
 
-### Health Check
+### Health Checks
 
-- Endpoint: `GET /up`
-- Returns: 200 OK when healthy
+- Liveness: `GET /up` — Returns 200 OK always
+- Readiness: `GET /health` — Returns health status of dependent services
 
-### Sentry
+### OpenTelemetry
 
-- Configure via `SENTRY_DSN`
-- Adjust sample rates for production:
-  ```
-  SENTRY_SAMPLE_RATE=0.1       # 10% error sampling
-  SENTRY_TRACES_SAMPLE_RATE=0.01  # 1% trace sampling
-  ```
+- Configure via `OTEL_EXPORTER_TYPE` (e.g., `otlp` for OTLP exporter, `none` to disable)
+- Set `OTEL_EXPORTER_OTLP_ENDPOINT` to your collector endpoint
+- See [Configuration](docs/configuration.md) for all `OTEL_*` variables
 
 ### Debugging Performance Issues
 

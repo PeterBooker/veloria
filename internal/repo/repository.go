@@ -29,6 +29,11 @@ const (
 	IndexTimeout     = 30 * time.Minute
 	FullScanInterval = 7 * 24 * time.Hour
 	globalMatchCap   = 100_000
+
+	// maxTotalRetries is the ceiling for total retry_count across restarts.
+	// Extensions that hit this limit are no longer resumed by ResumeUnindexed,
+	// preventing infinite retry loops for permanently broken packages.
+	maxTotalRetries = 15
 )
 
 // ExtensionType identifies the type of extension store.
@@ -803,28 +808,37 @@ func (r *ExtensionStore[T]) saveLargestRepoFiles(slug, name string, files []*Fil
 // from DB) but don't have an index on disk, plus extensions that previously
 // failed indexing and are due for a retry.
 func (r *ExtensionStore[T]) ResumeUnindexed() []IndexTask {
+	// Query DB for closed extensions so we skip them entirely.
+	// These have permanently-missing downloads and would just produce warn spam.
+	closedSet := r.closedSlugs()
+
 	r.mu.RLock()
 	seen := make(map[string]bool)
 	var unindexed []T
 	for _, ext := range r.List {
+		slug := ext.GetSlug()
+		if closedSet[slug] {
+			continue
+		}
 		ie := ext.GetIndexedExtension()
 		if (ie == nil || !ie.HasIndex()) && ext.GetDownloadLink() != "" {
 			unindexed = append(unindexed, ext)
-			seen[ext.GetSlug()] = true
+			seen[slug] = true
 		}
 	}
 	r.mu.RUnlock()
 
 	// Also resume stale failures from DB: extensions that exceeded maxRetries
 	// but whose last attempt was more than 24 hours ago.
+	// Exclude closed extensions and those that have hit the max total retry ceiling.
 	var staleFailedSlugs []string
 	identifierCol := "slug"
 	if r.repoType == TypeCores {
 		identifierCol = "version"
 	}
 	r.db.Table(string(r.repoType)).
-		Where("index_status = ? AND retry_count >= ? AND last_attempt_at < ?",
-			"failed", 3, time.Now().Add(-24*time.Hour)).
+		Where("index_status = ? AND retry_count >= ? AND retry_count < ? AND last_attempt_at < ? AND closed_at IS NULL",
+			"failed", 3, maxTotalRetries, time.Now().Add(-24*time.Hour)).
 		Pluck(identifierCol, &staleFailedSlugs)
 
 	for _, slug := range staleFailedSlugs {
@@ -856,6 +870,23 @@ func (r *ExtensionStore[T]) ResumeUnindexed() []IndexTask {
 	}
 
 	return tasks
+}
+
+// closedSlugs returns the set of slugs with closed_at IS NOT NULL for this repo type.
+func (r *ExtensionStore[T]) closedSlugs() map[string]bool {
+	identifierCol := "slug"
+	if r.repoType == TypeCores {
+		identifierCol = "version"
+	}
+	var slugs []string
+	r.db.Table(string(r.repoType)).
+		Where("closed_at IS NOT NULL").
+		Pluck(identifierCol, &slugs)
+	m := make(map[string]bool, len(slugs))
+	for _, s := range slugs {
+		m[s] = true
+	}
+	return m
 }
 
 // GetAll returns all extensions as a slice.

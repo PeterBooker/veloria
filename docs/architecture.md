@@ -11,39 +11,46 @@ Veloria is a single binary (`cmd/veloria/`) with subcommands:
 | `veloria` or `veloria serve` | Main server: HTTP API, web UI, background indexer (default command) |
 | `veloria index` | Downloads a ZIP, extracts source, and builds a search index. Invoked as a subprocess by the server. |
 | `veloria migrate <command>` | Runs database migrations (up, down, status, etc.). |
+| `veloria wipe` | Wipes data from the database and storage. |
+| `veloria maintenance` | Toggles maintenance mode on the running server. |
 | `veloria version` | Prints version information. |
 
 ## Package Layout
 
 ```
 internal/
-├── app/          # Application lifecycle (New, Start, Shutdown)
+├── admin/        # Admin web handlers (reindex, maintenance)
 ├── api/          # Shared JSON response helpers (WriteJSON, APIError, pagination)
-├── admin/        # Admin web handlers (reindex)
+├── app/          # Application lifecycle (New, Start, Shutdown)
 ├── auth/         # OAuth providers, session management
 ├── cache/        # Cache interface + Ristretto implementation
 ├── client/       # Shared HTTP client with User-Agent
 ├── codesearch/   # Low-level regexp search (port of Google codesearch)
 ├── config/       # Environment-based configuration
 ├── core/         # Core (WordPress versions) web + API handlers
+├── health/       # Health/readiness endpoint
+├── image/        # OG image generation
 ├── index/        # Search index: build, read, search operations
-├── logger/       # Zerolog setup + access logging middleware
+├── log/          # Zap logger setup
 ├── manager/      # Orchestrates all extension stores; owns the updater loop
-├── metrics/      # Prometheus metric collectors
+├── mcp/          # MCP (Model Context Protocol) service
+├── middleware/    # Custom HTTP middleware (recoverer, access logging)
 ├── plugin/       # Plugin web + API handlers
 ├── repo/         # Extension stores, data models, API client, SVN discovery
 ├── report/       # Search report (flagging) handlers
 ├── router/       # Chi router setup and middleware
 ├── search/       # Search web + API handlers, search model
-├── sentry/       # Sentry error tracking setup
 ├── server/       # HTTP server with TLS (certmagic) support
+├── service/      # Service registry for dynamic dependency resolution
 ├── storage/      # S3/MinIO client for search result storage
 ├── tasks/        # Scheduled background tasks (e.g. cleanup)
+├── telemetry/    # OpenTelemetry setup (metrics, tracing, logging)
 ├── testutil/     # Test fixtures, hand-written fakes
 ├── theme/        # Theme web + API handlers
 ├── types/        # Protobuf-generated types for search results
+├── ui/           # Templ components (layouts, pages, partials, icons, badges)
 ├── user/         # User model
-├── web/          # Shared web deps, templates, interfaces
+├── web/          # Shared web deps, interfaces
 ```
 
 ## Core Concepts
@@ -72,7 +79,7 @@ Indexable           (9 methods)  -- adds index wiring (GetIndexedExtension, SetI
 ExtensionStore[T]   (generic)   -- in-memory store with search, load, index management
     ^
     |
-DataSource          (10 methods) -- what the Manager needs from each store
+DataSource          (12 methods) -- what the Manager needs from each store
 ```
 
 **`Extension`** (`internal/repo/extension.go`) is the narrow read-only interface used everywhere outside the indexing subsystem:
@@ -89,7 +96,7 @@ type Extension interface {
 }
 ```
 
-**`Indexable`** extends `Extension` with index lifecycle methods. It is the generic constraint on `ExtensionStore[T Indexable]`.
+**`Indexable`** extends `Extension` with index lifecycle methods. It is the constraint for the generic `ExtensionStore[T Indexable]`.
 
 **`DataSource`** (`internal/repo/datasource.go`) abstracts what the Manager needs from each store:
 
@@ -100,11 +107,32 @@ type DataSource interface {
     Stats() (total int, indexed int)
     IndexStatus() map[string]bool
     Search(term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error)
-    PrepareUpdates() []IndexTask
+    PrepareUpdates() ([]IndexTask, error)
     ResumeUnindexed() []IndexTask
     GetExtension(slug string) (Extension, bool)
     MakeReindexTaskBySlug(slug string) (IndexTask, bool)
     ResolveSourceDir(slug string) (string, error)
+    RecordIndexSuccess(slug string)
+    RecordIndexFailure(slug string)
+}
+```
+
+### Service Registry
+
+The `service.Registry` (`internal/service/registry.go`) is a thread-safe container for mutable service references. It allows handlers to resolve dependencies at request time rather than at route-registration time, enabling dynamic reconnection after startup:
+
+```go
+type Registry struct {
+    mu          sync.RWMutex
+    db          *gorm.DB
+    s3          storage.ResultStorage
+    manager     *manager.Manager
+    tasks       *tasks.Tasks
+    apiClient   *repo.APIClient
+    session     *auth.SessionStore
+    authHandler *auth.Handler
+    mcpHandler  http.Handler
+    maintenance bool
 }
 ```
 
@@ -121,34 +149,36 @@ The Manager satisfies several interfaces consumed by different subsystems:
 
 | Interface | Package | Methods |
 |---|---|---|
-| `Searcher` | `manager` | `Search(repoType, term, params)` |
-| `RepoStatsProvider` | `manager` | `Stats()`, `IndexStatus()` (per-type, on DataSource directly) |
 | `SearchService` | `web` | `Search(repoType, term, params)` |
-| `ReindexService` | `web` | `SubmitReindex(repoType, slug)` |
+| `ReindexService` | `web` | `SubmitReindex(repoType, slug) error` |
 | `SourceResolver` | `web` | `ResolveSourceDir(repoType, slug)` |
 | `StatsProvider` | `web` | `Stats(repoType)`, `IndexStatus(repoType)` |
 
 ### Web Dependencies
 
-The `web.Deps` struct (`internal/web/deps.go`) is the shared dependency container for all web handlers. Instead of holding a concrete `*Manager`, it holds four narrow interfaces:
+The `web.Deps` struct (`internal/web/deps.go`) is the shared dependency container for all web handlers. It holds a `*service.Registry` and resolves services dynamically:
 
 ```go
 type Deps struct {
-    Templates  *Templates
-    DB         *gorm.DB
-    Search     SearchService      // Search(repoType, term, params)
-    Reindex    ReindexService     // SubmitReindex(repoType, slug)
-    Sources    SourceResolver     // ResolveSourceDir(repoType, slug)
-    Stats      StatsProvider      // Stats(repoType), IndexStatus(repoType)
-    S3         storage.ResultStorage
-    Cache      cache.Cache
-    Config     *config.Config
-    Progress   *ProgressStore
-    // ...
+    Registry *service.Registry
+    Cache    cache.Cache
+    Config   *config.Config
+    Progress *ProgressStore
 }
 ```
 
-Any of these may be nil when the corresponding subsystem is unavailable (e.g., no database connection). Handlers check for nil before use.
+Services are accessed via accessor methods that resolve from the Registry at call time:
+
+```go
+func (d *Deps) DB() *gorm.DB              { return d.Registry.DB() }
+func (d *Deps) S3() storage.ResultStorage  { return d.Registry.S3() }
+func (d *Deps) Search() SearchService      { ... } // nil-safe
+func (d *Deps) Reindex() ReindexService    { ... } // nil-safe
+func (d *Deps) Sources() SourceResolver    { ... } // nil-safe
+func (d *Deps) Stats() StatsProvider       { ... } // nil-safe
+```
+
+Any of these may return nil when the corresponding subsystem is unavailable (e.g., no database connection). Handlers check for nil before use.
 
 ### Router
 
@@ -156,15 +186,13 @@ The router (`internal/router/router.go`) uses a `RouterDeps` struct to receive a
 
 ```go
 type RouterDeps struct {
-    Logger  *zerolog.Logger
-    DB      *gorm.DB
-    Search  manager.Searcher
-    Stats   map[string]manager.RepoStatsProvider
-    S3      storage.ResultStorage
-    WebDeps *web.Deps
-    Session *auth.SessionStore
-    Auth    *auth.Handler
-    Options Options
+    Logger            *zap.Logger
+    Registry          *service.Registry
+    WebDeps           *web.Deps
+    OGGen             *ogimage.Generator
+    PrometheusHandler http.Handler
+    HealthHandler     http.HandlerFunc
+    Options           Options
 }
 ```
 
@@ -183,11 +211,13 @@ The circuit breaker (sony/gobreaker) trips after 5 consecutive failures and reco
 
 ### Startup
 
-1. `app.New()` loads config, connects to PostgreSQL and S3/MinIO
-2. Creates an `APIClient` with the AspireCloud API key
-3. Creates three stores: `PluginStore`, `ThemeStore`, `CoreStore`
-4. `manager.NewManager()` loads all stores concurrently from DB + disk indexes, then starts the background updater
-5. Builds the router with all dependencies and starts the HTTP server
+1. `app.New()` loads config, connects to PostgreSQL and S3/MinIO, sets up OpenTelemetry
+2. Creates a `service.Registry` for dynamic dependency resolution
+3. Creates an `APIClient` with the AspireCloud API key
+4. Creates three stores: `PluginStore`, `ThemeStore`, `CoreStore`
+5. `manager.NewManager()` loads all stores concurrently from DB + disk indexes, then starts the background updater
+6. Registers all services in the Registry
+7. Builds the router with all dependencies and starts the HTTP server
 
 ### Indexing Loop
 
