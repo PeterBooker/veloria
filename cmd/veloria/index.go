@@ -110,8 +110,9 @@ func (c *IndexCmd) Run() error {
 
 // downloadZip fetches a zip file from the given URL into a temporary file.
 // It returns the temp file path, a cleanup function, and any error.
-// On HTTP 404, it returns an exitError with code 2 to signal "download not found"
-// to the calling server process.
+// On permanently-failing HTTP statuses (400, 403, 404, 410), it returns an
+// exitError with code 2 to signal "download unavailable" to the calling
+// server process, preventing futile retries.
 func downloadZip(u string) (string, func(), error) {
 	tmpFile, err := os.CreateTemp("", "download-*.zip")
 	if err != nil {
@@ -135,10 +136,11 @@ func downloadZip(u string) (string, func(), error) {
 		}
 	}()
 
-	if resp.StatusCode == http.StatusNotFound {
+	if isPermanentHTTPFailure(resp.StatusCode) {
 		cleanup()
-		// Exit code 2 signals "download not found" to the calling server process.
-		return "", func() {}, &exitError{code: 2, msg: fmt.Sprintf("download not found (404): %s", u)}
+		// Exit code 2 signals "download permanently unavailable" to the
+		// calling server process, which marks the extension as closed.
+		return "", func() {}, &exitError{code: 2, msg: fmt.Sprintf("download unavailable (%d): %s", resp.StatusCode, u)}
 	}
 	if resp.StatusCode != http.StatusOK {
 		cleanup()
@@ -154,6 +156,19 @@ func downloadZip(u string) (string, func(), error) {
 		return "", func() {}, err
 	}
 	return tmpPath, cleanup, nil
+}
+
+// isPermanentHTTPFailure returns true for HTTP status codes that indicate the
+// download will never succeed and should not be retried.
+func isPermanentHTTPFailure(code int) bool {
+	switch code {
+	case http.StatusBadRequest,  // 400
+		http.StatusForbidden,    // 403
+		http.StatusNotFound,     // 404
+		http.StatusGone:         // 410
+		return true
+	}
+	return false
 }
 
 // exitError is an error that carries a process exit code.

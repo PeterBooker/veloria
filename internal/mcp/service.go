@@ -50,9 +50,8 @@ type SearchService interface {
 	ReadFile(ctx context.Context, repo, slug, path string, startLine, maxLines int) (*ReadFileResponse, error)
 }
 
-// searchSem limits concurrent MCP searches to 1, matching the REST API's
-// concurrency model (see internal/search/api.go:searchSem). Without this,
-// concurrent MCP tool calls could overload the trigram search engine.
+// searchSem limits concurrent MCP searches to 1 to prevent concurrent
+// MCP tool calls from overloading the trigram search engine.
 var searchSem = make(chan struct{}, 1)
 
 var (

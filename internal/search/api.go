@@ -31,21 +31,6 @@ type SearchRequest struct {
 	Public           *bool  `json:"public,omitempty"`
 }
 
-var searchSem = make(chan struct{}, 1)
-
-func acquireSearchSlot(ctx context.Context) error {
-	select {
-	case searchSem <- struct{}{}:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-func releaseSearchSlot() {
-	<-searchSem
-}
-
 func ViewSearchV1(reg *service.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		db := reg.DB()
@@ -119,11 +104,6 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 			return
 		}
 
-		if err := acquireSearchSlot(r.Context()); err != nil {
-			api.WriteJSON(w, api.ErrTimeout("request cancelled"))
-			return
-		}
-
 		private := false
 		if req.Public != nil {
 			private = !*req.Public
@@ -136,50 +116,43 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 			Repo:    req.Repo,
 		}
 		if err := db.Create(&s).Error; err != nil {
-			releaseSearchSlot()
 			api.WriteJSON(w, api.ErrInternal("failed to create search record"))
 			return
 		}
 
-		db.Model(&s).Update("status", searchmodel.StatusProcessing)
-		s.Status = searchmodel.StatusProcessing
+		// Run search asynchronously — the client polls GET /api/v1/search/{id}
+		// for results. This avoids HTTP write timeout issues when searches are
+		// slow (e.g. during heavy indexing).
+		go runAPISearchAsync(db, m, s3, s.ID, req) // #nosec G118 -- goroutine intentionally outlives request; search runs in background
 
-		searchStart := time.Now()
-		results, err := m.Search(req.Repo, req.Term, &manager.SearchParams{
-			FileMatch:        req.FileMatch,
-			ExcludeFileMatch: req.ExcludeFileMatch,
-			CaseInsensitive:  !req.CaseSensitive,
-		})
-		searchElapsed := time.Since(searchStart).Seconds()
-
-		// Search done — free the slot immediately so the next search can start.
-		releaseSearchSlot()
-
-		repoAttr := attribute.String("repo", req.Repo)
-		telemetry.SearchCount.Add(r.Context(), 1, metric.WithAttributes(repoAttr))
-		telemetry.SearchDuration.Record(r.Context(), searchElapsed, metric.WithAttributes(repoAttr))
-
-		if err != nil {
-			db.Model(&s).Update("status", searchmodel.StatusFailed)
-			api.WriteJSON(w, api.ErrInternal("search failed"))
-			return
-		}
-
-		now := time.Now()
-		totalMatches := web.CountTotalMatches(results)
-
-		s.Status = searchmodel.StatusCompleted
-		s.CompletedAt = &now
-		s.TotalMatches = &totalMatches
-		s.TotalExtensions = &results.Total
-		s.Results = results
-
-		// Persist results to S3 and update DB in the background so the
-		// client gets its response without waiting for the network upload.
-		go persistSearchResults(db, s3, s.ID, results, now, totalMatches, results.Total) // #nosec G118 -- goroutine intentionally outlives request; S3 upload runs in background
-
-		api.WriteSuccessJSON(w, http.StatusCreated, s)
+		api.WriteSuccessJSON(w, http.StatusAccepted, s)
 	})
+}
+
+// runAPISearchAsync executes a search in the background and persists results.
+func runAPISearchAsync(db *gorm.DB, m *manager.Manager, s3 storage.ResultStorage, searchID uuid.UUID, req SearchRequest) {
+	db.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusProcessing)
+
+	searchStart := time.Now()
+	results, err := m.Search(req.Repo, req.Term, &manager.SearchParams{
+		FileMatch:        req.FileMatch,
+		ExcludeFileMatch: req.ExcludeFileMatch,
+		CaseInsensitive:  !req.CaseSensitive,
+	})
+	searchElapsed := time.Since(searchStart).Seconds()
+
+	repoAttr := attribute.String("repo", req.Repo)
+	telemetry.SearchCount.Add(context.Background(), 1, metric.WithAttributes(repoAttr))
+	telemetry.SearchDuration.Record(context.Background(), searchElapsed, metric.WithAttributes(repoAttr))
+
+	if err != nil {
+		db.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
+		return
+	}
+
+	now := time.Now()
+	totalMatches := web.CountTotalMatches(results)
+	persistSearchResults(db, s3, searchID, results, now, totalMatches, results.Total)
 }
 
 // persistSearchResults uploads search results to S3 and updates the DB record.
