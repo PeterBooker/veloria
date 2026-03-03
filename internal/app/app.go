@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -122,6 +121,7 @@ func New(ctx context.Context) (*App, error) {
 	}
 
 	r := router.New(router.RouterDeps{
+		Logger:            l,
 		Registry:          reg,
 		WebDeps:           deps,
 		OGGen:             ogGen,
@@ -349,7 +349,7 @@ func (a *App) initDB() error {
 		logLevel = gormlogger.Error
 	}
 
-	dbLogger := gormlogger.New(log.New(os.Stderr, "\r\n", log.LstdFlags), gormlogger.Config{
+	dbLogger := gormlogger.New(zap.NewStdLog(a.Logger.Named("gorm")), gormlogger.Config{
 		LogLevel:                  logLevel,
 		IgnoreRecordNotFoundError: true,
 	})

@@ -9,12 +9,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
+	"go.uber.org/zap"
 
 	"veloria/assets"
 	"veloria/internal/admin"
 	api "veloria/internal/api"
 	"veloria/internal/core"
 	ogimage "veloria/internal/image"
+	veloriamd "veloria/internal/middleware"
 	"veloria/internal/plugin"
 	"veloria/internal/report"
 	"veloria/internal/search"
@@ -35,6 +37,7 @@ type Options struct {
 // RouterDeps holds all dependencies needed to construct the router.
 // Optional fields may be nil when the corresponding subsystem is unavailable.
 type RouterDeps struct {
+	Logger            *zap.Logger
 	Registry          *service.Registry
 	WebDeps           *web.Deps
 	OGGen             *ogimage.Generator // OG image generator; or nil
@@ -60,14 +63,15 @@ func New(deps RouterDeps) *chi.Mux {
 	// Security headers
 	r.Use(securityHeaders)
 
-	r.Use(middleware.Recoverer)
+	r.Use(veloriamd.Recoverer(deps.Logger))
 	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(veloriamd.AccessLog(deps.Logger))
 	handlerTimeout := 5 * time.Second
 	if opts.HandlerTimeout > 0 {
 		handlerTimeout = opts.HandlerTimeout
 	}
 	r.Use(middleware.Timeout(handlerTimeout))
-	r.Use(middleware.RealIP)
 	r.Use(middleware.StripSlashes)
 
 	// Auth middleware - dynamically resolved from registry
