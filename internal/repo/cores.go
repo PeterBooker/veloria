@@ -2,9 +2,12 @@ package repo
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
+	"io"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -215,28 +218,50 @@ func FetchCoreUpdates(ctx context.Context, c *config.Config) ([]Core, error) {
 // stableVersionRe matches only stable release versions (e.g. "3.5", "6.8.1").
 var stableVersionRe = regexp.MustCompile(`^\d+\.\d+(\.\d+)?$`)
 
+const stableCheckURL = "https://api.wordpress.org/core/stable-check/1.0/"
+
 // FetchWordPressReleaseZips fetches all stable WordPress release versions from
-// the SVN tags directory and returns Core structs with constructed download URLs.
+// the WordPress.org stable-check API and returns Core structs with constructed download URLs.
 func FetchWordPressReleaseZips(ctx context.Context) ([]Core, error) {
-	tags, err := fetchSVNSlugs(ctx, svnCoreTagsURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, stableCheckURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch SVN core tags: %w", err)
+		return nil, fmt.Errorf("failed to create stable-check request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch stable-check API: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, fmt.Errorf("unexpected status %s from stable-check API", resp.Status)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MiB max
+	if err != nil {
+		return nil, fmt.Errorf("failed to read stable-check response: %w", err)
+	}
+
+	var versions map[string]string
+	if err := json.Unmarshal(body, &versions); err != nil {
+		return nil, fmt.Errorf("failed to parse stable-check response: %w", err)
 	}
 
 	var cores []Core
-	for _, tag := range tags {
-		if !stableVersionRe.MatchString(tag) {
+	for version := range versions {
+		if !stableVersionRe.MatchString(version) {
 			continue
 		}
 		cores = append(cores, Core{
-			Name:    "WordPress " + tag,
-			Version: tag,
-			ZipURL:  fmt.Sprintf(coreZipDownloadURL, tag),
+			Name:    "WordPress " + version,
+			Version: version,
+			ZipURL:  fmt.Sprintf(coreZipDownloadURL, version),
 		})
 	}
 
 	if len(cores) == 0 {
-		return nil, errors.New("no stable releases found in SVN tags")
+		return nil, errors.New("no stable releases found from stable-check API")
 	}
 
 	return cores, nil
