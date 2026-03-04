@@ -9,8 +9,8 @@ import (
 	"veloria/internal/ui/layout"
 )
 
-func repoTypeLabel(repo string) string {
-	switch repo {
+func datasourceTypeLabel(dsType string) string {
+	switch dsType {
 	case "plugins":
 		return "Plugins"
 	case "themes":
@@ -18,7 +18,7 @@ func repoTypeLabel(repo string) string {
 	case "cores":
 		return "Core Versions"
 	default:
-		return repo
+		return dsType
 	}
 }
 
@@ -33,22 +33,22 @@ func barWidthInt(value, maxValue int) string {
 	return barWidth(int64(value), int64(maxValue))
 }
 
-templ Repo(data ui.RepoData) {
+templ DataSource(data ui.DataSourceData) {
 	@layout.Base(data.PageData) {
 		<!-- Heading -->
 		<div class="mb-6 pt-8 lg:pt-10">
 			<nav class="text-sm text-text-subtle mb-3">
 				<a href="/data-sources" class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors">Data Sources</a>
 				<span class="mx-2">/</span>
-				<span class="text-text-body font-medium">{ data.RepoSummary.Title }</span>
+				<span class="text-text-body font-medium">{ data.DataSourceSummary.Title }</span>
 			</nav>
 			<div class="flex items-center gap-4">
 				<div class="w-14 h-14 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-neon-pink">
-					@icon.Repo(data.RepoSummary.Repo, 28)
+					@icon.DataSource(data.DataSourceSummary.Type, 28)
 				</div>
 				<div>
-					<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright">{ data.RepoSummary.Title }</h1>
-					<p class="text-sm text-text-body">{ "WordPress " + data.RepoSummary.Repo + " repository" }</p>
+					<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright">{ data.DataSourceSummary.Title }</h1>
+					<p class="text-sm text-text-body">{ "WordPress " + data.DataSourceSummary.Type + " data source" }</p>
 				</div>
 			</div>
 		</div>
@@ -56,28 +56,28 @@ templ Repo(data ui.RepoData) {
 		<div class="glass-inner p-6 mb-6">
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-xl font-semibold text-text-bright">Index Status</h2>
-				<span class="text-sm text-text-muted">{ ui.FormatPercent(data.RepoSummary.IndexedPercent) + " complete" }</span>
+				<span class="text-sm text-text-muted">{ ui.FormatPercent(data.DataSourceSummary.IndexedPercent) + " complete" }</span>
 			</div>
 			<div class="grid grid-cols-3 gap-6 mb-4">
 				<div>
 					<p class="text-sm text-text-muted mb-1">Total Items</p>
-					<p class="text-2xl font-bold text-text-bright">{ ui.FormatNumber(data.RepoSummary.Total) }</p>
+					<p class="text-2xl font-bold text-text-bright">{ ui.FormatNumber(data.DataSourceSummary.Total) }</p>
 				</div>
 				<div>
 					<p class="text-sm text-text-muted mb-1">Indexed</p>
 					<p class="text-2xl font-bold text-text-bright">
-						{ ui.FormatNumber(data.RepoSummary.Indexed) }
-						<span class="text-sm font-normal text-text-subtle">{ "(" + ui.FormatPercent(data.RepoSummary.IndexedPercent) + ")" }</span>
+						{ ui.FormatNumber(data.DataSourceSummary.Indexed) }
+						<span class="text-sm font-normal text-text-subtle">{ "(" + ui.FormatPercent(data.DataSourceSummary.IndexedPercent) + ")" }</span>
 					</p>
 				</div>
 				<div>
 					<p class="text-sm text-text-muted mb-1">Not Indexed</p>
-					<p class="text-2xl font-bold text-text-subtle">{ ui.FormatNumber(data.RepoSummary.Total - data.RepoSummary.Indexed) }</p>
+					<p class="text-2xl font-bold text-text-subtle">{ ui.FormatNumber(data.DataSourceSummary.Total - data.DataSourceSummary.Indexed) }</p>
 				</div>
 			</div>
 			<div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
-				if data.RepoSummary.Total > 0 {
-					<div class="h-full rounded-full" style={ fmt.Sprintf("width: %.2f%%; background: linear-gradient(135deg, #ff2d7b, #b44dff);", data.RepoSummary.IndexedPercent) }></div>
+				if data.DataSourceSummary.Total > 0 {
+					<div class="h-full rounded-full" style={ fmt.Sprintf("width: %.2f%%; background: linear-gradient(135deg, #ff2d7b, #b44dff);", data.DataSourceSummary.IndexedPercent) }></div>
 				} else {
 					<div class="h-full bg-text-subtle rounded-full"></div>
 				}
@@ -105,59 +105,36 @@ templ Repo(data ui.RepoData) {
 				}
 			</div>
 			<script src={ "/static/js/echarts.min.js?v=" + data.Version }></script>
-			@repoChartsInit()
+			@datasourceChartsInit()
 		}
 		<!-- Largest Extensions -->
 		if len(data.LargestBySize) > 0 || len(data.LargestByFileCount) > 0 {
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
 				if len(data.LargestBySize) > 0 {
-					@largestBySize(data.RepoSummary.Repo, data.LargestBySize)
+					@largestBySize(data.DataSourceSummary.Type, data.LargestBySize)
 				}
 				if len(data.LargestByFileCount) > 0 {
-					@largestByFileCount(data.RepoSummary.Repo, data.LargestByFileCount)
+					@largestByFileCount(data.DataSourceSummary.Type, data.LargestByFileCount)
 				}
 			</div>
 		}
 		<!-- Failed Indexing -->
-		if len(data.FailedEvents) > 0 {
-			<div class="glass-inner overflow-hidden mb-6">
-				<div class="px-6 py-4 border-b-medium">
-					<h2 class="text-xl font-semibold text-text-bright">Failed Indexing</h2>
-					<p class="text-sm text-text-muted">{ strconv.Itoa(len(data.FailedEvents)) + " recent failures" }</p>
-				</div>
-				<div class="overflow-x-auto">
-					<table class="w-full">
-						<thead style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
-							<tr>
-								<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body">Slug</th>
-								<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body">Error</th>
-								<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body whitespace-nowrap">Time</th>
-							</tr>
-						</thead>
-						<tbody>
-							for _, ev := range data.FailedEvents {
-								<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-									<td class="px-5 py-3">
-										<a href={ templ.SafeURL("/data-sources/" + data.RepoSummary.Repo + "/" + ev.Slug) } class="text-sm text-brand-600 hover:underline hover:underline-offset-2 font-medium transition-colors">{ ev.Slug }</a>
-									</td>
-									<td class="px-5 py-3 max-w-md">
-										<span class="text-sm text-text-muted truncate block" title={ ev.ErrorMessage }>{ ev.ErrorMessage }</span>
-									</td>
-									<td class="px-5 py-3 whitespace-nowrap">
-										<span class="text-sm text-text-subtle">{ ui.TimeAgo(ev.CreatedAt) }</span>
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				</div>
+		<div class="glass-inner overflow-hidden mb-6">
+			<div class="px-6 py-4 border-b-medium">
+				<h2 class="text-xl font-semibold text-text-bright">Failed Indexing</h2>
 			</div>
-		}
+			<div
+				id="failed-indexing"
+				hx-get={ "/data-sources/" + data.DataSourceSummary.Type + "/failed-indexing" }
+				hx-trigger="load"
+				hx-swap="innerHTML"
+			></div>
+		</div>
 		<!-- Items List -->
 		<div class="glass-inner overflow-hidden">
 			<div class="px-6 py-4 flex items-center justify-between gap-4 border-b-medium">
 				<h2 class="text-xl font-semibold text-text-bright flex-shrink-0">
-					{ repoTypeLabel(data.RepoSummary.Repo) }
+					{ datasourceTypeLabel(data.DataSourceSummary.Type) }
 				</h2>
 				<div class="relative w-full max-w-xs">
 					<div class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-subtle pointer-events-none">
@@ -168,9 +145,9 @@ templ Repo(data ui.RepoData) {
 						name="search"
 						placeholder="Search by name or slug..."
 						aria-label="Search by name or slug"
-						hx-get={ "/data-sources/" + data.RepoSummary.Repo + "/items" }
+						hx-get={ "/data-sources/" + data.DataSourceSummary.Type + "/items" }
 						hx-trigger="input changed delay:300ms, search"
-						hx-target="#repo-items"
+						hx-target="#datasource-items"
 						hx-swap="innerHTML"
 						hx-include="this"
 						class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-text-body focus:outline-none focus:border-neon-cyan/40 focus:ring-2 focus:ring-neon-cyan/20 transition"
@@ -178,8 +155,8 @@ templ Repo(data ui.RepoData) {
 				</div>
 			</div>
 			<div
-				id="repo-items"
-				hx-get={ "/data-sources/" + data.RepoSummary.Repo + "/items" }
+				id="datasource-items"
+				hx-get={ "/data-sources/" + data.DataSourceSummary.Type + "/items" }
 				hx-trigger="load"
 				hx-swap="innerHTML"
 			>
@@ -194,16 +171,16 @@ templ Repo(data ui.RepoData) {
 	}
 }
 
-templ largestBySize(repo string, extensions []ui.LargestExtension) {
+templ largestBySize(dsType string, extensions []ui.LargestExtension) {
 	<div class="glass-inner overflow-hidden">
 		<div class="px-6 py-4 border-b-medium">
 			<h2 class="text-xl font-semibold text-text-bright">Largest by Size</h2>
-			<p class="text-sm text-text-muted">{ "Top " + strconv.Itoa(len(extensions)) + " " + repoTypeLabel(repo) }</p>
+			<p class="text-sm text-text-muted">{ "Top " + strconv.Itoa(len(extensions)) + " " + datasourceTypeLabel(dsType) }</p>
 		</div>
 		<div class="p-6">
 			<div class="space-y-3">
 				for _, ext := range extensions {
-					<a href={ templ.SafeURL("/data-sources/" + repo + "/" + ext.Slug) } class="group block">
+					<a href={ templ.SafeURL("/data-sources/" + dsType + "/" + ext.Slug) } class="group block">
 						<div class="flex items-center justify-between text-sm mb-1">
 							<span class="text-text-body group-hover:text-brand-600 group-hover:underline font-medium truncate transition-colors duration-200">{ ext.Name }</span>
 							<span class="text-text-muted ml-2 flex-shrink-0">{ ui.FormatBytes(ext.TotalSize) }</span>
@@ -221,16 +198,16 @@ templ largestBySize(repo string, extensions []ui.LargestExtension) {
 	</div>
 }
 
-templ largestByFileCount(repo string, extensions []ui.LargestExtension) {
+templ largestByFileCount(dsType string, extensions []ui.LargestExtension) {
 	<div class="glass-inner overflow-hidden">
 		<div class="px-6 py-4 border-b-medium">
 			<h2 class="text-xl font-semibold text-text-bright">Most Files</h2>
-			<p class="text-sm text-text-muted">{ "Top " + strconv.Itoa(len(extensions)) + " " + repoTypeLabel(repo) }</p>
+			<p class="text-sm text-text-muted">{ "Top " + strconv.Itoa(len(extensions)) + " " + datasourceTypeLabel(dsType) }</p>
 		</div>
 		<div class="p-6">
 			<div class="space-y-3">
 				for _, ext := range extensions {
-					<a href={ templ.SafeURL("/data-sources/" + repo + "/" + ext.Slug) } class="group block">
+					<a href={ templ.SafeURL("/data-sources/" + dsType + "/" + ext.Slug) } class="group block">
 						<div class="flex items-center justify-between text-sm mb-1">
 							<span class="text-text-body group-hover:text-brand-600 group-hover:underline font-medium truncate transition-colors duration-200">{ ext.Name }</span>
 							<span class="text-text-muted ml-2 flex-shrink-0">{ ui.FormatNumber(ext.FileCount) + " files" }</span>
@@ -268,7 +245,7 @@ func maxFileCount(extensions []ui.LargestExtension) int {
 	return m
 }
 
-templ repoChartsInit() {
+templ datasourceChartsInit() {
 	<script>
 	(function() {
 		function init() {

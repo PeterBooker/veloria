@@ -8,19 +8,19 @@ import (
 	"veloria/internal/ui/badge"
 )
 
-func repoItemsURL(repo string, page int, search string) string {
-	url := "/data-sources/" + repo + "/items?page=" + strconv.Itoa(page)
+func datasourceItemsURL(dsType string, page int, search string) string {
+	url := "/data-sources/" + dsType + "/items?page=" + strconv.Itoa(page)
 	if search != "" {
 		url += "&search=" + search
 	}
 	return url
 }
 
-templ RepoItems(data ui.RepoItemsData) {
+templ DataSourceItems(data ui.DataSourceItemsData) {
 	if len(data.Items) > 0 {
 		<div>
 			for _, item := range data.Items {
-				<a href={ templ.SafeURL("/data-sources/" + data.Repo + "/" + item.Slug) } class="px-6 py-4 flex items-center justify-between hover:bg-white/[0.08] transition-colors block" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+				<a href={ templ.SafeURL("/data-sources/" + data.DataSource + "/" + item.Slug) } class="px-6 py-4 flex items-center justify-between hover:bg-white/[0.08] transition-colors block" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
 					<div class="flex items-center gap-4">
 						<div>
 							<h3 class="text-text-bright font-medium">{ item.Name }</h3>
@@ -49,8 +49,8 @@ templ RepoItems(data ui.RepoItemsData) {
 				<div class="flex items-center gap-2">
 					if data.Page > 1 {
 						<button
-							hx-get={ repoItemsURL(data.Repo, data.Page-1, data.Search) }
-							hx-target="#repo-items"
+							hx-get={ datasourceItemsURL(data.DataSource, data.Page-1, data.Search) }
+							hx-target="#datasource-items"
 							hx-swap="innerHTML"
 							class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
 						>
@@ -59,8 +59,8 @@ templ RepoItems(data ui.RepoItemsData) {
 					}
 					if data.Page < data.TotalPages {
 						<button
-							hx-get={ repoItemsURL(data.Repo, data.Page+1, data.Search) }
-							hx-target="#repo-items"
+							hx-get={ datasourceItemsURL(data.DataSource, data.Page+1, data.Search) }
+							hx-target="#datasource-items"
 							hx-swap="innerHTML"
 							class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
 						>
@@ -75,7 +75,7 @@ templ RepoItems(data ui.RepoItemsData) {
 			if data.Search != "" {
 				<p class="text-text-muted">No items matching "{ data.Search }".</p>
 			} else {
-				<p class="text-text-muted">No items found in this repository.</p>
+				<p class="text-text-muted">No items found in this data source.</p>
 			}
 		</div>
 	}

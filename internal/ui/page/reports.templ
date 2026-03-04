@@ -21,7 +21,7 @@ templ Reports(data ui.ReportsPageData) {
 					<thead style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
 						<tr>
 							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Pattern</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Repository</th>
+							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Data Source</th>
 							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Reporter</th>
 							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Reason</th>
 							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Reported</th>
@@ -36,7 +36,7 @@ templ Reports(data ui.ReportsPageData) {
 									<a href={ templ.SafeURL("/search/" + report.SearchID) } class="font-mono text-sm text-brand-600 bg-brand-50 px-2 py-1 rounded hover:underline">{ report.SearchTerm }</a>
 								</td>
 								<td class="px-5 py-4">
-									<span class="text-sm text-text-body capitalize">{ report.SearchRepo }</span>
+									<span class="text-sm text-text-body capitalize">{ report.SearchDataSource }</span>
 								</td>
 								<td class="px-5 py-4">
 									<span class="text-sm text-text-body">{ report.ReporterName }</span>

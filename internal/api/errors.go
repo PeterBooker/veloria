@@ -2,12 +2,20 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 )
+
+// StatusCoder is implemented by errors that know their HTTP status code.
+// Inspired by Go-Kit's transport pattern: domain errors carry transport metadata
+// so callers don't need manual error-type switches.
+type StatusCoder interface {
+	StatusCode() int
+}
 
 // APIError is a structured error returned by API handlers.
 type APIError struct {
@@ -18,6 +26,11 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	return e.Message
+}
+
+// StatusCode implements the StatusCoder interface.
+func (e *APIError) StatusCode() int {
+	return e.Status
 }
 
 // ErrBadRequest creates a 400 error.
@@ -76,4 +89,27 @@ func WriteSuccessJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(data)
+}
+
+// WriteError writes any error as a JSON response. It checks for *APIError first,
+// then falls back to the StatusCoder interface for the HTTP status code.
+// Plain errors without StatusCoder produce a 500 with a generic message.
+func WriteError(w http.ResponseWriter, err error) {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		WriteJSON(w, apiErr)
+		return
+	}
+
+	status := http.StatusInternalServerError
+	if sc, ok := err.(StatusCoder); ok {
+		status = sc.StatusCode()
+	}
+
+	msg := "internal server error"
+	if status != http.StatusInternalServerError {
+		msg = err.Error()
+	}
+
+	WriteJSON(w, &APIError{Status: status, Message: msg})
 }

@@ -34,14 +34,14 @@ templ Extension(data ui.ExtensionData) {
 			<nav class="text-sm text-text-subtle mb-3">
 				<a href="/data-sources" class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors">Data Sources</a>
 				<span class="mx-2">/</span>
-				<a href={ templ.SafeURL("/data-sources/" + data.RepoType) } class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors capitalize">{ data.RepoType }</a>
+				<a href={ templ.SafeURL("/data-sources/" + data.DataSourceType) } class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors capitalize">{ data.DataSourceType }</a>
 				<span class="mx-2">/</span>
 				<span class="text-text-body font-medium">{ data.Name }</span>
 			</nav>
 			<div class="flex items-center gap-4">
 				<div class="w-14 h-14 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center">
-					<span class={ repoIconColor(data.RepoType) }>
-						@repoIcon(data.RepoType, 28)
+					<span class={ datasourceIconColor(data.DataSourceType) }>
+						@datasourceIcon(data.DataSourceType, 28)
 					</span>
 				</div>
 				<div>
@@ -59,7 +59,7 @@ templ Extension(data ui.ExtensionData) {
 					<div id="reindex-btn" class="ml-auto">
 						<button
 							hx-post="/admin/reindex"
-							hx-vals={ `{"repo_type": "` + data.RepoType + `", "slug": "` + data.Slug + `"}` }
+							hx-vals={ `{"repo_type": "` + data.DataSourceType + `", "slug": "` + data.Slug + `"}` }
 							hx-target="#reindex-btn"
 							hx-swap="innerHTML"
 							class="btn-ghost inline-flex items-center gap-1.5"
@@ -78,7 +78,7 @@ templ Extension(data ui.ExtensionData) {
 		}
 		<!-- Stats Grid -->
 		<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-			if data.RepoType == "plugins" || data.RepoType == "themes" {
+			if data.DataSourceType == "plugins" || data.DataSourceType == "themes" {
 				<div class="glass-inner p-4">
 					<p class="text-sm text-text-muted mb-1">Active Installs</p>
 					<p class="text-2xl font-bold text-text-bright">{ ui.FormatCompact(data.ActiveInstalls) }</p>
@@ -97,7 +97,7 @@ templ Extension(data ui.ExtensionData) {
 				<p class="text-2xl font-bold text-brand-700">{ ui.FormatBytes(data.TotalSize) }</p>
 			</div>
 		</div>
-		if data.RepoType == "plugins" || data.RepoType == "themes" {
+		if data.DataSourceType == "plugins" || data.DataSourceType == "themes" {
 			<!-- Details Grid -->
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
 				<!-- Compatibility -->
@@ -167,7 +167,7 @@ templ Extension(data ui.ExtensionData) {
 				</div>
 			}
 		}
-		if data.RepoType == "cores" {
+		if data.DataSourceType == "cores" {
 			<!-- Core Details -->
 			<div class="glass-inner p-5 mb-6">
 				<h3 class="text-xl font-semibold text-text-bright mb-3">Details</h3>
@@ -215,7 +215,7 @@ templ Extension(data ui.ExtensionData) {
 					</span>
 				</div>
 				<h3 class="text-xl font-medium text-text-bright mb-2">Not Yet Indexed</h3>
-				<p class="text-text-muted">File statistics will be available once this { data.RepoType } is indexed.</p>
+				<p class="text-text-muted">File statistics will be available once this { data.DataSourceType } is indexed.</p>
 			</div>
 		}
 	}

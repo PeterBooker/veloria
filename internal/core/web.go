@@ -52,7 +52,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 
 		data := web.ExtensionData{
 			PageData:     pd,
-			RepoType:     "cores",
+			DataSourceType: "cores",
 			Name:         html.UnescapeString(row.Name),
 			Slug:         row.Version,
 			Version:      row.Version,

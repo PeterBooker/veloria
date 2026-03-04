@@ -9,7 +9,7 @@ type (
 	PageData               = ui.PageData
 	LoginData              = ui.LoginData
 	SearchSummary          = ui.SearchSummary
-	RepoSummary            = ui.RepoSummary
+	DataSourceSummary      = ui.DataSourceSummary
 	HomeData               = ui.HomeData
 	SearchesData           = ui.SearchesData
 	SearchResultsData      = ui.SearchResultsData
@@ -19,17 +19,18 @@ type (
 	ExtensionResultsData   = ui.ExtensionResultsData
 	SearchContextLine      = ui.SearchContextLine
 	SearchContextData      = ui.SearchContextData
-	ReposData              = ui.ReposData
-	RepoItem               = ui.RepoItem
+	DataSourcesData        = ui.DataSourcesData
+	DataSourceItem         = ui.DataSourceItem
 	ChartData              = ui.ChartData
 	LargestExtension       = ui.LargestExtension
-	RepoData               = ui.RepoData
+	DataSourceData         = ui.DataSourceData
 	FileStat               = ui.FileStat
-	LargestRepoFile        = ui.LargestRepoFile
-	RepoItemsData          = ui.RepoItemsData
+	LargestDataSourceFile  = ui.LargestDataSourceFile
+	DataSourceItemsData    = ui.DataSourceItemsData
 	ReportedSearchItem     = ui.ReportedSearchItem
 	ReportsPageData        = ui.ReportsPageData
 	VisibilityToggleData   = ui.VisibilityToggleData
 	ExtensionData          = ui.ExtensionData
 	FailedIndexEvent       = ui.FailedIndexEvent
+	FailedIndexData        = ui.FailedIndexData
 )

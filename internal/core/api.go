@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -22,99 +21,32 @@ type CoreListItem struct {
 	Indexed   bool      `json:"indexed"`
 }
 
-type coreRow struct {
-	ID        uuid.UUID
-	Name      string
-	Version   string
-	UpdatedAt time.Time
-}
-
 func ViewCoreV1(reg *service.Registry) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db := reg.DB()
-		if db == nil {
-			api.WriteJSON(w, api.ErrUnavailable("cores are unavailable"))
-			return
-		}
-		idStr := chi.URLParam(r, "id")
-		id, err := uuid.Parse(idStr)
-		if err != nil {
-			api.WriteJSON(w, api.ErrBadRequest("invalid UUID"))
-			return
-		}
-
+	return api.ViewByID[repo.Core](reg, "core", "id", func(db *gorm.DB, id uuid.UUID) (repo.Core, error) {
 		var c repo.Core
-		if err := db.First(&c, "id = ?", id).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				api.WriteJSON(w, api.ErrNotFound("core not found"))
-			} else {
-				api.WriteJSON(w, api.ErrInternal("error fetching core"))
-			}
-			return
-		}
-
-		api.WriteSuccessJSON(w, http.StatusOK, c)
+		err := db.First(&c, "id = ?", id).Error
+		return c, err
 	})
 }
 
 func ListCoresV1(reg *service.Registry) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db := reg.DB()
-		if db == nil {
-			api.WriteJSON(w, api.ErrUnavailable("cores are unavailable"))
-			return
-		}
-		pagination, err := api.ParsePagination(r)
-		if err != nil {
-			api.WriteJSON(w, api.ErrBadRequest(err.Error()))
-			return
-		}
-
-		var total int64
-		if err := db.Table("cores").Where("deleted_at IS NULL").Count(&total).Error; err != nil {
-			api.WriteJSON(w, api.ErrInternal("error counting cores"))
-			return
-		}
-
-		var rows []coreRow
-		if err := db.Table("cores").
-			Select("id, name, version, updated_at").
-			Where("deleted_at IS NULL").
-			Order("updated_at DESC").
-			Order("version DESC").
-			Limit(pagination.Limit).
-			Offset(pagination.Offset).
-			Scan(&rows).Error; err != nil {
-			api.WriteJSON(w, api.ErrInternal("error fetching cores"))
-			return
-		}
-
-		indexedBySlug := map[string]bool{}
-		if m := reg.Manager(); m != nil {
-			if src := m.GetSource(repo.TypeCores); src != nil {
-				indexedBySlug = src.IndexStatus()
-			}
-		}
-
-		items := make([]CoreListItem, len(rows))
-		for i, row := range rows {
-			items[i] = CoreListItem{
-				ID:        row.ID,
-				Name:      row.Name,
-				Slug:      row.Version,
-				Version:   row.Version,
-				UpdatedAt: row.UpdatedAt,
-				Indexed:   indexedBySlug[row.Version],
-			}
-		}
-
-		resp := api.ListResponse[CoreListItem]{
-			Page:    pagination.Page,
-			PerPage: pagination.PerPage,
-			Total:   total,
-			Results: items,
-		}
-
-		api.WriteSuccessJSON(w, http.StatusOK, resp)
+	return api.ListHandler[CoreListItem](reg, api.ListConfig[CoreListItem]{
+		EntityName:    "cores",
+		Table:         "cores",
+		SelectColumns: "id, name, version AS slug, version, updated_at",
+		WhereClause:   "deleted_at IS NULL",
+		OrderClauses:  []string{"updated_at DESC", "version DESC"},
+		Enrich:        enrichCoreIndex,
 	})
+}
+
+func enrichCoreIndex(reg *service.Registry, items []CoreListItem) {
+	if m := reg.Manager(); m != nil {
+		if src := m.GetSource(repo.TypeCores); src != nil {
+			indexed := src.IndexStatus()
+			for i := range items {
+				items[i].Indexed = indexed[items[i].Version]
+			}
+		}
+	}
 }

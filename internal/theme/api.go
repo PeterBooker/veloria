@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -23,82 +22,31 @@ type ThemeListItem struct {
 }
 
 func ViewThemeV1(reg *service.Registry) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db := reg.DB()
-		if db == nil {
-			api.WriteJSON(w, api.ErrUnavailable("themes are unavailable"))
-			return
-		}
-		idStr := chi.URLParam(r, "id")
-		id, err := uuid.Parse(idStr)
-		if err != nil {
-			api.WriteJSON(w, api.ErrBadRequest("invalid UUID"))
-			return
-		}
-
+	return api.ViewByID[repo.Theme](reg, "theme", "id", func(db *gorm.DB, id uuid.UUID) (repo.Theme, error) {
 		var t repo.Theme
-		if err := db.First(&t, "id = ?", id).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				api.WriteJSON(w, api.ErrNotFound("theme not found"))
-			} else {
-				api.WriteJSON(w, api.ErrInternal("error fetching theme"))
-			}
-			return
-		}
-
-		api.WriteSuccessJSON(w, http.StatusOK, t)
+		err := db.First(&t, "id = ?", id).Error
+		return t, err
 	})
 }
 
 func ListThemesV1(reg *service.Registry) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db := reg.DB()
-		if db == nil {
-			api.WriteJSON(w, api.ErrUnavailable("themes are unavailable"))
-			return
-		}
-		pagination, err := api.ParsePagination(r)
-		if err != nil {
-			api.WriteJSON(w, api.ErrBadRequest(err.Error()))
-			return
-		}
+	return api.ListHandler[ThemeListItem](reg, api.ListConfig[ThemeListItem]{
+		EntityName:    "themes",
+		Table:         "themes",
+		SelectColumns: "id, name, slug, version, updated_at",
+		WhereClause:   "deleted_at IS NULL",
+		OrderClauses:  []string{"updated_at DESC", "slug ASC"},
+		Enrich:        enrichThemeIndex,
+	})
+}
 
-		var total int64
-		if err := db.Table("themes").Where("deleted_at IS NULL").Count(&total).Error; err != nil {
-			api.WriteJSON(w, api.ErrInternal("error counting themes"))
-			return
-		}
-
-		var items []ThemeListItem
-		if err := db.Table("themes").
-			Select("id, name, slug, version, updated_at").
-			Where("deleted_at IS NULL").
-			Order("updated_at DESC").
-			Order("slug ASC").
-			Limit(pagination.Limit).
-			Offset(pagination.Offset).
-			Scan(&items).Error; err != nil {
-			api.WriteJSON(w, api.ErrInternal("error fetching themes"))
-			return
-		}
-
-		indexedBySlug := map[string]bool{}
-		if m := reg.Manager(); m != nil {
-			if src := m.GetSource(repo.TypeThemes); src != nil {
-				indexedBySlug = src.IndexStatus()
+func enrichThemeIndex(reg *service.Registry, items []ThemeListItem) {
+	if m := reg.Manager(); m != nil {
+		if src := m.GetSource(repo.TypeThemes); src != nil {
+			indexed := src.IndexStatus()
+			for i := range items {
+				items[i].Indexed = indexed[items[i].Slug]
 			}
 		}
-		for i := range items {
-			items[i].Indexed = indexedBySlug[items[i].Slug]
-		}
-
-		resp := api.ListResponse[ThemeListItem]{
-			Page:    pagination.Page,
-			PerPage: pagination.PerPage,
-			Total:   total,
-			Results: items,
-		}
-
-		api.WriteSuccessJSON(w, http.StatusOK, resp)
-	})
+	}
 }

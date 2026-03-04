@@ -186,8 +186,8 @@ func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
 		}
 
 		data := web.SearchExtensionsData{
-			SearchID:   s.ID.String(),
-			SearchRepo: s.Repo,
+			SearchID:         s.ID.String(),
+			SearchDataSource: s.Repo,
 			Extensions: summaries[start:end],
 			Page:       page,
 			TotalPages: totalPages,
@@ -523,8 +523,8 @@ func ExtensionResultsPage(d *web.Deps) http.HandlerFunc {
 		}
 
 		data := web.ExtensionResultsData{
-			SearchID:   s.ID.String(),
-			SearchRepo: s.Repo,
+			SearchID:         s.ID.String(),
+			SearchDataSource: s.Repo,
 			Result:     match,
 		}
 
@@ -541,7 +541,7 @@ func ContextPage(d *web.Deps) http.HandlerFunc {
 		lineStr := r.URL.Query().Get("line")
 
 		data := web.SearchContextData{
-			Repo:     repoType,
+			DataSource: repoType,
 			Slug:     slug,
 			Filename: filename,
 		}

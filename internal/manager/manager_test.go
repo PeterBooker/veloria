@@ -1,8 +1,12 @@
 package manager_test
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"veloria/internal/api"
 	"veloria/internal/index"
 	"veloria/internal/manager"
 	"veloria/internal/repo"
@@ -221,4 +225,21 @@ func TestResolveSourceDir_UnknownType(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for unknown type")
 	}
+}
+
+func TestErrExtNotFound_ImplementsStatusCoder(t *testing.T) {
+	var sc api.StatusCoder
+	assert.ErrorAs(t, manager.ErrExtNotFound, &sc)
+	assert.Equal(t, 404, sc.StatusCode())
+}
+
+func TestErrQueueFull_ImplementsStatusCoder(t *testing.T) {
+	var sc api.StatusCoder
+	assert.ErrorAs(t, manager.ErrQueueFull, &sc)
+	assert.Equal(t, 429, sc.StatusCode())
+}
+
+func TestSentinelErrors_WorkWithErrorsIs(t *testing.T) {
+	assert.True(t, errors.Is(manager.ErrExtNotFound, manager.ErrExtNotFound))
+	assert.True(t, errors.Is(manager.ErrQueueFull, manager.ErrQueueFull))
 }

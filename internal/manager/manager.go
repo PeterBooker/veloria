@@ -22,10 +22,26 @@ const (
 	stalenessWarning = 15 * time.Minute
 )
 
-// Reindex error sentinels.
+// NotFoundError is a domain error indicating the requested extension was not found.
+// Implements api.StatusCoder so the transport layer maps it to HTTP 404.
+type NotFoundError struct {
+	Msg string
+}
+
+func (e *NotFoundError) Error() string  { return e.Msg }
+func (e *NotFoundError) StatusCode() int { return 404 }
+
+// QueueFullError indicates the reindex queue is at capacity.
+// Implements api.StatusCoder so the transport layer maps it to HTTP 429.
+type QueueFullError struct{}
+
+func (e *QueueFullError) Error() string  { return "reindex queue is full" }
+func (e *QueueFullError) StatusCode() int { return 429 }
+
+// Reindex error sentinels. Pointer identity is preserved for errors.Is checks.
 var (
-	ErrExtNotFound = fmt.Errorf("extension not found")
-	ErrQueueFull   = fmt.Errorf("reindex queue is full")
+	ErrExtNotFound = &NotFoundError{Msg: "extension not found"}
+	ErrQueueFull   = &QueueFullError{}
 )
 
 // retryEntry tracks a task waiting to be retried.

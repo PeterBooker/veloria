@@ -64,7 +64,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 
 		data := web.ExtensionData{
 			PageData:         pd,
-			RepoType:         "themes",
+			DataSourceType:   "themes",
 			Name:             html.UnescapeString(row.Name),
 			Slug:             row.Slug,
 			Source:           row.Source,

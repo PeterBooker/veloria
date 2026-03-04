@@ -19,7 +19,7 @@ templ SearchView(data ui.SearchViewData) {
 			</h1>
 			<div class="flex items-center gap-2 lg:gap-3 text-xs lg:text-sm text-text-muted flex-wrap">
 				<span class="inline-flex items-center gap-1.5 text-brand-600 font-medium capitalize">
-					@icon.Repo(data.Search.Repo, 16)
+					@icon.DataSource(data.Search.Repo, 16)
 					{ data.Search.Repo }
 				</span>
 				<span>Created { data.Search.CreatedAt.Format("2006-01-02 15:04") }</span>
@@ -49,30 +49,30 @@ templ SearchView(data ui.SearchViewData) {
 
 templ searchContentInner(data ui.SearchViewData) {
 	<!-- Status & Back -->
-	<div class="flex items-center gap-2 lg:gap-3 mb-6">
+	<div class="flex items-center gap-3 mb-6 flex-wrap">
 		@badge.Status(data.Search.Status)
 		if data.User != nil && data.User.IsAdmin {
 			<div id={ "admin-visibility-" + data.Search.ID.String() }>
 				if data.Search.Private {
-					<div class="flex items-center gap-2">
+					<div class="flex items-center gap-3">
 						@badge.Visibility(true)
 						<button
 							hx-post={ "/admin/search/" + data.Search.ID.String() + "/visibility" }
 							hx-target={ "#admin-visibility-" + data.Search.ID.String() }
 							hx-swap="innerHTML"
-							class="text-xs text-brand-600 hover:text-brand-700 hover:underline hover:underline-offset-2 font-medium"
+							class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 bg-white/5 border border-white/10 rounded-lg hover:bg-brand-500/10 hover:border-brand-500/30 transition"
 						>
 							Make Public
 						</button>
 					</div>
 				} else {
-					<div class="flex items-center gap-2">
+					<div class="flex items-center gap-3">
 						@badge.Visibility(false)
 						<button
 							hx-post={ "/admin/search/" + data.Search.ID.String() + "/visibility" }
 							hx-target={ "#admin-visibility-" + data.Search.ID.String() }
 							hx-swap="innerHTML"
-							class="text-xs text-red-600 hover:text-red-700 hover:underline hover:underline-offset-2 font-medium"
+							class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-white/5 border border-white/10 rounded-lg hover:bg-red-500/10 hover:border-red-500/30 transition"
 						>
 							Make Private
 						</button>
@@ -86,14 +86,14 @@ templ searchContentInner(data ui.SearchViewData) {
 					hx-post={ "/search/" + data.Search.ID.String() + "/report" }
 					hx-target={ "#report-btn-" + data.Search.ID.String() }
 					hx-swap="innerHTML"
-					class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 bg-white/5 border border-white/10 rounded-lg hover:bg-red-500/10 hover:border-red-500/30 transition"
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-white/5 border border-white/10 rounded-lg hover:bg-red-500/10 hover:border-red-500/30 transition"
 				>
 					@icon.Flag(14)
 					Report
 				</button>
 			</div>
 		}
-		<a href="/searches" class="inline-flex items-center gap-1.5 lg:gap-2 px-3 lg:px-4 py-2 text-xs font-medium text-text-body bg-white/5 border border-white/10 rounded-lg hover:bg-white/[0.08] transition ml-auto">
+		<a href="/searches" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-body bg-white/5 border border-white/10 rounded-lg hover:bg-white/[0.08] transition ml-auto">
 			@icon.ChevronLeft(14)
 			<span class="hidden sm:inline">Back to searches</span>
 			<span class="sm:hidden">Back</span>
@@ -158,7 +158,7 @@ templ searchContentInner(data ui.SearchViewData) {
 		@toggleExtDetailScript()
 	} else if data.Search.Status == searchmodel.StatusCompleted {
 		<!-- No Results -->
-		@shared.EmptyState("No matches found", "Try a different regex pattern or repository.") {
+		@shared.EmptyState("No matches found", "Try a different regex pattern or data source.") {
 			<svg class="w-8 h-8 lg:w-10 lg:h-10 text-text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 				<circle cx="11" cy="11" r="8"></circle>
 				<path d="m21 21-4.3-4.3"></path>

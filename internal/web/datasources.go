@@ -15,41 +15,41 @@ import (
 	"veloria/internal/ui/partial"
 )
 
-// ReposPage renders the repositories listing page.
-func ReposPage(d *Deps) http.HandlerFunc {
+// DataSourcesPage renders the data sources listing page.
+func DataSourcesPage(d *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if d.Stats() == nil {
-			http.Error(w, "Repositories are unavailable while the database is offline.", http.StatusServiceUnavailable)
+			http.Error(w, "Data sources are unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
 		pluginTotal, pluginIndexed, _ := d.Stats().Stats("plugins")
 		themeTotal, themeIndexed, _ := d.Stats().Stats("themes")
 		coreTotal, coreIndexed, _ := d.Stats().Stats("cores")
 
-		repoSummaries := []RepoSummary{
-			BuildRepoSummary("plugins", "Plugins", pluginTotal, pluginIndexed),
-			BuildRepoSummary("themes", "Themes", themeTotal, themeIndexed),
-			BuildRepoSummary("cores", "Core", coreTotal, coreIndexed),
+		summaries := []DataSourceSummary{
+			BuildDataSourceSummary("plugins", "Plugins", pluginTotal, pluginIndexed),
+			BuildDataSourceSummary("themes", "Themes", themeTotal, themeIndexed),
+			BuildDataSourceSummary("cores", "Core", coreTotal, coreIndexed),
 		}
 
 		pd := d.PageData(r)
-		pd.OG.Title = "Repositories - Veloria"
-		pd.OG.Description = "Browse WordPress plugin, theme, and core repositories indexed by Veloria."
+		pd.OG.Title = "Data Sources - Veloria"
+		pd.OG.Description = "Browse WordPress plugin, theme, and core data sources indexed by Veloria."
 
-		data := ReposData{
-			PageData:      pd,
-			RepoSummaries: repoSummaries,
+		data := DataSourcesData{
+			PageData:            pd,
+			DataSourceSummaries: summaries,
 		}
 
-		d.RenderComponent(w, r, page.Repos(data))
+		d.RenderComponent(w, r, page.DataSources(data))
 	}
 }
 
-// RepoPage renders a single repository view.
-func RepoPage(d *Deps) http.HandlerFunc {
+// DataSourcePage renders a single data source view.
+func DataSourcePage(d *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if d.Stats() == nil || d.DB() == nil {
-			http.Error(w, "Repository data is unavailable while the database is offline.", http.StatusServiceUnavailable)
+			http.Error(w, "Data source is unavailable while the database is offline.", http.StatusServiceUnavailable)
 			return
 		}
 		repoType := chi.URLParam(r, "type")
@@ -82,48 +82,33 @@ func RepoPage(d *Deps) http.HandlerFunc {
 			largestBySize = fetchLargestExtensions(d, "cores", 25, "total_size")
 			largestByFileCount = fetchLargestExtensions(d, "cores", 25, "file_count")
 		default:
-			http.Error(w, "Repository not found", http.StatusNotFound)
+			http.Error(w, "Data source not found", http.StatusNotFound)
 			return
 		}
 
 		pd := d.PageData(r)
-		pd.OG.Title = fmt.Sprintf("%s Repository - Veloria", title)
+		pd.OG.Title = fmt.Sprintf("%s Data Source - Veloria", title)
 		pd.OG.Description = fmt.Sprintf("Browse %d %s (%d indexed) in the Veloria code search index.", total, repoType, indexed)
 
-		// Show only the most recent failure per slug, excluding slugs whose
-		// latest event is a success (i.e. they recovered since the failure).
-		var failedEvents []FailedIndexEvent
-		d.DB().Raw(`
-			SELECT slug, error_message, created_at FROM (
-				SELECT DISTINCT ON (slug) slug, status, error_message, created_at
-				FROM index_events
-				WHERE repo_type = ?
-				ORDER BY slug, created_at DESC
-			) latest
-			WHERE status = 'failed'
-			ORDER BY created_at DESC
-			LIMIT 50`, repoType).Scan(&failedEvents)
-
-		data := RepoData{
+		data := DataSourceData{
 			PageData:           pd,
-			RepoSummary:        BuildRepoSummary(repoType, title, total, indexed),
+			DataSourceSummary:  BuildDataSourceSummary(repoType, title, total, indexed),
 			ActiveInstalls:     activeInstalls,
 			FileCount:          fileCount,
 			FileSize:           fileSize,
 			LargestBySize:      largestBySize,
 			LargestByFileCount: largestByFileCount,
-			FailedEvents:       failedEvents,
 		}
 
-		d.RenderComponent(w, r, page.Repo(data))
+		d.RenderComponent(w, r, page.DataSource(data))
 	}
 }
 
-// RepoItemsPartial renders the paginated, searchable items list as an HTMX partial.
-func RepoItemsPartial(d *Deps, repoType string) http.HandlerFunc {
+// DataSourceItemsPartial renders the paginated, searchable items list as an HTMX partial.
+func DataSourceItemsPartial(d *Deps, repoType string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if d.Stats() == nil || d.DB() == nil {
-			http.Error(w, "Repository data is unavailable.", http.StatusServiceUnavailable)
+			http.Error(w, "Data source is unavailable.", http.StatusServiceUnavailable)
 			return
 		}
 
@@ -136,7 +121,7 @@ func RepoItemsPartial(d *Deps, repoType string) http.HandlerFunc {
 		}
 		search := r.URL.Query().Get("search")
 
-		var items []RepoItem
+		var items []DataSourceItem
 		var total int
 
 		switch repoType {
@@ -147,7 +132,7 @@ func RepoItemsPartial(d *Deps, repoType string) http.HandlerFunc {
 		case "cores":
 			items, total = fetchCoreItems(d, page, pageSize, search)
 		default:
-			http.Error(w, "Repository not found", http.StatusNotFound)
+			http.Error(w, "Data source not found", http.StatusNotFound)
 			return
 		}
 
@@ -159,19 +144,93 @@ func RepoItemsPartial(d *Deps, repoType string) http.HandlerFunc {
 			page = totalPages
 		}
 
-		data := RepoItemsData{
-			Repo:       repoType,
+		data := DataSourceItemsData{
+			DataSource: repoType,
 			Items:      items,
 			Page:       page,
 			TotalPages: totalPages,
 			Search:     search,
 		}
 
-		d.RenderComponent(w, r, partial.RepoItems(data))
+		d.RenderComponent(w, r, partial.DataSourceItems(data))
 	}
 }
 
-func fetchPluginItems(d *Deps, page int, pageSize int, search string) ([]RepoItem, int) {
+// FailedIndexPartial renders the paginated failed indexing table as an HTMX partial.
+func FailedIndexPartial(d *Deps, repoType string) http.HandlerFunc {
+	table, slugCol := datasourceTableAndSlugCol(repoType)
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if d.DB() == nil {
+			http.Error(w, "Data source is unavailable.", http.StatusServiceUnavailable)
+			return
+		}
+
+		const pageSize = 10
+		pg := 1
+		if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+			if parsed, err := strconv.Atoi(pageStr); err == nil && parsed > 0 {
+				pg = parsed
+			}
+		}
+
+		// Count extensions that are not indexed.
+		var total int64
+		d.DB().Table(table).
+			Where("deleted_at IS NULL AND index_status != 'indexed'").
+			Count(&total)
+
+		totalPages := int(math.Ceil(float64(total) / float64(pageSize)))
+		if totalPages == 0 {
+			totalPages = 1
+		}
+		if pg > totalPages {
+			pg = totalPages
+		}
+		offset := (pg - 1) * pageSize
+
+		// Fetch unindexed extensions with their latest error from index_events.
+		var events []FailedIndexEvent
+		d.DB().Raw(`
+			SELECT t.`+slugCol+` AS slug,
+			       COALESCE(ie.error_message, '') AS error_message,
+			       COALESCE(t.last_attempt_at, t.created_at) AS created_at
+			FROM `+table+` t
+			LEFT JOIN LATERAL (
+				SELECT error_message
+				FROM index_events
+				WHERE repo_type = ? AND slug = t.`+slugCol+` AND status = 'failed'
+				ORDER BY created_at DESC
+				LIMIT 1
+			) ie ON true
+			WHERE t.deleted_at IS NULL AND t.index_status != 'indexed'
+			ORDER BY t.last_attempt_at DESC NULLS LAST
+			LIMIT ? OFFSET ?`, repoType, pageSize, offset).Scan(&events)
+
+		data := FailedIndexData{
+			DataSource: repoType,
+			Events:     events,
+			Page:       pg,
+			TotalPages: totalPages,
+			TotalCount: int(total),
+		}
+
+		d.RenderComponent(w, r, partial.FailedIndex(data))
+	}
+}
+
+func datasourceTableAndSlugCol(repoType string) (string, string) {
+	switch repoType {
+	case "themes":
+		return "themes", "slug"
+	case "cores":
+		return "cores", "version"
+	default:
+		return "plugins", "slug"
+	}
+}
+
+func fetchPluginItems(d *Deps, page int, pageSize int, search string) ([]DataSourceItem, int) {
 	offset := (page - 1) * pageSize
 
 	type pluginRow struct {
@@ -203,9 +262,9 @@ func fetchPluginItems(d *Deps, page int, pageSize int, search string) ([]RepoIte
 		Scan(&rows)
 
 	indexStatus := d.Stats().IndexStatus("plugins")
-	items := make([]RepoItem, len(rows))
+	items := make([]DataSourceItem, len(rows))
 	for i, row := range rows {
-		items[i] = RepoItem{
+		items[i] = DataSourceItem{
 			ID:         row.ID,
 			Name:       html.UnescapeString(row.Name),
 			Slug:       row.Slug,
@@ -219,7 +278,7 @@ func fetchPluginItems(d *Deps, page int, pageSize int, search string) ([]RepoIte
 	return items, int(total)
 }
 
-func fetchThemeItems(d *Deps, page int, pageSize int, search string) ([]RepoItem, int) {
+func fetchThemeItems(d *Deps, page int, pageSize int, search string) ([]DataSourceItem, int) {
 	offset := (page - 1) * pageSize
 
 	type themeRow struct {
@@ -251,9 +310,9 @@ func fetchThemeItems(d *Deps, page int, pageSize int, search string) ([]RepoItem
 		Scan(&rows)
 
 	indexStatus := d.Stats().IndexStatus("themes")
-	items := make([]RepoItem, len(rows))
+	items := make([]DataSourceItem, len(rows))
 	for i, row := range rows {
-		items[i] = RepoItem{
+		items[i] = DataSourceItem{
 			ID:         row.ID,
 			Name:       html.UnescapeString(row.Name),
 			Slug:       row.Slug,
@@ -267,7 +326,7 @@ func fetchThemeItems(d *Deps, page int, pageSize int, search string) ([]RepoItem
 	return items, int(total)
 }
 
-func fetchCoreItems(d *Deps, page int, pageSize int, search string) ([]RepoItem, int) {
+func fetchCoreItems(d *Deps, page int, pageSize int, search string) ([]DataSourceItem, int) {
 	offset := (page - 1) * pageSize
 
 	type coreRow struct {
@@ -295,9 +354,9 @@ func fetchCoreItems(d *Deps, page int, pageSize int, search string) ([]RepoItem,
 		Scan(&rows)
 
 	indexStatus := d.Stats().IndexStatus("cores")
-	items := make([]RepoItem, len(rows))
+	items := make([]DataSourceItem, len(rows))
 	for i, row := range rows {
-		items[i] = RepoItem{
+		items[i] = DataSourceItem{
 			ID:        row.ID,
 			Name:      "WordPress " + row.Version,
 			Slug:      row.Version,

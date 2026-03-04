@@ -44,9 +44,9 @@ type SearchSummary struct {
 	MatchesKnown bool
 }
 
-// RepoSummary contains aggregated stats for a repository.
-type RepoSummary struct {
-	Repo           string
+// DataSourceSummary contains aggregated stats for a data source.
+type DataSourceSummary struct {
+	Type           string
 	Title          string
 	Total          int
 	Indexed        int
@@ -91,12 +91,12 @@ type SearchViewData struct {
 
 // SearchExtensionsData contains data for the search extensions HTMX partial.
 type SearchExtensionsData struct {
-	SearchID   string
-	SearchRepo string
-	Extensions []ExtensionResultSummary
-	Page       int
-	TotalPages int
-	Search     string
+	SearchID         string
+	SearchDataSource string
+	Extensions       []ExtensionResultSummary
+	Page             int
+	TotalPages       int
+	Search           string
 }
 
 // ExtensionResultSummary contains summary info for one extension in search results (no match details).
@@ -110,9 +110,9 @@ type ExtensionResultSummary struct {
 
 // ExtensionResultsData contains data for rendering a single extension's detailed matches.
 type ExtensionResultsData struct {
-	SearchID   string
-	SearchRepo string
-	Result     *manager.SearchResult
+	SearchID         string
+	SearchDataSource string
+	Result           *manager.SearchResult
 }
 
 // SearchContextLine represents a single line of context.
@@ -124,21 +124,21 @@ type SearchContextLine struct {
 
 // SearchContextData contains data for the match context modal.
 type SearchContextData struct {
-	Repo     string
-	Slug     string
-	Filename string
-	Lines    []SearchContextLine
-	Error    string
+	DataSource string
+	Slug       string
+	Filename   string
+	Lines      []SearchContextLine
+	Error      string
 }
 
-// ReposData contains data for the repos listing page.
-type ReposData struct {
+// DataSourcesData contains data for the data sources listing page.
+type DataSourcesData struct {
 	PageData
-	RepoSummaries []RepoSummary
+	DataSourceSummaries []DataSourceSummary
 }
 
-// RepoItem represents an item in a repository list.
-type RepoItem struct {
+// DataSourceItem represents an item in a data source list.
+type DataSourceItem struct {
 	ID         uuid.UUID
 	Name       string
 	Slug       string
@@ -170,16 +170,24 @@ type FailedIndexEvent struct {
 	CreatedAt    time.Time
 }
 
-// RepoData contains data for a single repository view.
-type RepoData struct {
+// FailedIndexData contains data for the failed indexing HTMX partial.
+type FailedIndexData struct {
+	DataSource string
+	Events     []FailedIndexEvent
+	Page       int
+	TotalPages int
+	TotalCount int
+}
+
+// DataSourceData contains data for a single data source view.
+type DataSourceData struct {
 	PageData
-	RepoSummary        RepoSummary
+	DataSourceSummary  DataSourceSummary
 	ActiveInstalls     ChartData
 	FileCount          ChartData
 	FileSize           ChartData
 	LargestBySize      []LargestExtension
 	LargestByFileCount []LargestExtension
-	FailedEvents       []FailedIndexEvent
 }
 
 // FileStat represents a file with its size for display.
@@ -188,18 +196,18 @@ type FileStat struct {
 	Size int64
 }
 
-// LargestRepoFile represents a large file with its parent extension info.
-type LargestRepoFile struct {
+// LargestDataSourceFile represents a large file with its parent extension info.
+type LargestDataSourceFile struct {
 	Path string
 	Size int64
 	Slug string
 	Name string
 }
 
-// RepoItemsData contains data for the repo items HTMX partial.
-type RepoItemsData struct {
-	Repo       string
-	Items      []RepoItem
+// DataSourceItemsData contains data for the data source items HTMX partial.
+type DataSourceItemsData struct {
+	DataSource string
+	Items      []DataSourceItem
 	Page       int
 	TotalPages int
 	Search     string
@@ -207,14 +215,14 @@ type RepoItemsData struct {
 
 // ReportedSearchItem contains data for one reported search in the admin view.
 type ReportedSearchItem struct {
-	ReportID      string
-	SearchID      string
-	SearchTerm    string
-	SearchRepo    string
-	SearchPrivate bool
-	ReporterName  string
-	Reason        string
-	ReportedAt    string
+	ReportID         string
+	SearchID         string
+	SearchTerm       string
+	SearchDataSource string
+	SearchPrivate    bool
+	ReporterName     string
+	Reason           string
+	ReportedAt       string
 }
 
 // ReportsPageData contains data for the admin reports page.
@@ -234,7 +242,7 @@ type VisibilityToggleData struct {
 // ExtensionData contains data for single extension views.
 type ExtensionData struct {
 	PageData
-	RepoType         string
+	DataSourceType   string
 	Name             string
 	Slug             string
 	Source           string

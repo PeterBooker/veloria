@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -23,82 +22,31 @@ type PluginListItem struct {
 }
 
 func ViewPluginV1(reg *service.Registry) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db := reg.DB()
-		if db == nil {
-			api.WriteJSON(w, api.ErrUnavailable("plugins are unavailable"))
-			return
-		}
-		idStr := chi.URLParam(r, "id")
-		id, err := uuid.Parse(idStr)
-		if err != nil {
-			api.WriteJSON(w, api.ErrBadRequest("invalid UUID"))
-			return
-		}
-
+	return api.ViewByID[repo.Plugin](reg, "plugin", "id", func(db *gorm.DB, id uuid.UUID) (repo.Plugin, error) {
 		var p repo.Plugin
-		if err := db.First(&p, "id = ?", id).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				api.WriteJSON(w, api.ErrNotFound("plugin not found"))
-			} else {
-				api.WriteJSON(w, api.ErrInternal("error fetching plugin"))
-			}
-			return
-		}
-
-		api.WriteSuccessJSON(w, http.StatusOK, p)
+		err := db.First(&p, "id = ?", id).Error
+		return p, err
 	})
 }
 
 func ListPluginsV1(reg *service.Registry) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		db := reg.DB()
-		if db == nil {
-			api.WriteJSON(w, api.ErrUnavailable("plugins are unavailable"))
-			return
-		}
-		pagination, err := api.ParsePagination(r)
-		if err != nil {
-			api.WriteJSON(w, api.ErrBadRequest(err.Error()))
-			return
-		}
+	return api.ListHandler[PluginListItem](reg, api.ListConfig[PluginListItem]{
+		EntityName:    "plugins",
+		Table:         "plugins",
+		SelectColumns: "id, name, slug, version, updated_at",
+		WhereClause:   "deleted_at IS NULL",
+		OrderClauses:  []string{"updated_at DESC", "slug ASC"},
+		Enrich:        enrichPluginIndex,
+	})
+}
 
-		var total int64
-		if err := db.Table("plugins").Where("deleted_at IS NULL").Count(&total).Error; err != nil {
-			api.WriteJSON(w, api.ErrInternal("error counting plugins"))
-			return
-		}
-
-		var items []PluginListItem
-		if err := db.Table("plugins").
-			Select("id, name, slug, version, updated_at").
-			Where("deleted_at IS NULL").
-			Order("updated_at DESC").
-			Order("slug ASC").
-			Limit(pagination.Limit).
-			Offset(pagination.Offset).
-			Scan(&items).Error; err != nil {
-			api.WriteJSON(w, api.ErrInternal("error fetching plugins"))
-			return
-		}
-
-		indexedBySlug := map[string]bool{}
-		if m := reg.Manager(); m != nil {
-			if src := m.GetSource(repo.TypePlugins); src != nil {
-				indexedBySlug = src.IndexStatus()
+func enrichPluginIndex(reg *service.Registry, items []PluginListItem) {
+	if m := reg.Manager(); m != nil {
+		if src := m.GetSource(repo.TypePlugins); src != nil {
+			indexed := src.IndexStatus()
+			for i := range items {
+				items[i].Indexed = indexed[items[i].Slug]
 			}
 		}
-		for i := range items {
-			items[i].Indexed = indexedBySlug[items[i].Slug]
-		}
-
-		resp := api.ListResponse[PluginListItem]{
-			Page:    pagination.Page,
-			PerPage: pagination.PerPage,
-			Total:   total,
-			Results: items,
-		}
-
-		api.WriteSuccessJSON(w, http.StatusOK, resp)
-	})
+	}
 }
