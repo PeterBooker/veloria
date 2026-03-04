@@ -9,38 +9,36 @@ import (
 
 const UserAgent = "Veloria/1.0"
 
-// HTTPClients holds injectable HTTP clients for API and ZIP operations.
-type HTTPClients struct {
-	API *http.Client
-	Zip *http.Client
+// httpClients holds HTTP clients for API and ZIP operations.
+type httpClients struct {
+	api *http.Client
+	zip *http.Client
 }
 
-// NewHTTPClients creates a new set of HTTP clients with default transport settings.
-func NewHTTPClients() *HTTPClients {
+func newHTTPClients() *httpClients {
 	transport := newTransport()
-	return &HTTPClients{
-		API: &http.Client{
+	return &httpClients{
+		api: &http.Client{
 			Timeout:   30 * time.Second,
 			Transport: transport,
 		},
-		Zip: &http.Client{
+		zip: &http.Client{
 			Timeout:   180 * time.Second,
 			Transport: transport,
 		},
 	}
 }
 
-// Package-level default clients for backwards compatibility.
-var defaultClients = NewHTTPClients()
+var defaultClients = newHTTPClients()
 
 // GetAPI returns the default API HTTP client.
 func GetAPI() *http.Client {
-	return defaultClients.API
+	return defaultClients.api
 }
 
 // GetZip returns the default ZIP download HTTP client.
 func GetZip() *http.Client {
-	return defaultClients.Zip
+	return defaultClients.zip
 }
 
 func newTransport() *http.Transport {

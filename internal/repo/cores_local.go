@@ -1,9 +1,6 @@
 package repo
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 var localCoreVersions = []string{
 	"6.8.2",
@@ -21,10 +18,9 @@ func FetchLocalCores() ([]Core, error) {
 	var cores []Core
 	for _, version := range localCoreVersions {
 		c := &Core{
-			Name:     "",
-			Version:  version,
-			ZipURL:   fmt.Sprintf(coreZipDownloadURL, version),
-			Released: time.Now(),
+			Name:    "",
+			Version: version,
+			ZipURL:  fmt.Sprintf(coreZipDownloadURL, version),
 		}
 		cores = append(cores, *c)
 	}

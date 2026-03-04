@@ -599,14 +599,14 @@ func wordpressDownloadURL(repoType ExtensionType, slug, version string) string {
 	}
 }
 
-// IndexerResult contains the output from running the indexer.
-type IndexerResult struct {
+// indexerResult contains the output from running the indexer.
+type indexerResult struct {
 	IndexPath string
 	Stats     *ExtractStats
 }
 
 // runIndexer executes the "veloria index" subcommand as a subprocess and returns the index path and stats.
-func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*IndexerResult, error) {
+func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*indexerResult, error) {
 	ctx, cancel := context.WithTimeout(r.ctx, IndexTimeout)
 	defer cancel()
 
@@ -642,7 +642,7 @@ func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*IndexerResul
 	}
 
 	// Parse INDEX_READY:<path> and EXTRACT_STATS:<json> from stdout
-	result := &IndexerResult{}
+	result := &indexerResult{}
 	scanner := bufio.NewScanner(&stdout)
 	for scanner.Scan() {
 		line := scanner.Text()

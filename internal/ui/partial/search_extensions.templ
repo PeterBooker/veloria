@@ -48,7 +48,7 @@ templ SearchExtensions(data ui.SearchExtensionsData) {
 							</div>
 						</div>
 						<div class="flex flex-wrap items-center gap-2.5 sm:gap-4 pl-7 sm:pl-0">
-							@badge.RepoType(data.SearchRepo)
+							@badge.DataSourceType(data.SearchDataSource)
 							if ext.ActiveInstalls > 0 {
 								<span class="text-text-muted text-xs whitespace-nowrap">{ ui.FormatInstalls(ext.ActiveInstalls) } installs</span>
 							}

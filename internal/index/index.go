@@ -92,7 +92,7 @@ func CompileSearch(pat string, opt *SearchOptions) (*CompiledSearch, error) {
 		patForRe = regexp.QuoteMeta(pat)
 	}
 
-	fullPat := GetRegexpPattern(patForRe, opt.IgnoreCase)
+	fullPat := getRegexpPattern(patForRe, opt.IgnoreCase)
 
 	cre, err := cregexp.Compile(fullPat)
 	if err != nil {

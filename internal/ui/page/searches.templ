@@ -2,15 +2,10 @@ package page
 
 import (
 	"veloria/internal/ui"
-	"veloria/internal/ui/badge"
 	"veloria/internal/ui/icon"
 	"veloria/internal/ui/layout"
 	"veloria/internal/ui/shared"
 )
-
-func searchRowAttrs(id string) templ.Attributes {
-	return templ.Attributes{"onclick": "window.location='/search/" + id + "'"}
-}
 
 templ Searches(data ui.SearchesData) {
 	@layout.Base(data.PageData) {
@@ -37,66 +32,54 @@ templ Searches(data ui.SearchesData) {
 		</div>
 		if len(data.Searches) > 0 {
 			<div class="glass-inner overflow-hidden">
-				<table class="w-full">
-					<thead style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
-						<tr>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Pattern</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Repository</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Matches</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Status</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Created</th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, s := range data.Searches {
-							<tr
-								class="hover:bg-white/[0.08] transition-colors cursor-pointer"
-								style="border-bottom: 1px solid rgba(255,255,255,0.06);"
-								{ searchRowAttrs(s.Search.ID.String())... }
-							>
-								<td class="px-5 py-4">
-									if data.View == "own" {
-										<div class="flex items-center gap-2">
-											<code class="font-mono text-sm text-brand-600 bg-brand-100 px-2 py-1 rounded">{ s.Search.Term }</code>
-											if s.Search.Private {
-												<span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-md bg-white/5 text-text-muted border-l-2 border-white/20">
-													<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-														<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-														<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-													</svg>
-													Private
-												</span>
-											}
-										</div>
-									} else {
-										<code class="font-mono text-sm text-text-body bg-brand-100 px-2 py-1 rounded">{ s.Search.Term }</code>
-									}
-								</td>
-								<td class="px-5 py-4">
-									<span class="inline-flex items-center gap-1.5 text-sm text-text-body capitalize">
-										<span class="text-brand-600">
-											@icon.Repo(s.Search.Repo, 16)
-										</span>
-										{ s.Search.Repo }
+				<!-- Desktop header -->
+				<div class="hidden md:grid md:grid-cols-[3fr_1fr_1fr_1fr] px-5 py-4 text-sm font-medium text-text-body text-left" style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
+					<span>Pattern</span>
+					<span>Data Source</span>
+					<span>Matches</span>
+					<span>Created</span>
+				</div>
+				for _, s := range data.Searches {
+					<a
+						href={ templ.SafeURL("/search/" + s.Search.ID.String()) }
+						class="block px-5 py-4 hover:bg-white/[0.08] transition-colors cursor-pointer"
+						style="border-bottom: 1px solid rgba(255,255,255,0.06);"
+					>
+						<div class="flex flex-col gap-2 md:grid md:grid-cols-[3fr_1fr_1fr_1fr] md:items-center">
+							<!-- Pattern -->
+							<div class="flex items-center gap-2 min-w-0">
+								<code class="font-mono text-sm text-text-body bg-brand-100 px-2 py-1 rounded break-all">{ s.Search.Term }</code>
+								if s.Search.Private {
+									<span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-md bg-white/5 text-text-muted border-l-2 border-white/20">
+										<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+											<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+										</svg>
+										Private
 									</span>
-								</td>
-								<td class="px-5 py-4">
+								}
+							</div>
+							<!-- Data Source + Matches: always visible -->
+							<span class="inline-flex items-center gap-3 text-sm text-text-body capitalize md:contents">
+								<span class="inline-flex items-center gap-1.5 text-sm text-text-body capitalize">
+									<span class="text-brand-600">
+										@icon.DataSource(s.Search.Repo, 16)
+									</span>
+									{ s.Search.Repo }
+								</span>
+								<span>
 									if s.MatchesKnown {
 										<span class="text-sm text-brand-600 font-medium">{ ui.FormatNumber(s.MatchCount) }</span>
 									} else {
 										<span class="text-sm text-text-subtle">&mdash;</span>
 									}
-								</td>
-								<td class="px-5 py-4">
-									@badge.Status(s.Search.Status)
-								</td>
-								<td class="px-5 py-4">
-									<span class="text-sm text-text-muted">{ s.Search.CreatedAt.Format("2006-01-02 15:04") }</span>
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
+								</span>
+							</span>
+							<!-- Status + Created: desktop only -->
+							<span class="hidden md:block text-sm text-text-muted">{ s.Search.CreatedAt.Format("2006-01-02 15:04") }</span>
+						</div>
+					</a>
+				}
 			</div>
 			if data.View == "own" {
 				@shared.LinkPagination("/searches/own", data.Page, data.TotalPages)

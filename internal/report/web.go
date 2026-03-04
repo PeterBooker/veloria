@@ -132,10 +132,10 @@ func ReportsPage(d *web.Deps) http.HandlerFunc {
 		reports := make([]web.ReportedSearchItem, len(rows))
 		for i, row := range rows {
 			reports[i] = web.ReportedSearchItem{
-				ReportID:      row.ReportID.String(),
-				SearchID:      row.SearchID.String(),
-				SearchTerm:    row.SearchTerm,
-				SearchRepo:    row.SearchRepo,
+				ReportID:         row.ReportID.String(),
+				SearchID:         row.SearchID.String(),
+				SearchTerm:       row.SearchTerm,
+				SearchDataSource: row.SearchRepo,
 				SearchPrivate: row.SearchPrivate,
 				ReporterName:  row.ReporterName,
 				Reason:        row.Reason,

@@ -42,16 +42,16 @@ func CountTotalMatches(results *manager.SearchResponse) int {
 	return total
 }
 
-// BuildRepoSummary creates a RepoSummary with calculated percentage.
-func BuildRepoSummary(repo string, title string, total int, indexed int) RepoSummary {
+// BuildDataSourceSummary creates a DataSourceSummary with calculated percentage.
+func BuildDataSourceSummary(dsType string, title string, total int, indexed int) DataSourceSummary {
 	percent := 0.0
 	if total > 0 {
 		// Truncate to 2 decimal places so we never round up to 100%.
 		percent = math.Floor(float64(indexed)*10000/float64(total)) / 100
 	}
 
-	return RepoSummary{
-		Repo:           repo,
+	return DataSourceSummary{
+		Type:           dsType,
 		Title:          title,
 		Total:          total,
 		Indexed:        indexed,

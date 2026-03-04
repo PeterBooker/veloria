@@ -2,14 +2,18 @@ package index
 
 import (
 	"archive/zip"
-	"github.com/klauspost/compress/gzip"
 	"container/heap"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/klauspost/compress/gzip"
+
+	cindex "veloria/internal/codesearch/index"
 )
 
 // maxDecompressSize is the maximum allowed size for a single decompressed file (100 MB).
@@ -48,21 +52,10 @@ func (h *minHeap) Pop() any {
 	return x
 }
 
-// Unzip extracts all files in the zip archive src into dest.
-func Unzip(src, dest string) error {
-	return unzipWithFilter(src, dest, nil)
-}
-
-// UnzipTextFiles extracts all files from src into dest.
-func UnzipTextFiles(src, dest string) error {
-	_, err := UnzipWithStats(src, dest)
-	return err
-}
-
-// IndexableExtensions returns the set of file extensions that should be included
+// indexableExtensions returns the set of file extensions that should be included
 // in the trigram search index. Used during index building (not extraction) to
 // filter which files get trigram-indexed.
-func IndexableExtensions() map[string]bool {
+func indexableExtensions() map[string]bool {
 	return map[string]bool{
 		".txt":      true,
 		".md":       true,
@@ -92,7 +85,7 @@ func IndexableExtensions() map[string]bool {
 
 // UnzipWithStats extracts all files from the ZIP and returns extraction statistics
 // including file count, total size, and the top 100 largest files.
-// TextFileCount tracks files matching IndexableExtensions() for index coverage reporting.
+// TextFileCount tracks files matching indexableExtensions() for index coverage reporting.
 func UnzipWithStats(src, dest string) (*ExtractStats, error) {
 	return unzipWithFilterAndStats(src, dest, nil, 100)
 }
@@ -113,7 +106,7 @@ func unzipWithFilterAndStats(src, dest string, filter func(*zip.File) bool, topN
 	cleanDest := filepath.Clean(dest) + string(os.PathSeparator)
 
 	stats = &ExtractStats{}
-	textExts := IndexableExtensions()
+	textExts := indexableExtensions()
 	h := &minHeap{}
 	heap.Init(h)
 
@@ -213,71 +206,6 @@ func extractFileWithSize(f *zip.File, fpath string) (written int64, err error) {
 	return written, nil
 }
 
-// UnzipAllFiles extracts all files from src into dest.
-func UnzipAllFiles(src, dest string) error {
-	return unzipWithFilter(src, dest, nil)
-}
-
-// internal unzipping function; if filter==nil, extracts everything.
-func unzipWithFilter(src, dest string, filter func(*zip.File) bool) (err error) {
-	zr, err := zip.OpenReader(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if cerr := zr.Close(); err == nil && cerr != nil {
-			err = cerr
-		}
-	}()
-
-	// Detect common top-level directory to strip (e.g., "bbpress/" in WordPress zips)
-	stripPrefix := findCommonPrefix(zr.File)
-
-	// Clean the destination path for security comparison
-	cleanDest := filepath.Clean(dest) + string(os.PathSeparator)
-
-	for _, f := range zr.File {
-		if filter != nil && !filter(f) {
-			continue
-		}
-
-		// Strip common prefix from file name
-		name := f.Name
-		if stripPrefix != "" {
-			name = strings.TrimPrefix(name, stripPrefix)
-			if name == "" {
-				// Skip the top-level directory itself
-				continue
-			}
-		}
-
-		// Security: Prevent Zip Slip attack by validating the path
-		fpath := filepath.Join(dest, name) // #nosec G305 -- validated by cleanPath check below
-		cleanPath := filepath.Clean(fpath)
-		if !strings.HasPrefix(cleanPath, cleanDest) && cleanPath != filepath.Clean(dest) {
-			return fmt.Errorf("illegal file path in zip: %s", f.Name)
-		}
-
-		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(fpath, f.Mode()); err != nil {
-				return err
-			}
-			continue
-		}
-
-		if err := os.MkdirAll(filepath.Dir(fpath), 0o750); err != nil {
-			return err
-		}
-
-		// Extract file in a closure to ensure proper resource cleanup
-		if err := extractFile(f, fpath); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // findCommonPrefix detects if all files in the zip share a common top-level directory.
 // Returns the prefix to strip (e.g., "bbpress/") or empty string if no common prefix.
 func findCommonPrefix(files []*zip.File) string {
@@ -308,37 +236,77 @@ func findCommonPrefix(files []*zip.File) string {
 	return commonDir + "/"
 }
 
-// extractFile extracts a single file from the zip archive.
-// Using a separate function ensures defer calls execute after each file.
-func extractFile(f *zip.File, fpath string) (err error) {
-	rc, err := f.Open()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if cerr := rc.Close(); err == nil && cerr != nil {
-			err = cerr
-		}
-	}()
+// flushQuiet calls ix.Flush() with the standard logger silenced,
+// suppressing the codesearch library's unconditional log output.
+func flushQuiet(ix *cindex.IndexWriter) {
+	prev := log.Writer()
+	log.SetOutput(io.Discard)
+	ix.Flush()
+	log.SetOutput(prev)
+}
 
-	outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode()) // #nosec G304 -- path validated by caller
-	if err != nil {
-		return err
+// IndexDirToFile creates a trigram index from indexSrc and writes it to trigramsPath.
+// Only files with extensions in indexableExtensions() are added to the index.
+func IndexDirToFile(indexSrc string, trigramsPath string) *cindex.IndexWriter {
+	// Ensure parent directory exists and "touch" the trigrams file.
+	if err := os.MkdirAll(filepath.Dir(trigramsPath), 0o750); err != nil {
+		log.Fatalf("failed to create index directory %q: %v", filepath.Dir(trigramsPath), err)
 	}
-	defer func() {
-		if cerr := outFile.Close(); err == nil && cerr != nil {
-			err = cerr
+	if _, err := os.Stat(trigramsPath); os.IsNotExist(err) {
+		f, err := os.OpenFile(trigramsPath, os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- path built from internal config
+		if err != nil {
+			log.Fatalf("failed to create trigrams file %q: %v", trigramsPath, err)
 		}
-	}()
+		_ = f.Close()
+	} else if err != nil {
+		log.Fatalf("failed to stat trigrams file %q: %v", trigramsPath, err)
+	}
 
-	written, err := io.Copy(outFile, io.LimitReader(rc, maxDecompressSize+1))
-	if err != nil {
-		return err
+	ix := cindex.Create(trigramsPath)
+	ix.Verbose = false
+	ix.Zip = false
+
+	textExts := indexableExtensions()
+
+	var roots []cindex.Path
+	roots = append(roots, cindex.MakePath(filepath.Join(indexSrc)))
+	ix.AddRoots(roots)
+
+	for _, root := range roots {
+		if err := filepath.Walk(root.String(), func(path string, info os.FileInfo, err error) error {
+			if _, elem := filepath.Split(path); elem != "" {
+				// Skip temporary or hidden files/dirs.
+				if elem[0] == '.' || elem[0] == '#' || elem[0] == '~' || elem[len(elem)-1] == '~' {
+					if info.IsDir() {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+			}
+
+			if err != nil {
+				log.Printf("%s: %s", path, err)
+				return nil
+			}
+
+			if info != nil && info.Mode()&os.ModeType == 0 {
+				// Only index files with known text extensions.
+				ext := strings.ToLower(filepath.Ext(path))
+				if !textExts[ext] {
+					return nil
+				}
+				if err := ix.AddFile(path); err != nil {
+					return nil
+				}
+			}
+			return nil
+		}); err != nil {
+			log.Printf("failed to walk %s: %v", root, err)
+		}
 	}
-	if written > maxDecompressSize {
-		return fmt.Errorf("file exceeds maximum decompressed size of %d bytes", maxDecompressSize)
-	}
-	return nil
+
+	flushQuiet(ix)
+	return ix
 }
 
 // CompressSourceDir gzip-compresses every regular file in dir in place.

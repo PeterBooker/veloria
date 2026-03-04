@@ -35,13 +35,11 @@ func New(ctx context.Context) *Tasks {
 	}
 }
 
-func (t *Tasks) AddJob(ctx context.Context, key string, f fn, period time.Duration) error {
+func (t *Tasks) AddJob(f fn, period time.Duration) {
 	t.c.Every(period).Do(&Job{
 		ctx: t.ctx,
 		f:   f,
 	})
-
-	return nil
 }
 
 func (t *Tasks) Start() {

@@ -8,8 +8,8 @@ import (
 	"veloria/internal/ui/icon"
 )
 
-func contextURL(searchID, searchRepo, slug, filename string, lineNumber int) string {
-	return "/search/" + searchID + "/context?repo=" + searchRepo + "&slug=" + slug + "&file=" + filename + "&line=" + strconv.Itoa(lineNumber)
+func contextURL(searchID, searchDataSource, slug, filename string, lineNumber int) string {
+	return "/search/" + searchID + "/context?repo=" + searchDataSource + "&slug=" + slug + "&file=" + filename + "&line=" + strconv.Itoa(lineNumber)
 }
 
 func matchCountLabel(count int) string {
@@ -41,7 +41,7 @@ templ SearchExtensionResults(data ui.ExtensionResultsData) {
 							<div class="px-3 lg:px-4 py-2.5 flex-shrink-0 flex items-center">
 								<button
 									type="button"
-									hx-get={ contextURL(data.SearchID, data.SearchRepo, data.Result.Slug, file.Filename, match.LineNumber) }
+									hx-get={ contextURL(data.SearchID, data.SearchDataSource, data.Result.Slug, file.Filename, match.LineNumber) }
 									hx-target="#context-modal"
 									hx-swap="innerHTML"
 									class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-neon-cyan bg-[rgba(0,229,255,0.06)] hover:bg-[rgba(0,229,255,0.12)] border border-[rgba(0,229,255,0.20)] rounded-md transition-all"

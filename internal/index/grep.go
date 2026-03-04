@@ -1,7 +1,7 @@
 package index
 
-// GetRegexpPattern wraps a pattern with regex flags.
-func GetRegexpPattern(pat string, ignoreCase bool) string {
+// getRegexpPattern wraps a pattern with regex flags.
+func getRegexpPattern(pat string, ignoreCase bool) string {
 	if ignoreCase {
 		return "(?i)(?m)" + pat
 	}

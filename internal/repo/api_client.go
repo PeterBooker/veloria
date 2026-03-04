@@ -25,16 +25,6 @@ type ThrottleConfig struct {
 	DefaultRetryDelay time.Duration // fallback when Retry-After header is absent
 }
 
-// DefaultThrottleConfig returns sensible defaults.
-func DefaultThrottleConfig() ThrottleConfig {
-	return ThrottleConfig{
-		RequestsPerSecond: 10,
-		Burst:             5,
-		MaxRetries:        3,
-		DefaultRetryDelay: 5 * time.Second,
-	}
-}
-
 // APIClient wraps the HTTP client, API key, circuit breaker, and rate limiter
 // for AspireCloud API calls. Pass into StoreConfig to eliminate package-level globals.
 type APIClient struct {

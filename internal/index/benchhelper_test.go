@@ -90,7 +90,7 @@ func buildPluginIndex(b *testing.B, compress bool) *Index {
 		b.Fatal(err)
 	}
 
-	if err := UnzipTextFiles(zipPath, sourceDir); err != nil {
+	if _, err := UnzipWithStats(zipPath, sourceDir); err != nil {
 		b.Fatalf("failed to extract plugin zip: %v", err)
 	}
 
