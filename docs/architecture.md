@@ -4,16 +4,98 @@ This document covers the high-level design of Veloria, a code search engine for 
 
 ## CLI Commands
 
-Veloria is a single binary (`cmd/veloria/`) with subcommands:
+Veloria is a single binary (`cmd/veloria/`) dispatched by [Kong](https://github.com/alecthomas/kong). Running `veloria` with no subcommand defaults to `serve`.
 
-| Command | Purpose |
+### `veloria serve`
+
+Start the HTTP server (default command).
+
+```
+veloria [serve]
+```
+
+Loads configuration from environment variables (and `.env` in development), connects to PostgreSQL and S3/MinIO, starts the background indexer, and serves the HTTP API and web UI. Shuts down gracefully on SIGINT/SIGTERM.
+
+### `veloria index`
+
+Download a ZIP, extract source files, and build a trigram search index.
+
+```
+veloria index --repo <type> --slug <name> --zipurl <url>
+```
+
+| Flag | Required | Description |
+|---|---|---|
+| `--repo` | No | Repository type: `plugins`, `themes`, or `cores` (default: `plugins`) |
+| `--slug` | Yes | Extension slug — used as the folder name under `source/` and `index/` |
+| `--zipurl` | Yes | URL of the ZIP file to download |
+
+This command is not meant to be run manually. The server invokes it as a subprocess for process isolation. It downloads the ZIP (with retry on 429), extracts text files into `<datadir>/<repo>/source/<slug>/`, builds a trigram index at `<datadir>/<repo>/index/<slug>/trigrams`, then gzip-compresses the source files. Outputs `INDEX_READY:<path>` and `EXTRACT_STATS:<json>` on stdout for the parent process.
+
+Exit code 2 signals a permanent download failure (400/403/404/410), telling the server not to retry.
+
+### `veloria migrate`
+
+Run database migrations via [goose](https://github.com/pressly/goose).
+
+```
+veloria migrate <command> [args...]
+```
+
+| Command | Description |
 |---|---|
-| `veloria` or `veloria serve` | Main server: HTTP API, web UI, background indexer (default command) |
-| `veloria index` | Downloads a ZIP, extracts source, and builds a search index. Invoked as a subprocess by the server. |
-| `veloria migrate <command>` | Runs database migrations (up, down, status, etc.). |
-| `veloria wipe` | Wipes data from the database and storage. |
-| `veloria maintenance` | Toggles maintenance mode on the running server. |
-| `veloria version` | Prints version information. |
+| `up` | Apply all pending migrations |
+| `down` | Roll back the last migration |
+| `status` | Show migration status |
+| `version` | Print the current migration version |
+| `redo` | Roll back and re-apply the last migration |
+| `reset` | Roll back all migrations |
+| `up-by-one` | Apply the next pending migration |
+| `up-to <version>` | Migrate up to a specific version |
+| `down-to <version>` | Roll back down to a specific version |
+| `create <name>` | Create a new migration file |
+| `fix` | Fix migration version ordering |
+
+Always loads `.env` from the current directory so it works standalone on production hosts.
+
+### `veloria wipe`
+
+Destructive commands for wiping data. Each subcommand prompts for confirmation unless `--force` / `-f` is passed.
+
+#### `veloria wipe data-sources`
+
+```
+veloria wipe data-sources [--force]
+```
+
+Wipes all extension data: truncates `plugins`, `themes`, `cores`, `largest_repo_files`, and `index_events` tables, resets datasource scan timestamps, and removes all source and index files from disk.
+
+#### `veloria wipe searches`
+
+```
+veloria wipe searches [--force]
+```
+
+Wipes all search data: deletes all search result objects from S3/MinIO and truncates the `searches` and `search_reports` tables.
+
+### `veloria maintenance`
+
+Toggle maintenance mode on the running server via its Unix control socket.
+
+```
+veloria maintenance on
+veloria maintenance off
+```
+
+Connects to the server's control socket at `<datadir>/veloria.sock` and sends a JSON command. The server must be running.
+
+### `veloria version`
+
+Print version information.
+
+```
+veloria version
+```
 
 ## Package Layout
 
