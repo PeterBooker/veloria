@@ -120,26 +120,6 @@ input[type="checkbox"], input[type="radio"] {
     border-color: rgba(255,255,255,0.16);
 }
 
-/* ── Search wrapper ── */
-.search-wrapper {
-    background: rgba(255,255,255,0.05);
-    border: 1.5px solid rgba(255,255,255,0.12);
-    border-radius: 14px;
-    transition: all 0.2s ease;
-}
-.search-wrapper:focus-within {
-    border-color: rgba(0,229,255,0.45);
-    box-shadow: 0 0 0 3px rgba(0,229,255,0.12);
-}
-
-/* ── Control pill ── */
-.control-pill {
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.10);
-    background: rgba(255,255,255,0.05);
-}
-
 /* ── Nav ── */
 .nav-active { background: rgba(255,255,255,0.06); }
 
@@ -181,14 +161,6 @@ input[type="checkbox"], input[type="radio"] {
     border-top: 1px solid rgba(255,255,255,0.10);
 }
 
-/* ── Badge count ── */
-.badge-count {
-    background: linear-gradient(135deg, #ff2d7b, #b44dff);
-    color: white; font-size: 18px; font-weight: 700;
-    border-radius: 10px; padding: 2px 7px;
-    min-width: 20px; text-align: center; line-height: 1.4;
-}
-
 /* ── Neon divider ── */
 .neon-divider {
     height: 1px; flex: 1;
@@ -228,12 +200,7 @@ input[type="checkbox"].neon-check:checked::after {
 input[type="radio"]:checked + label .neon-indicator { display: block; }
 
 /* ── Semantic border utility classes ── */
-.border-b-subtle { border-bottom: 1px solid rgba(255,255,255,0.06); }
 .border-b-medium { border-bottom: 1px solid rgba(255,255,255,0.08); }
-.table-header {
-    background: rgba(255,255,255,0.03);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-}
 
 /* ── Search container ── */
 .search-container {
@@ -306,9 +273,7 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 .neon-strip-gold { height: 3px; background: linear-gradient(90deg, #ffd700, rgba(255,215,0,0.27)); box-shadow: 0 0 8px rgba(255,215,0,0.21); }
 
 /* ── Neon dots ── */
-.neon-dot-purple { width: 3px; height: 3px; border-radius: 9999px; background: #b44dff; box-shadow: 0 0 4px rgba(180,77,255,0.44); }
 .neon-dot-cyan { width: 6px; height: 6px; border-radius: 9999px; background: #00e5ff; box-shadow: 0 0 6px rgba(0,229,255,0.25); }
-.neon-dot-pink { width: 6px; height: 6px; border-radius: 9999px; background: #ff2d7b; box-shadow: 0 0 6px rgba(255,45,123,0.25); }
 
 /* ── Search button gradient ── */
 .btn-search {

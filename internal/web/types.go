@@ -12,7 +12,6 @@ type (
 	DataSourceSummary      = ui.DataSourceSummary
 	HomeData               = ui.HomeData
 	SearchesData           = ui.SearchesData
-	SearchResultsData      = ui.SearchResultsData
 	SearchViewData         = ui.SearchViewData
 	SearchExtensionsData   = ui.SearchExtensionsData
 	ExtensionResultSummary = ui.ExtensionResultSummary
@@ -25,7 +24,6 @@ type (
 	LargestExtension       = ui.LargestExtension
 	DataSourceData         = ui.DataSourceData
 	FileStat               = ui.FileStat
-	LargestDataSourceFile  = ui.LargestDataSourceFile
 	DataSourceItemsData    = ui.DataSourceItemsData
 	ReportedSearchItem     = ui.ReportedSearchItem
 	ReportsPageData        = ui.ReportsPageData

@@ -296,10 +296,10 @@ func (tr *ThemeStore) getAllKnownSlugs() (map[string]struct{}, error) {
 	return known, nil
 }
 
-// ThemeResponse represents the JSON response from the WordPress Themes API.
-type ThemeResponse struct {
-	Info   Info    `json:"info"`
-	Themes []Theme `json:"themes"`
+// themeResponse represents the JSON response from the WordPress Themes API.
+type themeResponse struct {
+	Info   pageInfo `json:"info"`
+	Themes []Theme  `json:"themes"`
 }
 
 const baseThemesURL = "https://api.aspirecloud.net/themes/info/1.2/"
@@ -445,14 +445,14 @@ func FetchThemesSince(ctx context.Context, api *APIClient, l *zap.Logger, since 
 }
 
 // fetchThemePage fetches a single page of themes from the API.
-func fetchThemePage(ctx context.Context, api *APIClient, url string) (themes []Theme, info Info, err error) {
-	var tr ThemeResponse
+func fetchThemePage(ctx context.Context, api *APIClient, url string) (themes []Theme, info pageInfo, err error) {
+	var tr themeResponse
 	if err := api.FetchJSON(ctx, url, &tr); err != nil {
-		return nil, Info{}, err
+		return nil, pageInfo{}, err
 	}
 
 	if tr.Info.Pages > 0 && tr.Info.Page > tr.Info.Pages {
-		return nil, Info{}, fmt.Errorf("API returned page %d but only %d pages exist (results: %d)", tr.Info.Page, tr.Info.Pages, tr.Info.Results)
+		return nil, pageInfo{}, fmt.Errorf("API returned page %d but only %d pages exist (results: %d)", tr.Info.Page, tr.Info.Pages, tr.Info.Results)
 	}
 
 	return tr.Themes, tr.Info, nil

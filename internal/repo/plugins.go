@@ -302,16 +302,16 @@ func (pr *PluginStore) getAllKnownSlugs() (map[string]struct{}, error) {
 }
 
 
-// Info holds pagination info from the API response.
-type Info struct {
+// pageInfo holds pagination info from the API response.
+type pageInfo struct {
 	Page    int `json:"page"`
 	Pages   int `json:"pages"`
 	Results int `json:"results"`
 }
 
-// PluginResponse represents the JSON response from the WordPress Plugins API.
-type PluginResponse struct {
-	Info    Info     `json:"info"`
+// pluginResponse represents the JSON response from the WordPress Plugins API.
+type pluginResponse struct {
+	Info    pageInfo `json:"info"`
 	Plugins []Plugin `json:"plugins"`
 }
 
@@ -426,14 +426,14 @@ func FetchPluginsSince(ctx context.Context, api *APIClient, l *zap.Logger, since
 }
 
 // fetchPluginPage fetches a single page of plugins from the API.
-func fetchPluginPage(ctx context.Context, api *APIClient, url string) (plugins []Plugin, info Info, err error) {
-	var pr PluginResponse
+func fetchPluginPage(ctx context.Context, api *APIClient, url string) (plugins []Plugin, info pageInfo, err error) {
+	var pr pluginResponse
 	if err := api.FetchJSON(ctx, url, &pr); err != nil {
-		return nil, Info{}, err
+		return nil, pageInfo{}, err
 	}
 
 	if pr.Info.Pages > 0 && pr.Info.Page > pr.Info.Pages {
-		return nil, Info{}, fmt.Errorf("API returned page %d but only %d pages exist (results: %d)", pr.Info.Page, pr.Info.Pages, pr.Info.Results)
+		return nil, pageInfo{}, fmt.Errorf("API returned page %d but only %d pages exist (results: %d)", pr.Info.Page, pr.Info.Pages, pr.Info.Results)
 	}
 
 	return pr.Plugins, pr.Info, nil

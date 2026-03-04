@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"veloria/internal/index"
-	"veloria/internal/manager"
 	"veloria/internal/repo"
 )
 
@@ -93,58 +92,3 @@ func (f *FakeDataSource) RecordIndexFailure(_ string) {}
 // Compile-time interface check.
 var _ repo.DataSource = (*FakeDataSource)(nil)
 
-// FakeSearchService is a hand-written fake implementing web.SearchService.
-type FakeSearchService struct {
-	SearchFunc func(repoType string, term string, params *manager.SearchParams) (*manager.SearchResponse, error)
-}
-
-func (f *FakeSearchService) Search(repoType string, term string, params *manager.SearchParams) (*manager.SearchResponse, error) {
-	if f.SearchFunc != nil {
-		return f.SearchFunc(repoType, term, params)
-	}
-	return &manager.SearchResponse{}, nil
-}
-
-// FakeReindexService is a hand-written fake implementing web.ReindexService.
-type FakeReindexService struct {
-	SubmitReindexFunc func(repoType, slug string) error
-}
-
-func (f *FakeReindexService) SubmitReindex(repoType, slug string) error {
-	if f.SubmitReindexFunc != nil {
-		return f.SubmitReindexFunc(repoType, slug)
-	}
-	return nil
-}
-
-// FakeSourceResolver is a hand-written fake implementing web.SourceResolver.
-type FakeSourceResolver struct {
-	ResolveSourceDirFunc func(repoType, slug string) (string, error)
-}
-
-func (f *FakeSourceResolver) ResolveSourceDir(repoType, slug string) (string, error) {
-	if f.ResolveSourceDirFunc != nil {
-		return f.ResolveSourceDirFunc(repoType, slug)
-	}
-	return "", nil
-}
-
-// FakeStatsProvider is a hand-written fake implementing web.StatsProvider.
-type FakeStatsProvider struct {
-	StatsFunc       func(repoType string) (int, int, bool)
-	IndexStatusFunc func(repoType string) map[string]bool
-}
-
-func (f *FakeStatsProvider) Stats(repoType string) (int, int, bool) {
-	if f.StatsFunc != nil {
-		return f.StatsFunc(repoType)
-	}
-	return 0, 0, false
-}
-
-func (f *FakeStatsProvider) IndexStatus(repoType string) map[string]bool {
-	if f.IndexStatusFunc != nil {
-		return f.IndexStatusFunc(repoType)
-	}
-	return nil
-}

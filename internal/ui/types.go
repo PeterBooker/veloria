@@ -69,14 +69,6 @@ type SearchesData struct {
 	LoggedIn   bool   // whether to show the toggle
 }
 
-// SearchResultsData contains data for search results partial.
-type SearchResultsData struct {
-	PageData
-	Search  searchmodel.Search
-	Results *manager.SearchResponse
-	Error   string
-}
-
 // SearchViewData contains data for the single search view.
 type SearchViewData struct {
 	PageData
@@ -194,14 +186,6 @@ type DataSourceData struct {
 type FileStat struct {
 	Path string
 	Size int64
-}
-
-// LargestDataSourceFile represents a large file with its parent extension info.
-type LargestDataSourceFile struct {
-	Path string
-	Size int64
-	Slug string
-	Name string
 }
 
 // DataSourceItemsData contains data for the data source items HTMX partial.

@@ -26,8 +26,7 @@ type Core struct {
 	ID       uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Name     string    `json:"name"`
 	Version  string    `json:"version"`
-	ZipURL   string    `json:"-" gorm:"-"`
-	Released time.Time `json:"-" gorm:"-"`
+	ZipURL string `json:"-" gorm:"-"`
 
 	// Index stats
 	FileCount    int                            `json:"-" gorm:"default:0"`

@@ -38,11 +38,6 @@ func ErrBadRequest(msg string) *APIError {
 	return &APIError{Status: http.StatusBadRequest, Message: msg}
 }
 
-// ErrBadRequestf creates a 400 error with detail.
-func ErrBadRequestf(msg, detail string) *APIError {
-	return &APIError{Status: http.StatusBadRequest, Message: msg, Detail: detail}
-}
-
 // ErrNotFound creates a 404 error.
 func ErrNotFound(msg string) *APIError {
 	return &APIError{Status: http.StatusNotFound, Message: msg}
@@ -56,11 +51,6 @@ func ErrInternal(msg string) *APIError {
 // ErrUnavailable creates a 503 error.
 func ErrUnavailable(msg string) *APIError {
 	return &APIError{Status: http.StatusServiceUnavailable, Message: msg}
-}
-
-// ErrTimeout creates a 408 error.
-func ErrTimeout(msg string) *APIError {
-	return &APIError{Status: http.StatusRequestTimeout, Message: msg}
 }
 
 // ParseID parses a UUID or ULID string into a uuid.UUID.

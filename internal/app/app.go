@@ -164,7 +164,7 @@ func (a *App) initDBDependents(ctx context.Context, appCache cache.Cache) {
 	db := reg.DB()
 
 	t := tasks.New(ctx)
-	_ = t.AddJob(ctx, "search-cleanup", tasks.CleanupStuckSearches(db, l), tasks.SearchCleanupInterval)
+	t.AddJob(tasks.CleanupStuckSearches(db, l), tasks.SearchCleanupInterval)
 	t.Start()
 	reg.SetTasks(t)
 
@@ -177,7 +177,7 @@ func (a *App) initDBDependents(ctx context.Context, appCache cache.Cache) {
 	reg.SetAPIClient(apiClient)
 
 	eventRecorder := repo.NewIndexEventRecorder(db, l)
-	_ = t.AddJob(ctx, "index-event-cleanup", repo.CleanupOldEvents(db, l, 30*24*time.Hour), 1*time.Hour)
+	t.AddJob(repo.CleanupOldEvents(db, l, 30*24*time.Hour), 1*time.Hour)
 
 	pr := repo.NewPluginStore(ctx, db, c, l, appCache, apiClient)
 	tr := repo.NewThemeStore(ctx, db, c, l, appCache, apiClient)
