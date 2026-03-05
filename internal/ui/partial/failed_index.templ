@@ -1,0 +1,76 @@
+package partial
+
+import (
+	"fmt"
+	"strconv"
+
+	"veloria/internal/ui"
+)
+
+func failedIndexURL(dsType string, page int) string {
+	return "/data-sources/" + dsType + "/failed-indexing?page=" + strconv.Itoa(page)
+}
+
+templ FailedIndex(data ui.FailedIndexData) {
+	if len(data.Events) > 0 {
+		<div class="overflow-x-auto">
+			<table class="w-full">
+				<thead style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
+					<tr>
+						<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body">Slug</th>
+						<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body">Error</th>
+						<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body whitespace-nowrap">Time</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, ev := range data.Events {
+						<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+							<td class="px-5 py-3">
+								<a href={ templ.SafeURL("/data-sources/" + data.DataSource + "/" + ev.Slug) } class="text-sm text-brand-600 hover:underline hover:underline-offset-2 font-medium transition-colors">{ ev.Slug }</a>
+							</td>
+							<td class="px-5 py-3 max-w-md">
+								<span class="text-sm text-text-muted truncate block" title={ ev.ErrorMessage }>{ ev.ErrorMessage }</span>
+							</td>
+							<td class="px-5 py-3 whitespace-nowrap">
+								<span class="text-sm text-text-subtle">{ ui.TimeAgo(ev.CreatedAt) }</span>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		if data.TotalPages > 1 {
+			<div class="px-6 py-4 flex items-center justify-between" style="border-top: 1px solid rgba(255,255,255,0.08);">
+				<p class="text-sm text-text-muted">
+					{ fmt.Sprintf("Page %d of %d (%d total)", data.Page, data.TotalPages, data.TotalCount) }
+				</p>
+				<div class="flex items-center gap-2">
+					if data.Page > 1 {
+						<button
+							hx-get={ failedIndexURL(data.DataSource, data.Page-1) }
+							hx-target="#failed-indexing"
+							hx-swap="innerHTML"
+							class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+						>
+							Previous
+						</button>
+					}
+					if data.Page < data.TotalPages {
+						<button
+							hx-get={ failedIndexURL(data.DataSource, data.Page+1) }
+							hx-target="#failed-indexing"
+							hx-swap="innerHTML"
+							class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+						>
+							Next
+						</button>
+					}
+				</div>
+			</div>
+		}
+	} else {
+		<div class="px-6 py-8 text-center">
+			<p class="text-text-muted">No failed indexing attempts.</p>
+		</div>
+	}
+}

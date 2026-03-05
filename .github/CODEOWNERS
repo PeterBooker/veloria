@@ -1,0 +1,5 @@
+# Default code owners
+* @PeterBooker
+
+# CI and release automation
+.github/workflows/ @PeterBooker

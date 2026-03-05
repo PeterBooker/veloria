@@ -1,0 +1,13 @@
+package shared
+
+templ EmptyState(title, subtitle string) {
+	<div class="glass-inner text-center py-12 lg:py-16">
+		<div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/5 border border-white/10 mb-4 lg:mb-6">
+			{ children... }
+		</div>
+		<h3 class="text-xl lg:text-2xl text-text-body mb-2">{ title }</h3>
+		if subtitle != "" {
+			<p class="text-text-muted text-sm lg:text-base">{ subtitle }</p>
+		}
+	</div>
+}

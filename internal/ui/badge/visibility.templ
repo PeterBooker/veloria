@@ -1,0 +1,9 @@
+package badge
+
+templ Visibility(private bool) {
+	if private {
+		<span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md bg-white/5 text-text-body border-l-2 border-white/20">Private</span>
+	} else {
+		<span class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md bg-green-500/10 text-green-400 border-l-2 border-green-400">Public</span>
+	}
+}

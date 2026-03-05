@@ -1,0 +1,60 @@
+package partial
+
+import (
+	"fmt"
+	"strconv"
+
+	"veloria/internal/ui"
+	"veloria/internal/ui/icon"
+)
+
+func contextURL(searchID, searchDataSource, slug, filename string, lineNumber int) string {
+	return "/search/" + searchID + "/context?repo=" + searchDataSource + "&slug=" + slug + "&file=" + filename + "&line=" + strconv.Itoa(lineNumber)
+}
+
+func matchCountLabel(count int) string {
+	if count == 1 {
+		return "1 match"
+	}
+	return fmt.Sprintf("%d matches", count)
+}
+
+templ SearchExtensionResults(data ui.ExtensionResultsData) {
+	<div class="p-4 lg:p-5 flex flex-col gap-4">
+		for _, file := range data.Result.Matches {
+			<!-- File Group -->
+			<div class="rounded-xl border border-white/[0.08] overflow-hidden">
+				<!-- File Header -->
+				<div class="flex items-center gap-2.5 px-4 py-2.5 bg-white/[0.04] border-b border-white/[0.08]">
+					@icon.File(15, "stroke-neon-pink")
+					<span class="text-neon-cyan text-sm font-mono truncate flex-1" title={ file.Filename }>{ file.Filename }</span>
+					<span class="text-text-muted text-xs font-medium">{ matchCountLabel(len(file.Matches)) }</span>
+				</div>
+				<!-- Matches for this file -->
+				<div class="flex flex-col">
+					for _, match := range file.Matches {
+						<div class="flex items-stretch border-b border-white/[0.06] last:border-b-0 group hover:bg-white/[0.02] transition-colors">
+							<div class="px-3 lg:px-4 py-2.5 text-text-muted text-xs text-right select-none whitespace-nowrap border-r-2 border-neon-pink/40 bg-brand-50 font-mono flex items-center justify-end" style="width: 3.5rem; min-width: 3.5rem;">{ strconv.Itoa(match.LineNumber) }</div>
+							<div class="flex-1 min-w-0 py-2.5 px-4 overflow-x-auto">
+								<code class="text-text-body text-sm font-mono whitespace-pre leading-relaxed">{ match.Line }</code>
+							</div>
+							<div class="px-3 lg:px-4 py-2.5 flex-shrink-0 flex items-center">
+								<button
+									type="button"
+									hx-get={ contextURL(data.SearchID, data.SearchDataSource, data.Result.Slug, file.Filename, match.LineNumber) }
+									hx-target="#context-modal"
+									hx-swap="innerHTML"
+									class="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-neon-cyan bg-[rgba(0,229,255,0.06)] hover:bg-[rgba(0,229,255,0.12)] border border-[rgba(0,229,255,0.20)] rounded-md transition-all"
+									title="Show context"
+								>
+									@icon.External(14)
+									<span class="hidden sm:inline">Context</span>
+								</button>
+							</div>
+						</div>
+					}
+				</div>
+			</div>
+		}
+	</div>
+}

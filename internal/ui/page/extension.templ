@@ -1,0 +1,222 @@
+package page
+
+import (
+	"fmt"
+	"strconv"
+
+	"veloria/internal/ui"
+	"veloria/internal/ui/icon"
+	"veloria/internal/ui/layout"
+)
+
+func fileBarWidth(size, maxSize int64) string {
+	if maxSize <= 0 {
+		return "0%"
+	}
+	pct := float64(size) / float64(maxSize) * 100
+	return fmt.Sprintf("%.1f%%", pct)
+}
+
+func maxFileSize(files []ui.FileStat) int64 {
+	var m int64
+	for _, f := range files {
+		if f.Size > m {
+			m = f.Size
+		}
+	}
+	return m
+}
+
+templ Extension(data ui.ExtensionData) {
+	@layout.Base(data.PageData) {
+		<!-- Heading -->
+		<div class="mb-6 pt-8 lg:pt-10">
+			<nav class="text-sm text-text-subtle mb-3">
+				<a href="/data-sources" class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors">Data Sources</a>
+				<span class="mx-2">/</span>
+				<a href={ templ.SafeURL("/data-sources/" + data.DataSourceType) } class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors capitalize">{ data.DataSourceType }</a>
+				<span class="mx-2">/</span>
+				<span class="text-text-body font-medium">{ data.Name }</span>
+			</nav>
+			<div class="flex items-center gap-4">
+				<div class="w-14 h-14 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center">
+					<span class={ datasourceIconColor(data.DataSourceType) }>
+						@datasourceIcon(data.DataSourceType, 28)
+					</span>
+				</div>
+				<div>
+					<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright">{ data.Name }</h1>
+					<p class="text-sm text-text-body">
+						v{ data.Version } ·
+						if data.Indexed {
+							<span class="text-green-400">Indexed</span>
+						} else {
+							<span class="text-text-subtle">Pending</span>
+						}
+					</p>
+				</div>
+				if data.User != nil && data.User.IsAdmin {
+					<div id="reindex-btn" class="ml-auto">
+						<button
+							hx-post="/admin/reindex"
+							hx-vals={ `{"repo_type": "` + data.DataSourceType + `", "slug": "` + data.Slug + `"}` }
+							hx-target="#reindex-btn"
+							hx-swap="innerHTML"
+							class="btn-ghost inline-flex items-center gap-1.5"
+						>
+							@icon.Refresh(14)
+							Re-index
+						</button>
+					</div>
+				}
+			</div>
+		</div>
+		if data.ShortDescription != "" {
+			<div class="glass-inner p-6 mb-6">
+				<p class="text-text-body">{ data.ShortDescription }</p>
+			</div>
+		}
+		<!-- Stats Grid -->
+		<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+			if data.DataSourceType == "plugins" || data.DataSourceType == "themes" {
+				<div class="glass-inner p-4">
+					<p class="text-sm text-text-muted mb-1">Active Installs</p>
+					<p class="text-2xl font-bold text-text-bright">{ ui.FormatCompact(data.ActiveInstalls) }</p>
+				</div>
+				<div class="glass-inner p-4">
+					<p class="text-sm text-text-muted mb-1">Downloads</p>
+					<p class="text-2xl font-bold text-text-bright">{ ui.FormatCompact(data.Downloaded) }</p>
+				</div>
+			}
+			<div class="glass-inner p-4">
+				<p class="text-sm text-text-muted mb-1">Total Files</p>
+				<p class="text-2xl font-bold text-brand-600">{ ui.FormatNumber(data.FileCount) }</p>
+			</div>
+			<div class="glass-inner p-4">
+				<p class="text-sm text-text-muted mb-1">Total Size</p>
+				<p class="text-2xl font-bold text-brand-700">{ ui.FormatBytes(data.TotalSize) }</p>
+			</div>
+		</div>
+		if data.DataSourceType == "plugins" || data.DataSourceType == "themes" {
+			<!-- Details Grid -->
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+				<!-- Compatibility -->
+				<div class="glass-inner p-5">
+					<h3 class="text-xl font-semibold text-text-bright mb-3">Compatibility</h3>
+					<dl class="space-y-2 text-sm">
+						if data.Requires != "" {
+							<div class="flex justify-between">
+								<dt class="text-text-muted">Requires WordPress</dt>
+								<dd class="text-text-bright font-medium">{ data.Requires }+</dd>
+							</div>
+						}
+						if data.Tested != "" {
+							<div class="flex justify-between">
+								<dt class="text-text-muted">Tested up to</dt>
+								<dd class="text-text-bright font-medium">{ data.Tested }</dd>
+							</div>
+						}
+						if data.RequiresPHP != "" {
+							<div class="flex justify-between">
+								<dt class="text-text-muted">Requires PHP</dt>
+								<dd class="text-text-bright font-medium">{ data.RequiresPHP }+</dd>
+							</div>
+						}
+						if data.Source != "" {
+							<div class="flex justify-between">
+								<dt class="text-text-muted">Source</dt>
+								<dd class="text-text-bright font-medium">{ data.Source }</dd>
+							</div>
+						}
+					</dl>
+				</div>
+				<!-- Rating & Links -->
+				<div class="glass-inner p-5">
+					<h3 class="text-xl font-semibold text-text-bright mb-3">Details</h3>
+					<dl class="space-y-2 text-sm">
+						if data.Rating > 0 {
+							<div class="flex justify-between items-center">
+								<dt class="text-text-muted">Rating</dt>
+								<dd class="flex items-center gap-2">
+									<div class="w-20 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+										<div class="h-full rounded-full bg-amber-400" style={ "width: " + strconv.Itoa(data.Rating) + "%" }></div>
+									</div>
+									<span class="text-text-bright font-medium">{ strconv.Itoa(data.Rating) }%</span>
+								</dd>
+							</div>
+						}
+						if data.DownloadLink != "" {
+							<div class="flex justify-between items-center">
+								<dt class="text-text-muted">Download</dt>
+								<dd>
+									<a href={ templ.SafeURL(data.DownloadLink) } class="text-brand-600 hover:text-brand-700 hover:underline hover:underline-offset-2 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
+								</dd>
+							</div>
+						}
+					</dl>
+				</div>
+			</div>
+			if len(data.Tags) > 0 {
+				<div class="glass-inner p-5 mb-6">
+					<h3 class="text-xl font-semibold text-text-bright mb-3">Tags</h3>
+					<div class="flex flex-wrap gap-2">
+						for _, value := range data.Tags {
+							<span class="inline-block px-2.5 py-1 rounded-md bg-white/5 text-xs text-text-body border-l-2 border-neon-cyan">{ value }</span>
+						}
+					</div>
+				</div>
+			}
+		}
+		if data.DataSourceType == "cores" {
+			<!-- Core Details -->
+			<div class="glass-inner p-5 mb-6">
+				<h3 class="text-xl font-semibold text-text-bright mb-3">Details</h3>
+				<dl class="space-y-2 text-sm">
+					if data.DownloadLink != "" {
+						<div class="flex justify-between items-center">
+							<dt class="text-text-muted">Download</dt>
+							<dd>
+								<a href={ templ.SafeURL(data.DownloadLink) } class="text-brand-600 hover:text-brand-700 hover:underline hover:underline-offset-2 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
+							</dd>
+						</div>
+					}
+				</dl>
+			</div>
+		}
+		if data.Indexed && len(data.LargestFiles) > 0 {
+			<!-- Largest Files -->
+			<div class="glass-inner overflow-hidden mb-6">
+				<div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+					<h2 class="text-xl font-semibold text-text-bright">Largest Files</h2>
+					<p class="text-sm text-text-muted">Top { strconv.Itoa(len(data.LargestFiles)) } by size</p>
+				</div>
+				<div class="p-6">
+					<div class="space-y-2.5">
+						for _, file := range data.LargestFiles {
+							<div>
+								<div class="flex items-center justify-between text-sm mb-1">
+									<span class="text-text-body font-mono text-xs truncate">{ file.Path }</span>
+									<span class="text-text-muted ml-2 flex-shrink-0">{ ui.FormatBytes(file.Size) }</span>
+								</div>
+								<div class="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+									<div class="h-full rounded-full" style={ "width: " + fileBarWidth(file.Size, maxFileSize(data.LargestFiles)) + "; background: linear-gradient(135deg, #ff2d7b, #b44dff)" }></div>
+								</div>
+							</div>
+						}
+					</div>
+				</div>
+			</div>
+		}
+		if !data.Indexed {
+			<div class="glass-inner p-12 text-center">
+				<div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
+					<span class="text-text-subtle">
+						@icon.Info(32)
+					</span>
+				</div>
+				<h3 class="text-xl font-medium text-text-bright mb-2">Not Yet Indexed</h3>
+				<p class="text-text-muted">File statistics will be available once this { data.DataSourceType } is indexed.</p>
+			</div>
+		}
+	}
+}

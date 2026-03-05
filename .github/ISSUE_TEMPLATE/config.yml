@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue (private)
+    url: https://github.com/PeterBooker/veloria/security/advisories/new
+    about: Report vulnerabilities privately.
+  - name: Support policy
+    url: https://github.com/PeterBooker/veloria/blob/main/SUPPORT.md
+    about: Read support expectations before opening an issue.

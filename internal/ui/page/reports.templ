@@ -1,0 +1,115 @@
+package page
+
+import (
+	"veloria/internal/ui"
+	"veloria/internal/ui/badge"
+	"veloria/internal/ui/icon"
+	"veloria/internal/ui/layout"
+	"veloria/internal/ui/shared"
+)
+
+templ Reports(data ui.ReportsPageData) {
+	@layout.Base(data.PageData) {
+		<!-- Heading -->
+		<div class="mb-6 pt-8 lg:pt-10">
+			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Reported Searches</h1>
+			<p class="text-sm text-text-body">Review and moderate user-reported searches.</p>
+		</div>
+		if len(data.Reports) > 0 {
+			<div class="glass-inner overflow-hidden">
+				<table class="w-full">
+					<thead style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
+						<tr>
+							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Pattern</th>
+							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Data Source</th>
+							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Reporter</th>
+							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Reason</th>
+							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Reported</th>
+							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Visibility</th>
+							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, report := range data.Reports {
+							<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+								<td class="px-5 py-4">
+									<a href={ templ.SafeURL("/search/" + report.SearchID) } class="font-mono text-sm text-brand-600 bg-brand-50 px-2 py-1 rounded hover:underline">{ report.SearchTerm }</a>
+								</td>
+								<td class="px-5 py-4">
+									<span class="text-sm text-text-body capitalize">{ report.SearchDataSource }</span>
+								</td>
+								<td class="px-5 py-4">
+									<span class="text-sm text-text-body">{ report.ReporterName }</span>
+								</td>
+								<td class="px-5 py-4">
+									if report.Reason != "" {
+										<span class="text-sm text-text-body">{ report.Reason }</span>
+									} else {
+										<span class="text-sm text-text-subtle">--</span>
+									}
+								</td>
+								<td class="px-5 py-4">
+									<span class="text-sm text-text-muted">{ report.ReportedAt }</span>
+								</td>
+								<td class="px-5 py-4">
+									<div id={ "visibility-" + report.ReportID }>
+										if report.SearchPrivate {
+											<div class="flex items-center gap-2">
+												@badge.Visibility(true)
+												<button
+													hx-post={ "/admin/search/" + report.SearchID + "/visibility" }
+													hx-target={ "#visibility-" + report.ReportID }
+													hx-swap="innerHTML"
+													class="text-xs text-brand-600 hover:text-brand-700 hover:underline hover:underline-offset-2 font-medium"
+												>
+													Make Public
+												</button>
+											</div>
+										} else {
+											<div class="flex items-center gap-2">
+												@badge.Visibility(false)
+												<button
+													hx-post={ "/admin/search/" + report.SearchID + "/visibility" }
+													hx-target={ "#visibility-" + report.ReportID }
+													hx-swap="innerHTML"
+													class="text-xs text-red-600 hover:text-red-700 hover:underline hover:underline-offset-2 font-medium"
+												>
+													Make Private
+												</button>
+											</div>
+										}
+									</div>
+								</td>
+								<td class="px-5 py-4">
+									<div id={ "actions-" + report.ReportID } class="flex items-center gap-2">
+										<button
+											hx-post={ "/admin/reports/" + report.ReportID + "/resolve" }
+											hx-target={ "#actions-" + report.ReportID }
+											hx-swap="innerHTML"
+											class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-text-body bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition"
+										>
+											@icon.Check(12)
+											Resolve
+										</button>
+									</div>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+			@shared.LinkPagination("/admin/reports", data.Page, data.TotalPages)
+		} else {
+			<!-- Empty State -->
+			<div class="glass-inner text-center py-16">
+				<div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/10 border border-white/10 mb-6">
+					<svg class="w-10 h-10 text-text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+					</svg>
+				</div>
+				<h3 class="text-2xl text-text-body mb-2">No pending reports</h3>
+				<p class="text-text-muted">All reported searches have been resolved.</p>
+			</div>
+		}
+	}
+}

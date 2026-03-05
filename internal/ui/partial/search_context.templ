@@ -1,0 +1,62 @@
+package partial
+
+import (
+	"strconv"
+
+	"veloria/internal/ui"
+	"veloria/internal/ui/icon"
+)
+
+templ SearchContext(data ui.SearchContextData) {
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);" role="dialog" aria-modal="true">
+		<button
+			type="button"
+			class="absolute inset-0 w-full h-full cursor-pointer"
+			aria-label="Close modal"
+			onclick="document.getElementById('context-modal').innerHTML = ''"
+		></button>
+		<div class="relative z-10 w-full max-w-3xl glass-inner overflow-hidden">
+			<div class="flex items-center justify-between px-4 lg:px-5 py-3 lg:py-4 border-b border-white/10 bg-bg-card">
+				<div>
+					<p class="text-xs text-text-muted uppercase tracking-widest font-semibold mb-1">Match Context</p>
+					<div class="text-sm text-text-bright font-mono truncate font-medium">{ data.Filename }</div>
+				</div>
+				<button
+					type="button"
+					class="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text-body hover:bg-white/5 transition"
+					onclick="document.getElementById('context-modal').innerHTML = ''"
+				>
+					<span class="sr-only">Close</span>
+					@icon.Close(18)
+				</button>
+			</div>
+			<div class="p-4 lg:p-5">
+				if data.Error != "" {
+					<div class="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+						{ data.Error }
+					</div>
+				} else {
+					<div class="rounded-xl overflow-hidden border border-white/[0.06] bg-bg-card">
+						<table class="w-full" style="border-collapse: collapse; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 16px; line-height: 1.65;">
+							<tbody>
+								for _, line := range data.Lines {
+									if line.IsMatch {
+										<tr class="bg-brand-200 transition-colors">
+											<td class="px-2 lg:px-3 py-0.5 text-text-subtle text-right select-none whitespace-nowrap border-r-2 border-brand-400" style="width: 1px;">{ strconv.Itoa(line.Number) }</td>
+											<td class="px-3 lg:px-4 py-0.5 text-text-bright whitespace-pre overflow-x-auto">{ line.Text }</td>
+										</tr>
+									} else {
+										<tr class="bg-white/[0.03] hover:bg-white/5 transition-colors">
+											<td class="px-2 lg:px-3 py-0.5 text-text-subtle text-right select-none whitespace-nowrap border-r-2 border-transparent" style="width: 1px;">{ strconv.Itoa(line.Number) }</td>
+											<td class="px-3 lg:px-4 py-0.5 text-text-body whitespace-pre overflow-x-auto">{ line.Text }</td>
+										</tr>
+									}
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}

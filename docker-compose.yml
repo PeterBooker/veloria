@@ -1,0 +1,138 @@
+services:
+  postgres:
+    image: 'postgres:17-alpine'
+    shm_size: 512mb
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    environment:
+      POSTGRES_USER: '${DB_USERNAME}'
+      POSTGRES_PASSWORD: '${DB_PASSWORD}'
+      POSTGRES_DB: '${DB_DATABASE}'
+    volumes:
+      - 'veloria-postgres:/var/lib/postgresql/data'
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}" ]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+    networks:
+      - veloria
+
+  mailpit:
+    image: 'axllent/mailpit:latest'
+    ports:
+      - '${MAILPIT_PORT:-1025}:1025'
+      - '${MAILPIT_DASHBOARD_PORT:-8025}:8025'
+    networks:
+      - veloria
+
+  minio:
+    image: 'minio/minio:latest'
+    ports:
+      - '${MINIO_PORT:-9000}:9000'
+      - '${MINIO_CONSOLE_PORT:-9001}:9001'
+    environment:
+      MINIO_ROOT_USER: '${S3_ACCESS_KEY:-minioadmin}'
+      MINIO_ROOT_PASSWORD: '${S3_SECRET_KEY:-minioadmin}'
+    command: server /data --console-address ":9001"
+    volumes:
+      - 'veloria-minio:/data'
+    networks:
+      - veloria
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: 'minio/mc:latest'
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin};
+      mc mb --ignore-existing myminio/$${S3_BUCKET:-veloria-searches};
+      exit 0;
+      "
+    networks:
+      - veloria
+
+  # --- Observability ---
+
+  alloy:
+    image: 'grafana/alloy:latest'
+    volumes:
+      - './local/alloy.alloy:/etc/alloy/config.alloy'
+    command: run /etc/alloy/config.alloy --server.http.listen-addr=0.0.0.0:12345
+    ports:
+      - '4317:4317'
+      - '${ALLOY_UI_PORT:-12345}:12345'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
+    networks:
+      - veloria
+
+  tempo:
+    image: 'grafana/tempo:latest'
+    volumes:
+      - './local/tempo.yaml:/etc/tempo/config.yaml'
+    command: -config.file=/etc/tempo/config.yaml
+    ports:
+      - '${TEMPO_PORT:-3200}:3200'
+    networks:
+      - veloria
+
+  prometheus:
+    image: 'prom/prometheus:latest'
+    volumes:
+      - './local/prometheus.yaml:/etc/prometheus/prometheus.yml'
+    command: >-
+      --config.file=/etc/prometheus/prometheus.yml
+      --web.enable-remote-write-receiver
+    ports:
+      - '${PROMETHEUS_PORT:-9090}:9090'
+    networks:
+      - veloria
+
+  loki:
+    image: 'grafana/loki:3'
+    volumes:
+      - './local/loki.yaml:/etc/loki/local-config.yaml'
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - '${LOKI_PORT:-3100}:3100'
+    networks:
+      - veloria
+
+  grafana:
+    image: 'grafana/grafana:latest'
+    volumes:
+      - './local/grafana/provisioning:/etc/grafana/provisioning'
+    ports:
+      - '${GRAFANA_PORT:-3000}:3000'
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    networks:
+      - veloria
+
+networks:
+  veloria:
+    driver: bridge
+volumes:
+  veloria-postgres:
+    driver: local
+
+  veloria-minio:
+    driver: local

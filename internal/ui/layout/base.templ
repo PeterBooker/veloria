@@ -1,0 +1,74 @@
+package layout
+
+import (
+	"veloria/internal/ui/nav"
+	"veloria/internal/ui"
+)
+
+templ Base(pd ui.PageData) {
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<meta name="view-transition" content="same-origin"/>
+		<meta name="htmx-config" content='{"globalViewTransitions": true}'/>
+		@Head(pd)
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
+		<link rel="icon" href="/favicon.ico" sizes="32x32"/>
+		<link rel="stylesheet" href={ "/static/css/styles.css?v=" + pd.Version }/>
+		<script src={ "/static/js/htmx.min.js?v=" + pd.Version }></script>
+	</head>
+	<body class="min-h-screen overflow-x-hidden flex flex-col" hx-boost="true">
+		<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[60] focus:px-4 focus:py-2 focus:bg-neon-pink focus:text-white focus:rounded-lg focus:outline-none">
+			Skip to main content
+		</a>
+		@neonGrid()
+		@nav.MobileHeader(pd.CurrentPath, pd.User)
+		@nav.DesktopHeader(pd.CurrentPath, pd.User)
+		<main id="main-content" class="relative z-[1] flex-1 pb-12 lg:pb-16">
+			<div class="max-w-[1280px] mx-auto px-4 lg:px-8">
+				{ children... }
+			</div>
+		</main>
+		@nav.Footer(pd.Version, pd.RequestStart)
+		<div id="context-modal"></div>
+		@mobileMenuScript()
+	</body>
+	</html>
+}
+
+templ neonGrid() {
+	<div class="neon-grid" aria-hidden="true">
+		<div class="neon-blob-1"></div>
+		<div class="neon-blob-2"></div>
+		<div class="neon-blob-3"></div>
+		<div class="neon-blob-4"></div>
+		<div class="neon-scanlines"></div>
+	</div>
+}
+
+templ mobileMenuScript() {
+	<script>
+		function toggleMobileMenu() {
+			var menu = document.getElementById('mobile-menu');
+			var button = document.getElementById('mobile-menu-button');
+			var isHidden = menu.classList.contains('hidden');
+			if (isHidden) {
+				menu.classList.remove('hidden');
+				button.setAttribute('aria-expanded', 'true');
+				document.body.style.overflow = 'hidden';
+			} else {
+				menu.classList.add('hidden');
+				button.setAttribute('aria-expanded', 'false');
+				document.body.style.overflow = '';
+			}
+		}
+		document.addEventListener('keydown', function(e) {
+			if (e.key === 'Escape') {
+				var menu = document.getElementById('mobile-menu');
+				if (!menu.classList.contains('hidden')) toggleMobileMenu();
+			}
+		});
+	</script>
+}

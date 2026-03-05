@@ -1,0 +1,28 @@
+package partial
+
+import (
+	"veloria/internal/ui"
+	"veloria/internal/ui/badge"
+)
+
+templ AdminVisibilityToggle(data ui.VisibilityToggleData) {
+	<div class="flex items-center gap-2">
+		if data.Private {
+			@badge.Visibility(true)
+			<button
+				hx-post={ "/admin/search/" + data.SearchID + "/visibility" }
+				hx-target="closest div"
+				hx-swap="outerHTML"
+				class="text-xs text-brand-600 hover:text-brand-700 hover:underline hover:underline-offset-2 font-medium"
+			>Make Public</button>
+		} else {
+			@badge.Visibility(false)
+			<button
+				hx-post={ "/admin/search/" + data.SearchID + "/visibility" }
+				hx-target="closest div"
+				hx-swap="outerHTML"
+				class="text-xs text-red-600 hover:text-red-700 hover:underline hover:underline-offset-2 font-medium"
+			>Make Private</button>
+		}
+	</div>
+}

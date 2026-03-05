@@ -1,0 +1,21 @@
+package layout
+
+import "veloria/internal/ui"
+
+templ Head(pd ui.PageData) {
+	<title>{ pd.OG.Title }</title>
+	<meta property="og:title" content={ pd.OG.Title }/>
+	<meta property="og:description" content={ pd.OG.Description }/>
+	<meta property="og:url" content={ pd.OG.URL }/>
+	<meta property="og:image" content={ pd.OG.Image }/>
+	<meta property="og:type" content={ pd.OG.Type }/>
+	<meta property="og:site_name" content="Veloria"/>
+	<meta name="twitter:card" content="summary_large_image"/>
+	<meta name="twitter:title" content={ pd.OG.Title }/>
+	<meta name="twitter:description" content={ pd.OG.Description }/>
+	<meta name="twitter:image" content={ pd.OG.Image }/>
+	<meta name="description" content={ pd.OG.Description }/>
+	if pd.OG.URL != "" {
+		<link rel="canonical" href={ pd.OG.URL }/>
+	}
+}

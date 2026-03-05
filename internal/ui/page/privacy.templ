@@ -1,0 +1,53 @@
+package page
+
+import (
+	"veloria/internal/ui"
+	"veloria/internal/ui/layout"
+)
+
+templ Privacy(pd ui.PageData) {
+	@layout.Base(pd) {
+		<div class="mb-6 pt-8 lg:pt-10">
+			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Privacy Policy</h1>
+			<p class="text-sm text-text-body">Last updated: February 2026</p>
+		</div>
+		<div class="max-w-3xl space-y-10">
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">What We Collect</h2>
+				<p class="text-lg text-text-body leading-relaxed">
+					Veloria collects the minimum data necessary to operate the service. When you perform a search, the query and results are stored so they can be shared and revisited. Searches marked as private are visible only to those with the URL. Searches made when logged in are linked to your user.
+				</p>
+			</section>
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">Authentication</h2>
+				<p class="text-lg text-text-body leading-relaxed">
+					If you sign in via a third-party provider (GitHub, GitLab, or Atlassian), Veloria stores your display name and avatar URL solely to personalise your session. We do not access your repositories, email address, or any other account data beyond what is needed for login.
+				</p>
+			</section>
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">Cookies</h2>
+				<p class="text-lg text-text-body leading-relaxed">
+					Veloria uses a single session cookie to keep you logged in. No analytics trackers, advertising scripts, or third-party cookies are loaded.
+				</p>
+			</section>
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">Server Logs</h2>
+				<p class="text-lg text-text-body leading-relaxed">
+					Standard server logs (IP address, request path, timestamp) are retained for a limited period for debugging and abuse prevention, then deleted.
+				</p>
+			</section>
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">Third Parties</h2>
+				<p class="text-lg text-text-body leading-relaxed">
+					Veloria does not sell, share, or transfer your data to third parties. The only external services involved are the OAuth providers you choose to sign in with.
+				</p>
+			</section>
+			<section>
+				<h2 class="text-2xl font-bold text-text-bright mb-3">Contact</h2>
+				<p class="text-lg text-text-body leading-relaxed">
+					If you have questions about this policy, please open an issue on <a href="https://github.com/PeterBooker/veloria" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">GitHub</a>.
+				</p>
+			</section>
+		</div>
+	}
+}

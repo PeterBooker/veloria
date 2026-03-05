@@ -1,0 +1,101 @@
+package nav
+
+import (
+	"veloria/internal/ui/icon"
+	"veloria/internal/user"
+)
+
+templ MobileHeader(currentPath string, u *user.User) {
+	<header class="lg:hidden site-header">
+		<div class="flex items-center justify-between px-4 h-[56px]">
+			<a href="/" class="flex items-center gap-2.5">
+				@icon.Logo(28)
+				<span class="text-lg font-bold tracking-wide text-text-bright">Veloria</span>
+			</a>
+			<button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-xl hover:bg-white/5 transition" aria-label="Open menu" aria-expanded="false" id="mobile-menu-button" hx-boost="false">
+				@icon.Menu(24)
+			</button>
+		</div>
+	</header>
+	<!-- Mobile Menu Overlay -->
+	<div id="mobile-menu" class="lg:hidden fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-label="Navigation menu" hx-boost="false">
+		<div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="toggleMobileMenu()"></div>
+		<nav class="absolute inset-y-0 left-0 w-72 flex flex-col bg-[rgba(12,14,28,0.95)] backdrop-blur-[24px]">
+			<div class="flex items-center justify-between p-4 border-b-medium">
+				<a href="/" class="flex items-center gap-2.5" onclick="toggleMobileMenu()">
+					@icon.Logo(28)
+					<span class="text-lg font-bold tracking-wide text-text-bright">Veloria</span>
+				</a>
+				<button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-xl hover:bg-white/5 transition" aria-label="Close menu">
+					@icon.Close(24)
+				</button>
+			</div>
+			<div class="flex-1 overflow-y-auto p-3 space-y-1">
+				@mobileNavLink("/", "Home", currentPath == "/") {
+					@icon.Home(20)
+				}
+				for _, item := range BuildNavItems(currentPath, u != nil, u != nil && u.IsAdmin) {
+					@mobileNavLink(item.Href, item.Label, item.Active) {
+						@mobileNavIcon(item.Href)
+					}
+				}
+			</div>
+			<div class="p-4 border-t border-white/[0.08]">
+				if u != nil {
+					@mobileUserSection(u)
+				} else {
+					<a href="/login" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-text-muted hover:bg-white/5 transition">
+						@icon.Login(20)
+						Log in
+					</a>
+				}
+			</div>
+		</nav>
+	</div>
+}
+
+templ mobileNavLink(href, label string, active bool) {
+	if active {
+		<a href={ templ.SafeURL(href) } onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition font-semibold text-text-active nav-active">
+			{ children... }
+			{ label }
+		</a>
+	} else {
+		<a href={ templ.SafeURL(href) } onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition text-text-muted hover:bg-white/5">
+			{ children... }
+			{ label }
+		</a>
+	}
+}
+
+templ mobileNavIcon(href string) {
+	switch href {
+		case "/searches":
+			@icon.Search(20)
+		case "/data-sources":
+			@icon.Database(20)
+		case "/docs":
+			@icon.Book(20)
+		case "/about":
+			@icon.Info(20)
+		case "/admin/reports":
+			@icon.Shield(20)
+	}
+}
+
+templ mobileUserSection(u *user.User) {
+	<div class="flex items-center gap-3 px-4 py-3">
+		if u.AvatarURL != nil && *u.AvatarURL != "" {
+			<img src={ *u.AvatarURL } alt="" class="w-8 h-8 rounded-full ring-2 ring-white/10"/>
+		} else {
+			<div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium bg-gradient-to-br from-neon-pink to-neon-purple">
+				{ string(u.Name[0:1]) }
+			</div>
+		}
+		<span class="text-sm text-text-body">{ u.Name }</span>
+	</div>
+	<a href="/logout" hx-boost="false" onclick="toggleMobileMenu()" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-text-muted hover:bg-white/5 hover:underline hover:underline-offset-2 transition">
+		@icon.Logout(20)
+		Sign out
+	</a>
+}

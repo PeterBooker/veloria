@@ -1,0 +1,12 @@
+package icon
+
+templ DataSource(dsType string, size int) {
+	switch dsType {
+		case "plugins":
+			@Plugin(size)
+		case "themes":
+			@Theme(size)
+		case "cores":
+			@Core(size)
+	}
+}

@@ -1,0 +1,75 @@
+package page
+
+import (
+	"fmt"
+
+	"veloria/internal/ui"
+	"veloria/internal/ui/icon"
+	"veloria/internal/ui/layout"
+)
+
+templ datasourceIcon(dsType string, size int) {
+	switch dsType {
+		case "plugins":
+			@icon.Plugin(size)
+		case "themes":
+			@icon.Theme(size)
+		default:
+			@icon.Core(size)
+	}
+}
+
+templ DataSources(data ui.DataSourcesData) {
+	@layout.Base(data.PageData) {
+		<!-- Heading -->
+		<div class="mb-6 pt-8 lg:pt-10">
+			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Data Sources</h1>
+			<p class="text-sm text-text-body">Browse indexed WordPress data sources</p>
+		</div>
+		<!-- Data Source Cards -->
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+			for _, ds := range data.DataSourceSummaries {
+				<a href={ templ.SafeURL("/data-sources/" + ds.Type) } class="glass-inner group block p-6 hover:shadow-lg hover:border-brand-300 transition-all duration-300">
+					<div class="flex items-center gap-4 mb-4">
+						<div class="w-12 h-12 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center group-hover:border-brand-200 transition-colors">
+							<span class={ datasourceIconColor(ds.Type) }>
+								@datasourceIcon(ds.Type, 24)
+							</span>
+						</div>
+						<div>
+							<h3 class="text-xl font-semibold text-text-bright group-hover:text-brand-600 transition-colors">{ ds.Title }</h3>
+							<p class="text-sm text-text-subtle capitalize">{ ds.Type } data source</p>
+						</div>
+					</div>
+					<div class="flex items-center justify-between text-sm text-text-muted mb-3">
+						<span>
+							<span class="text-text-bright font-semibold">{ ui.FormatNumber(ds.Total) }</span> total
+						</span>
+						<span>
+							<span class="text-text-bright font-semibold">{ ui.FormatNumber(ds.Indexed) }</span> indexed
+						</span>
+					</div>
+					<div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+						if ds.Total > 0 {
+							<div class="h-full rounded-full transition-all duration-300" style={ fmt.Sprintf("width: %.2f%%; background: linear-gradient(135deg, #ff2d7b, #b44dff)", ds.IndexedPercent) }></div>
+						} else {
+							<div class="h-full bg-text-subtle rounded-full"></div>
+						}
+					</div>
+					<p class="mt-3 text-xs text-text-subtle text-right">{ ui.FormatPercent(ds.IndexedPercent) } indexed</p>
+				</a>
+			}
+		</div>
+	}
+}
+
+func datasourceIconColor(dsType string) string {
+	switch dsType {
+	case "plugins":
+		return "text-neon-pink"
+	case "themes":
+		return "text-neon-purple"
+	default:
+		return "text-neon-cyan"
+	}
+}

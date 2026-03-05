@@ -1,0 +1,38 @@
+package shared
+
+import (
+	"fmt"
+	"strconv"
+
+	"veloria/internal/ui/icon"
+)
+
+templ LinkPagination(baseURL string, page, totalPages int) {
+	if totalPages > 1 {
+		<div class="flex items-center justify-center gap-3 mt-6">
+			if page > 1 {
+				<a href={ templ.SafeURL(baseURL + "?page=" + strconv.Itoa(page-1)) } class="btn-ghost">
+					@icon.ChevronLeft(14)
+					Previous
+				</a>
+			} else {
+				<span class="btn-ghost opacity-50 cursor-default">
+					@icon.ChevronLeft(14)
+					Previous
+				</span>
+			}
+			<span class="text-sm text-text-muted">{ fmt.Sprintf("Page %d of %d", page, totalPages) }</span>
+			if page < totalPages {
+				<a href={ templ.SafeURL(baseURL + "?page=" + strconv.Itoa(page+1)) } class="btn-ghost">
+					Next
+					@icon.ChevronRight(14)
+				</a>
+			} else {
+				<span class="btn-ghost opacity-50 cursor-default">
+					Next
+					@icon.ChevronRight(14)
+				</span>
+			}
+		</div>
+	}
+}

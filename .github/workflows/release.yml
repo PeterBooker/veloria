@@ -1,0 +1,79 @@
+name: Release and Deploy
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-prod
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GOEXPERIMENT: jsonv2,greenteagc
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.0"
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Generate assets
+        run: go generate ./assets/...
+
+      - name: Set version
+        id: version
+        run: echo "version=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build deployment binary
+        run: |
+          LDFLAGS="-s -w -X veloria/internal/config.Version=${{ steps.version.outputs.version }}"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria ./cmd/veloria
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria-converter ./cmd/veloria-converter
+
+      - name: Deploy to production
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${HOST}" >> ~/.ssh/known_hosts
+
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria "${USER}@${HOST}:/opt/veloria/veloria.new"
+          rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria-converter "${USER}@${HOST}:/opt/veloria/veloria-converter.new"
+
+          ssh -i ~/.ssh/deploy_key "${USER}@${HOST}" << 'ENDSSH'
+            set -e
+            cd /opt/veloria
+
+            chmod +x veloria.new
+            chmod +x veloria-converter.new
+
+            # Back up current binaries
+            for bin in veloria veloria-converter; do
+              [ -f "$bin" ] && cp "$bin" "$bin.prev"
+            done
+
+            mv veloria.new veloria
+            mv veloria-converter.new veloria-converter
+
+            sudo systemctl restart veloria
+            sleep 3
+          ENDSSH

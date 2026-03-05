@@ -1,0 +1,119 @@
+package page
+
+import (
+	"veloria/internal/ui"
+	"veloria/internal/ui/icon"
+	"veloria/internal/ui/layout"
+	"veloria/internal/ui/shared"
+)
+
+templ Searches(data ui.SearchesData) {
+	@layout.Base(data.PageData) {
+		<!-- Heading -->
+		<div class="mb-6 pt-8 lg:pt-10">
+			if data.View == "own" {
+				<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">My Searches</h1>
+				<p class="text-sm text-text-body">Your personal search history, including private searches.</p>
+			} else {
+				<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Recent Searches</h1>
+				<p class="text-sm text-text-body">View and revisit previous code searches.</p>
+			}
+			if data.LoggedIn {
+				<div class="flex items-center gap-1 mt-4">
+					if data.View == "own" {
+						<a href="/searches" class="px-3 py-1.5 text-sm rounded-lg text-text-muted hover:text-text-body hover:bg-white/5 transition">All Searches</a>
+						<span class="px-3 py-1.5 text-sm rounded-lg font-semibold text-text-bright bg-white/10">My Searches</span>
+					} else {
+						<span class="px-3 py-1.5 text-sm rounded-lg font-semibold text-text-bright bg-white/10">All Searches</span>
+						<a href="/searches/own" class="px-3 py-1.5 text-sm rounded-lg text-text-muted hover:text-text-body hover:bg-white/5 transition">My Searches</a>
+					}
+				</div>
+			}
+		</div>
+		if len(data.Searches) > 0 {
+			<div class="glass-inner overflow-hidden">
+				<!-- Desktop header -->
+				<div class="hidden md:grid md:grid-cols-[3fr_1fr_1fr_1fr] px-5 py-4 text-sm font-medium text-text-body text-left" style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
+					<span>Pattern</span>
+					<span>Data Source</span>
+					<span>Matches</span>
+					<span>Created</span>
+				</div>
+				for _, s := range data.Searches {
+					<a
+						href={ templ.SafeURL("/search/" + s.Search.ID.String()) }
+						class="block px-5 py-4 hover:bg-white/[0.08] transition-colors cursor-pointer"
+						style="border-bottom: 1px solid rgba(255,255,255,0.06);"
+					>
+						<div class="flex flex-col gap-2 md:grid md:grid-cols-[3fr_1fr_1fr_1fr] md:items-center">
+							<!-- Pattern -->
+							<div class="flex items-center gap-2 min-w-0">
+								<code class="font-mono text-sm text-text-body bg-brand-100 px-2 py-1 rounded break-all">{ s.Search.Term }</code>
+								if s.Search.Private {
+									<span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-medium rounded-md bg-white/5 text-text-muted border-l-2 border-white/20">
+										<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+											<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+										</svg>
+										Private
+									</span>
+								}
+							</div>
+							<!-- Data Source + Matches: always visible -->
+							<span class="inline-flex items-center gap-3 text-sm text-text-body capitalize md:contents">
+								<span class="inline-flex items-center gap-1.5 text-sm text-text-body capitalize">
+									<span class="text-brand-600">
+										@icon.DataSource(s.Search.Repo, 16)
+									</span>
+									{ s.Search.Repo }
+								</span>
+								<span>
+									if s.MatchesKnown {
+										<span class="text-sm text-brand-600 font-medium">{ ui.FormatNumber(s.MatchCount) }</span>
+									} else {
+										<span class="text-sm text-text-subtle">&mdash;</span>
+									}
+								</span>
+							</span>
+							<!-- Status + Created: desktop only -->
+							<span class="hidden md:block text-sm text-text-muted">{ s.Search.CreatedAt.Format("2006-01-02 15:04") }</span>
+						</div>
+					</a>
+				}
+			</div>
+			if data.View == "own" {
+				@shared.LinkPagination("/searches/own", data.Page, data.TotalPages)
+			} else {
+				@shared.LinkPagination("/searches", data.Page, data.TotalPages)
+			}
+		} else {
+			<!-- Empty State -->
+			<div class="glass-inner text-center py-16">
+				<div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/5 border border-white/10 mb-6">
+					<span class="text-text-subtle">
+						@icon.Search(40)
+					</span>
+				</div>
+				<h3 class="text-2xl text-text-body mb-2">No searches yet</h3>
+				if data.View == "own" {
+					<p class="text-text-muted mb-6">You haven't performed any searches yet. Start exploring WordPress source code!</p>
+				} else {
+					<p class="text-text-muted mb-6">Start exploring WordPress source code with powerful regex patterns.</p>
+				}
+				if data.SearchEnabled {
+					<a href="/" class="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-neon-cyan/40 focus:ring-offset-2 hover:shadow-lg hover:shadow-neon-pink/25" style="background: linear-gradient(135deg, #ff2d7b, #b44dff);">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+						</svg>
+						Start Searching
+					</a>
+				} else {
+					<div class="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-text-subtle bg-white/5 rounded-xl border border-white/10">
+						@icon.Close(16)
+						Search unavailable
+					</div>
+				}
+			</div>
+		}
+	}
+}
