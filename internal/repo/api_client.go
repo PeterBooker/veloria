@@ -51,7 +51,12 @@ func NewAPIClient(apiKey string, l *zap.Logger, tc ThrottleConfig) *APIClient {
 		},
 		// Treat 429 responses as non-failures so they don't trip the breaker.
 		// Returning true means the error is counted as a success.
+		// Note: gobreaker calls IsSuccessful for ALL results, including nil errors,
+		// so we must return true for nil (actual success) as well.
 		IsSuccessful: func(err error) bool {
+			if err == nil {
+				return true
+			}
 			var throttled *ErrThrottled
 			return errors.As(err, &throttled)
 		},
