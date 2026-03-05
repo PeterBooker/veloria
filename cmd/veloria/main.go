@@ -10,6 +10,9 @@ var cli struct {
 	Migrate     MigrateCmd     `cmd:"" help:"Run database migrations."`
 	Wipe        WipeCmd        `cmd:"" help:"Wipe data from the database and storage."`
 	Maintenance MaintenanceCmd `cmd:"" help:"Toggle maintenance mode on the running server."`
+	User        UserCmd        `cmd:"" help:"Manage user accounts."`
+	Reindex     ReindexCmd     `cmd:"" help:"Queue a re-index for an extension on the running server."`
+	Stats       StatsCmd       `cmd:"" help:"Print index statistics."`
 	Version     VersionCmd     `cmd:"" help:"Print version information."`
 }
 

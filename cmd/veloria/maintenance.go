@@ -26,8 +26,10 @@ func (c *MaintenanceOffCmd) Run() error { return sendMaintenance(false) }
 
 // ctlRequest mirrors app.ctlRequest.
 type ctlRequest struct {
-	Action  string `json:"action"`
-	Enabled bool   `json:"enabled"`
+	Action   string `json:"action"`
+	Enabled  bool   `json:"enabled,omitempty"`
+	RepoType string `json:"repo_type,omitempty"`
+	Slug     string `json:"slug,omitempty"`
 }
 
 // ctlResponse mirrors app.ctlResponse.

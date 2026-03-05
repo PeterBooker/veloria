@@ -741,6 +741,13 @@ func (r *ExtensionStore[T]) updateMetadata(slug, source string, updates map[stri
 
 	if err := query.Updates(updates).Error; err != nil {
 		r.l.Warn("Failed to update extension metadata", zap.String("slug", slug), zap.Error(err))
+		return
+	}
+
+	if r.cache != nil {
+		r.cache.Delete("stats:" + string(r.repoType))
+		r.cache.Delete("largest:" + string(r.repoType) + ":total_size")
+		r.cache.Delete("largest:" + string(r.repoType) + ":file_count")
 	}
 }
 

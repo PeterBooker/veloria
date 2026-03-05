@@ -443,6 +443,13 @@ func fetchFileStatsCharts(d *Deps, table string) (ChartData, ChartData) {
 }
 
 func fetchLargestExtensions(d *Deps, table string, limit int, orderCol string) []LargestExtension {
+	cacheKey := "largest:" + table + ":" + orderCol
+	if d.Cache != nil {
+		if v, ok := d.Cache.Get(cacheKey); ok {
+			return v.([]LargestExtension)
+		}
+	}
+
 	nameCol := "name"
 	slugCol := "slug"
 	if table == "cores" {
@@ -459,6 +466,10 @@ func fetchLargestExtensions(d *Deps, table string, limit int, orderCol string) [
 		Scan(&extensions)
 	for i := range extensions {
 		extensions[i].Name = html.UnescapeString(extensions[i].Name)
+	}
+
+	if d.Cache != nil {
+		d.Cache.Set(cacheKey, extensions, 10*time.Minute)
 	}
 	return extensions
 }

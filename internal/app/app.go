@@ -183,7 +183,7 @@ func (a *App) initDBDependents(ctx context.Context, appCache cache.Cache) {
 	tr := repo.NewThemeStore(ctx, db, c, l, appCache, apiClient)
 	cr := repo.NewCoreStore(ctx, db, c, l, appCache, apiClient)
 
-	m, err := manager.NewManager(ctx, l, []repo.DataSource{pr, tr, cr}, c.IndexerConcurrency, eventRecorder, apiClient)
+	m, err := manager.NewManager(ctx, l, []repo.DataSource{pr, tr, cr}, c.IndexerConcurrency, eventRecorder, apiClient, appCache)
 	if err != nil {
 		l.Error("Failed to load repositories; running in degraded mode", zap.Error(err))
 	} else {
@@ -408,8 +408,10 @@ func (a *App) controlSocketPath() string {
 
 // ctlRequest is the JSON payload for control socket commands.
 type ctlRequest struct {
-	Action  string `json:"action"`
-	Enabled bool   `json:"enabled"`
+	Action   string `json:"action"`
+	Enabled  bool   `json:"enabled,omitempty"`
+	RepoType string `json:"repo_type,omitempty"`
+	Slug     string `json:"slug,omitempty"`
 }
 
 // ctlResponse is the JSON response from control socket commands.
@@ -464,6 +466,18 @@ func (a *App) handleControlConn(conn net.Conn) {
 		}
 		resp = ctlResponse{OK: true, Message: fmt.Sprintf("Maintenance mode %s", state)}
 		a.Logger.Info("Maintenance mode changed via CLI", zap.Bool("enabled", req.Enabled))
+	case "reindex":
+		mgr := a.Registry.Manager()
+		if mgr == nil {
+			resp = ctlResponse{Message: "indexer unavailable"}
+			break
+		}
+		if err := mgr.SubmitReindex(req.RepoType, req.Slug); err != nil {
+			resp = ctlResponse{Message: err.Error()}
+			break
+		}
+		resp = ctlResponse{OK: true, Message: fmt.Sprintf("Queued %s/%s for re-index", req.RepoType, req.Slug)}
+		a.Logger.Info("Re-index queued via CLI", zap.String("repo", req.RepoType), zap.String("slug", req.Slug))
 	default:
 		resp = ctlResponse{Message: fmt.Sprintf("unknown action: %s", req.Action)}
 	}

@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
 
+	"veloria/internal/cache"
 	"veloria/internal/index"
 	"veloria/internal/repo"
 	"veloria/internal/telemetry"
@@ -63,6 +64,7 @@ type Manager struct {
 	events      *repo.IndexEventRecorder // nil when DB unavailable
 	done        chan struct{}             // closed when updater goroutine exits
 	api         *repo.APIClient          // for health checks
+	cache       cache.Cache              // shared app cache (may be nil)
 
 	// Failure tracking (read by health endpoint, written by updater goroutine).
 	mu                  sync.RWMutex
@@ -72,7 +74,7 @@ type Manager struct {
 
 // NewManager creates a new Manager, initializes all data sources, and starts
 // a single shared updater loop that pulls work from all sources.
-func NewManager(ctx context.Context, l *zap.Logger, sources []repo.DataSource, concurrency int, events *repo.IndexEventRecorder, api *repo.APIClient) (*Manager, error) {
+func NewManager(ctx context.Context, l *zap.Logger, sources []repo.DataSource, concurrency int, events *repo.IndexEventRecorder, api *repo.APIClient, c cache.Cache) (*Manager, error) {
 	var (
 		wg       sync.WaitGroup
 		errMu    sync.Mutex
@@ -116,6 +118,7 @@ func NewManager(ctx context.Context, l *zap.Logger, sources []repo.DataSource, c
 		events:              events,
 		done:                make(chan struct{}),
 		api:                 api,
+		cache:               c,
 		consecutiveFailures: make(map[repo.ExtensionType]int),
 		lastSuccessUpdate:   make(map[repo.ExtensionType]time.Time),
 	}
@@ -555,6 +558,13 @@ type SearchParams struct {
 	OnProgress       ProgressFunc
 }
 
+// searchCacheKey builds a cache key for a search query.
+func searchCacheKey(repoType string, term string, params *SearchParams) string {
+	return fmt.Sprintf("search:%s:%s:%v:%s:%s:%d",
+		repoType, term, params.CaseInsensitive,
+		params.FileMatch, params.ExcludeFileMatch, params.LinesOfContext)
+}
+
 // Search searches the specified source for the given term.
 func (m *Manager) Search(repoType string, term string, params *SearchParams) (*SearchResponse, error) {
 	if params == nil {
@@ -564,6 +574,18 @@ func (m *Manager) Search(repoType string, term string, params *SearchParams) (*S
 	ds, ok := m.sources[repo.ExtensionType(repoType)]
 	if !ok {
 		return nil, fmt.Errorf("unknown extension type: %s", repoType)
+	}
+
+	// Check cache for identical query.
+	cacheKey := searchCacheKey(repoType, term, params)
+	if m.cache != nil {
+		if v, ok := m.cache.Get(cacheKey); ok {
+			resp := v.(*SearchResponse)
+			if params.OnProgress != nil {
+				params.OnProgress(resp.Total, resp.Total)
+			}
+			return resp, nil
+		}
 	}
 
 	opt := &index.SearchOptions{
@@ -603,6 +625,11 @@ func (m *Manager) Search(repoType string, term string, params *SearchParams) (*S
 	})
 
 	response.Total = len(response.Results)
+
+	if m.cache != nil {
+		m.cache.Set(cacheKey, response, 60*time.Second)
+	}
+
 	return response, nil
 }
 
