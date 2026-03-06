@@ -740,18 +740,12 @@ func grepSingleFile(path string, re *regexp.Regexp, contextLines int) ([]GrepLin
 		}
 
 		if contextLines > 0 {
-			start := i - contextLines
-			if start < 0 {
-				start = 0
-			}
+			start := max(i-contextLines, 0)
 			if start < i {
 				m.Before = allLines[start:i]
 			}
 
-			end := i + 1 + contextLines
-			if end > len(allLines) {
-				end = len(allLines)
-			}
+			end := min(i+1+contextLines, len(allLines))
 			if i+1 < end {
 				m.After = allLines[i+1 : end]
 			}

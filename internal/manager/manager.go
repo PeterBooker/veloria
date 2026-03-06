@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -29,14 +30,14 @@ type NotFoundError struct {
 	Msg string
 }
 
-func (e *NotFoundError) Error() string  { return e.Msg }
+func (e *NotFoundError) Error() string   { return e.Msg }
 func (e *NotFoundError) StatusCode() int { return 404 }
 
 // QueueFullError indicates the reindex queue is at capacity.
 // Implements api.StatusCoder so the transport layer maps it to HTTP 429.
 type QueueFullError struct{}
 
-func (e *QueueFullError) Error() string  { return "reindex queue is full" }
+func (e *QueueFullError) Error() string   { return "reindex queue is full" }
 func (e *QueueFullError) StatusCode() int { return 429 }
 
 // Reindex error sentinels. Pointer identity is preserved for errors.Is checks.
@@ -62,7 +63,7 @@ type Manager struct {
 	sourceOrder []repo.ExtensionType // deterministic iteration order
 	adhocCh     chan repo.IndexTask
 	events      *repo.IndexEventRecorder // nil when DB unavailable
-	done        chan struct{}             // closed when updater goroutine exits
+	done        chan struct{}            // closed when updater goroutine exits
 	api         *repo.APIClient          // for health checks
 	cache       cache.Cache              // shared app cache (may be nil)
 
@@ -109,7 +110,7 @@ func NewManager(ctx context.Context, l *zap.Logger, sources []repo.DataSource, c
 		srcMap[ds.Type()] = ds
 		order = append(order, ds.Type())
 	}
-	sort.Slice(order, func(i, j int) bool { return order[i] < order[j] })
+	slices.Sort(order)
 
 	m := &Manager{
 		sources:             srcMap,
@@ -136,7 +137,7 @@ func NewTestManager(l *zap.Logger, sources []repo.DataSource) (*Manager, error) 
 		srcMap[ds.Type()] = ds
 		order = append(order, ds.Type())
 	}
-	sort.Slice(order, func(i, j int) bool { return order[i] < order[j] })
+	slices.Sort(order)
 
 	return &Manager{
 		sources:             srcMap,
@@ -459,7 +460,7 @@ func (m *Manager) SourceHealth() map[string]SourceStatus {
 // SourceStatus holds health information about a single data source.
 type SourceStatus struct {
 	ConsecutiveFailures int       `json:"consecutive_failures"`
-	LastSuccess         time.Time `json:"last_success,omitempty"`
+	LastSuccess         time.Time `json:"last_success"`
 }
 
 // SubmitReindex queues an ad-hoc re-index task for the given extension.

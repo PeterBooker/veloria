@@ -38,7 +38,7 @@ type SourceInfo struct {
 	Total               int       `json:"total"`
 	Indexed             int       `json:"indexed"`
 	ConsecutiveFailures int       `json:"consecutive_failures"`
-	LastSuccess         time.Time `json:"last_success,omitempty"`
+	LastSuccess         time.Time `json:"last_success"`
 }
 
 // Checker holds the dependencies needed to evaluate system health.

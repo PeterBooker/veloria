@@ -72,10 +72,7 @@ func FormatSearchMatches(resp *SearchResponse, offset, limit int) string {
 		return b.String()
 	}
 
-	end := offset + limit
-	if end > total {
-		end = total
-	}
+	end := min(offset+limit, total)
 
 	page := all[offset:end]
 

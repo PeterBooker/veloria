@@ -87,15 +87,12 @@ func NewAPIClient(apiKey string, l *zap.Logger, tc ThrottleConfig) *APIClient {
 
 	// Set up channel-based throttle if rate > 0.
 	if tc.RequestsPerSecond > 0 {
-		burst := tc.Burst
-		if burst < 1 {
-			burst = 1
-		}
+		burst := max(tc.Burst, 1)
 		ac.throttle = make(chan time.Time, burst)
 		ac.done = make(chan struct{})
 
 		// Pre-fill burst tokens.
-		for i := 0; i < burst; i++ {
+		for range burst {
 			ac.throttle <- time.Now()
 		}
 

@@ -86,7 +86,7 @@ func TestThrottle_Disabled(t *testing.T) {
 	})
 
 	start := time.Now()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		var out map[string]string
 		err := ac.FetchJSON(context.Background(), srv.URL, &out)
 		require.NoError(t, err)
@@ -114,7 +114,7 @@ func TestThrottle_RateLimiting(t *testing.T) {
 	})
 
 	start := time.Now()
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		var out map[string]string
 		err := ac.FetchJSON(context.Background(), srv.URL, &out)
 		require.NoError(t, err)
@@ -237,7 +237,7 @@ func Test429_DoesNotTripCircuitBreaker(t *testing.T) {
 
 	// Make 8 requests that all get 429. These should NOT trip the breaker
 	// (breaker trips at >5 consecutive failures).
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		var out map[string]string
 		err := ac.FetchJSON(context.Background(), srv.URL, &out)
 		require.Error(t, err)
@@ -325,7 +325,7 @@ func TestNon429Error_TripsCircuitBreaker(t *testing.T) {
 
 	// Make 8 requests that all get 500. Breaker trips at >5 consecutive failures
 	// (i.e. on the 6th failure), so requests 7+ are blocked by the open breaker.
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		var out map[string]string
 		_ = ac.FetchJSON(context.Background(), srv.URL, &out)
 	}
