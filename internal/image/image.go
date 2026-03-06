@@ -97,10 +97,7 @@ func (g *Generator) RenderSearch(term string, totalMatches, totalExtensions int,
 
 	lines := breakText(dc, displayTerm, textMaxW)
 	lineHeight := fontSize * 1.4
-	maxLines := int(maxTermHeight / lineHeight)
-	if maxLines < 1 {
-		maxLines = 1
-	}
+	maxLines := max(int(maxTermHeight/lineHeight), 1)
 	if len(lines) > maxLines {
 		lines = lines[:maxLines]
 		// Ensure the closing quote is present on the last visible line.
