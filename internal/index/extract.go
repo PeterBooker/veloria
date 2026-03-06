@@ -16,8 +16,8 @@ import (
 	cindex "veloria/internal/codesearch/index"
 )
 
-// maxDecompressSize is the maximum allowed size for a single decompressed file (100 MB).
-const maxDecompressSize = 100 << 20
+// maxDecompressSize is the maximum allowed size for a single decompressed file (256 MB).
+const maxDecompressSize = 256 << 20
 
 // FileStat holds information about a single file.
 type FileStat struct {
