@@ -100,6 +100,9 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 		if req.Public != nil {
 			private = !*req.Public
 		}
+		if !private && shouldForcePrivate(req.Term) {
+			private = true
+		}
 
 		s := searchmodel.Search{
 			Status:  searchmodel.StatusQueued,

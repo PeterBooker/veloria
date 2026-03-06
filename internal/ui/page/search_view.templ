@@ -11,6 +11,9 @@ import (
 
 templ SearchView(data ui.SearchViewData) {
 	@layout.Base(data.PageData) {
+		if data.ModerationNotice != "" {
+			@shared.InfoAlert(data.ModerationNotice)
+		}
 		<!-- Heading -->
 		<div class="mb-6 pt-8 lg:pt-10">
 			<p class="text-xs text-text-bright uppercase tracking-widest mb-1.5">Search Result</p>
