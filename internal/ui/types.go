@@ -79,6 +79,7 @@ type SearchViewData struct {
 	ProgressSearched int
 	ProgressTotal    int
 	Error            string
+	ModerationNotice string
 }
 
 // SearchExtensionsData contains data for the search extensions HTMX partial.

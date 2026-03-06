@@ -61,6 +61,9 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			PageData: pd,
 			Search:   s,
 		}
+		if s.Private && shouldForcePrivate(s.Term) {
+			data.ModerationNotice = "This search has been automatically set to private because the search term contains a URL or inappropriate language."
+		}
 		if s.CompletedAt != nil {
 			data.DurationMs = s.CompletedAt.Sub(s.CreatedAt).Milliseconds()
 		}
@@ -305,6 +308,9 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 		}
 
 		private := visibility == "private"
+		if !private && shouldForcePrivate(term) {
+			private = true
+		}
 
 		currentUser := auth.UserFromContext(r.Context())
 
