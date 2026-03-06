@@ -538,7 +538,7 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 			result, err := r.runIndexer(taskSlug, primaryURL)
 			if err != nil {
 				if errors.Is(err, ErrDownloadNotFound) {
-					// Try wordpress.org fallback for mirrored packages.
+					// Try wordpress.org versioned fallback for mirrored packages.
 					fallbackURL := wordpressDownloadURL(r.repoType, taskSlug, taskExt.GetVersion())
 					if taskSource == SourceWordPress && fallbackURL != "" && fallbackURL != primaryURL {
 						r.l.Info("Primary download not found, trying wordpress.org fallback",
@@ -547,6 +547,18 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 							zap.String("fallback_url", fallbackURL),
 						)
 						result, err = r.runIndexer(taskSlug, fallbackURL)
+					}
+				}
+				if errors.Is(err, ErrDownloadNotFound) {
+					// Try wordpress.org versionless fallback (some plugins only have slug.zip).
+					versionlessURL := wordpressDownloadURL(r.repoType, taskSlug, "")
+					if taskSource == SourceWordPress && versionlessURL != "" && versionlessURL != primaryURL {
+						r.l.Info("Versioned download not found, trying versionless fallback",
+							zap.String("type", string(r.repoType)),
+							zap.String("slug", taskSlug),
+							zap.String("fallback_url", versionlessURL),
+						)
+						result, err = r.runIndexer(taskSlug, versionlessURL)
 					}
 				}
 				if err != nil {
@@ -589,14 +601,19 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 // wordpressDownloadURL constructs a direct wordpress.org download URL for
 // plugins and themes. Used as a fallback when the AspireCloud mirror 404s.
 func wordpressDownloadURL(repoType ExtensionType, slug, version string) string {
+	var base string
 	switch repoType {
 	case TypePlugins:
-		return fmt.Sprintf("https://downloads.wordpress.org/plugin/%s.%s.zip", slug, version)
+		base = "https://downloads.wordpress.org/plugin/"
 	case TypeThemes:
-		return fmt.Sprintf("https://downloads.wordpress.org/theme/%s.%s.zip", slug, version)
+		base = "https://downloads.wordpress.org/theme/"
 	default:
 		return ""
 	}
+	if version == "" {
+		return base + slug + ".zip"
+	}
+	return fmt.Sprintf("%s%s.%s.zip", base, slug, version)
 }
 
 // indexerResult contains the output from running the indexer.
