@@ -428,6 +428,14 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 					progressFn(n, total)
 				}
 			}()
+			defer func() {
+				if rv := recover(); rv != nil {
+					r.l.Error("Panic in search worker",
+						zap.String("slug", e.GetSlug()),
+						zap.Any("panic", rv),
+					)
+				}
+			}()
 
 			if totalMatches.Load() >= globalMatchCap {
 				return

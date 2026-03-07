@@ -3,6 +3,7 @@ package index
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/klauspost/compress/gzip"
 	"io"
 	"math"
@@ -63,15 +64,12 @@ type SearchOptions struct {
 // Create one via CompileSearch and reuse it across multiple Index.SearchCompiled calls
 // to avoid redundant regex compilation.
 //
-// The rePool holds a sync.Pool of *cregexp.Regexp instances. Each goroutine borrows
-// one from the pool for its search and returns it when done. This avoids recompiling
-// the DFA regexp for every extension and — critically — lets the DFA state cache stay
-// warm across extensions within the same worker, which makes subsequent matches
-// nearly free (one table lookup per byte instead of recomputing DFA transitions).
+// The codesearch DFA regexp (cregexp.Regexp) is NOT safe for concurrent use, so each
+// SearchCompiled call compiles a fresh instance. The trigram query, standard regexps,
+// and options are all safe to share.
 type CompiledSearch struct {
 	query          *cindex.Query // pre-computed trigram query, safe for concurrent reads
 	pattern        string
-	rePool         sync.Pool // pool of *cregexp.Regexp; not safe to copy CompiledSearch
 	fre            *regexp.Regexp
 	excludeFre     *regexp.Regexp
 	contentRe      *regexp.Regexp // standard regexp for finding match positions within lines
@@ -105,15 +103,8 @@ func CompileSearch(pat string, opt *SearchOptions) (*CompiledSearch, error) {
 	}
 
 	cs := &CompiledSearch{
-		query:   cindex.RegexpQuery(cre.Syntax),
-		pattern: fullPat,
-		rePool: sync.Pool{
-			New: func() any {
-				// Pattern was validated above; compilation cannot fail here.
-				re, _ := cregexp.Compile(fullPat) //nolint:errcheck
-				return re
-			},
-		},
+		query:          cindex.RegexpQuery(cre.Syntax),
+		pattern:        fullPat,
 		contentRe:      contentRe,
 		maxResults:     opt.MaxResults,
 		linesOfContext: int(min(opt.LinesOfContext, uint(math.MaxInt))), // #nosec G115 -- clamped to MaxInt
@@ -177,10 +168,12 @@ func (i *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) 
 func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 	startedAt := time.Now()
 
-	// Borrow a DFA regexp from the pool. Each worker keeps its DFA state cache
-	// warm across extensions, avoiding cold-start overhead on every call.
-	re := cs.rePool.Get().(*cregexp.Regexp)
-	defer cs.rePool.Put(re)
+	// Compile a fresh DFA regexp for this call. The codesearch DFA regexp is
+	// NOT safe for concurrent use, so each search gets its own instance.
+	re, err := cregexp.Compile(cs.pattern)
+	if err != nil {
+		return nil, fmt.Errorf("compiling search regexp: %w", err)
+	}
 
 	// Borrow a read buffer from the pool. Reused across all files in this
 	// search to avoid allocating a new []byte for every source file opened.
