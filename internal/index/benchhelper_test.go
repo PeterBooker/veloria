@@ -95,7 +95,7 @@ func buildPluginIndex(b *testing.B, compress bool) *Index {
 	}
 
 	trigramsPath := filepath.Join(indexDir, "trigrams")
-	IndexDirToFile(sourceDir, trigramsPath)
+	IndexDirToFile(sourceDir, trigramsPath, "")
 
 	if compress {
 		if err := CompressSourceDir(sourceDir); err != nil {

@@ -555,10 +555,6 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 		Run: func() error {
 			r.l.Info("Indexing extension", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 
-			taskIE := taskExt.GetIndexedExtension()
-			taskIE.LockUpdates()
-			defer taskIE.UnlockUpdates()
-
 			primaryURL := taskExt.GetDownloadLink()
 			result, err := r.runIndexer(taskSlug, primaryURL)
 			if err != nil {
@@ -588,7 +584,7 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 				}
 				if err != nil {
 					if errors.Is(err, ErrDownloadNotFound) {
-						if taskIE.HasIndex() {
+						if taskExt.GetIndexedExtension().HasIndex() {
 							r.l.Warn("Download not found, keeping existing index", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 						} else {
 							r.l.Warn("Download not found, skipping", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))

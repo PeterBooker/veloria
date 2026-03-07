@@ -57,22 +57,32 @@ func (c *IndexCmd) Run() error {
 	}
 	defer cleanup()
 
-	// Extract files into source/<slug> and collect stats.
-	// Clear previous extraction to avoid stale files from older versions.
+	// Extract to a staging directory so the existing source files remain
+	// available for in-flight searches. The staging dir is atomically renamed
+	// to the final path once the index and compression are complete.
 	dest := filepath.Join(sourceDir, c.Slug)
-	if err := os.RemoveAll(dest); err != nil {
-		return fmt.Errorf("failed to remove old source dir %q: %w", dest, err)
+	stagingDest := dest + ".staging"
+	if err := os.RemoveAll(stagingDest); err != nil {
+		return fmt.Errorf("failed to remove stale staging dir %q: %w", stagingDest, err)
 	}
-	if err := os.MkdirAll(dest, 0o750); err != nil {
-		return fmt.Errorf("failed to create destination dir %q: %w", dest, err)
+	if err := os.MkdirAll(stagingDest, 0o750); err != nil {
+		return fmt.Errorf("failed to create staging dir %q: %w", stagingDest, err)
 	}
-	stats, err := index.UnzipWithStats(tmpZip, dest)
+	// stagingSwapped tracks whether the staging dir was successfully renamed
+	// to the final path. If not, the deferred cleanup removes it.
+	stagingSwapped := false
+	defer func() {
+		if !stagingSwapped {
+			_ = os.RemoveAll(stagingDest)
+		}
+	}()
+	stats, err := index.UnzipWithStats(tmpZip, stagingDest)
 	if err != nil {
-		return fmt.Errorf("failed to unzip files into %q: %w", dest, err)
+		return fmt.Errorf("failed to unzip files into %q: %w", stagingDest, err)
 	}
 
-	// Index to a temporary file, then atomically rename to final path.
-	// This allows a single directory per slug instead of versioned directories.
+	// Build the trigram index from the staging directory. Paths stored in the
+	// index use the final dest so the index is valid immediately after rename.
 	slugDir := filepath.Join(indexDir, c.Slug)
 	tmpPath := filepath.Join(slugDir, "trigrams.tmp")
 	finalPath := filepath.Join(slugDir, "trigrams")
@@ -86,19 +96,38 @@ func (c *IndexCmd) Run() error {
 		log.Printf("warning: failed to remove stale tmp file %q: %v", tmpPath, err)
 	}
 
-	index.IndexDirToFile(dest, tmpPath)
+	index.IndexDirToFile(stagingDest, tmpPath, dest)
+	defer func() {
+		// Clean up trigrams.tmp if it was not renamed to the final path.
+		if _, err := os.Stat(tmpPath); err == nil {
+			_ = os.Remove(tmpPath)
+		}
+	}()
 
-	// Atomically rename .tmp to final path
+	// Gzip-compress source files before swapping into place.
+	if err := index.CompressSourceDir(stagingDest); err != nil {
+		return fmt.Errorf("failed to compress source files in %q: %w", stagingDest, err)
+	}
+
+	// Atomic swap: move old source out of the way, move staging into place,
+	// then rename the trigram index. This keeps old source files available
+	// until the very last moment so concurrent searches are not disrupted.
+	oldDest := dest + ".old"
+	_ = os.RemoveAll(oldDest)
+	// Rename existing source dir (may fail if this is the first index — that's OK).
+	_ = os.Rename(dest, oldDest)
+	if err := os.Rename(stagingDest, dest); err != nil {
+		// Try to restore the old source dir on failure.
+		_ = os.Rename(oldDest, dest)
+		return fmt.Errorf("failed to rename staging dir %q to %q: %w", stagingDest, dest, err)
+	}
+	stagingSwapped = true
 	if err := os.Rename(tmpPath, finalPath); err != nil {
 		return fmt.Errorf("failed to rename %q to %q: %w", tmpPath, finalPath, err)
 	}
-
-	// Gzip-compress source files now that the trigram index has been built
-	// from the uncompressed content. Compressed files reduce disk footprint
-	// and page cache pressure during search.
-	if err := index.CompressSourceDir(dest); err != nil {
-		return fmt.Errorf("failed to compress source files in %q: %w", dest, err)
-	}
+	// Clean up old source directory synchronously. A background goroutine
+	// would race with subprocess exit and likely never complete.
+	_ = os.RemoveAll(oldDest)
 
 	// Output the index directory path so the server can load it.
 	// Format: INDEX_READY:<path>

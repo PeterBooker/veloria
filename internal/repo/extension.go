@@ -46,8 +46,6 @@ type Indexable interface {
 type IndexedExtension struct {
 	idx *index.Index
 	mu  sync.RWMutex
-
-	updateMu sync.RWMutex
 }
 
 // NewIndexedExtension creates a new IndexedExtension.
@@ -73,23 +71,8 @@ func (ie *IndexedExtension) HasIndex() bool {
 	return ie.idx != nil
 }
 
-func (ie *IndexedExtension) LockUpdates() {
-	ie.updateMu.Lock()
-}
-
-func (ie *IndexedExtension) UnlockUpdates() {
-	ie.updateMu.Unlock()
-}
-
 // Search searches the extension's index for the given term.
-// If the extension is currently being re-indexed, it returns nil to avoid
-// blocking the search on a long-running indexer subprocess.
 func (ie *IndexedExtension) Search(term string, opt *index.SearchOptions) (*index.SearchResponse, error) {
-	if !ie.updateMu.TryRLock() {
-		return nil, nil // extension is being re-indexed, skip
-	}
-	defer ie.updateMu.RUnlock()
-
 	ie.mu.RLock()
 	idx := ie.idx
 	ie.mu.RUnlock()
@@ -102,15 +85,7 @@ func (ie *IndexedExtension) Search(term string, opt *index.SearchOptions) (*inde
 }
 
 // SearchCompiled searches the extension's index using pre-compiled patterns.
-// Uses TryRLock to avoid blocking on extensions being re-indexed — if the
-// update lock is held, the extension is skipped rather than stalling the
-// entire search worker pool.
 func (ie *IndexedExtension) SearchCompiled(cs *index.CompiledSearch) (*index.SearchResponse, error) {
-	if !ie.updateMu.TryRLock() {
-		return nil, nil // extension is being re-indexed, skip
-	}
-	defer ie.updateMu.RUnlock()
-
 	ie.mu.RLock()
 	idx := ie.idx
 	ie.mu.RUnlock()
