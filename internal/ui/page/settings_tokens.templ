@@ -1,0 +1,107 @@
+package page
+
+import (
+	"veloria/internal/ui"
+	"veloria/internal/ui/icon"
+	"veloria/internal/ui/layout"
+)
+
+templ SettingsTokens(data ui.TokensPageData) {
+	@layout.Base(data.PageData) {
+		<div class="mb-6 pt-8 lg:pt-10">
+			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">API Tokens</h1>
+			<p class="text-sm text-text-body">Create tokens to authenticate MCP clients with your Veloria account. Searches made with your token will appear in your <a href="/searches/own" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">My Searches</a> list.</p>
+		</div>
+		<div class="max-w-2xl space-y-8">
+			if data.NewRawToken != "" {
+				@newTokenBanner(data.NewRawToken)
+			}
+			if data.Error != "" {
+				<div class="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+					{ data.Error }
+				</div>
+			}
+			<!-- Create Token Form -->
+			<div class="card-glass rounded-2xl p-6">
+				<h2 class="text-lg font-semibold text-text-bright mb-4">Create new token</h2>
+				<form method="POST" action="/settings/tokens" class="flex flex-col sm:flex-row gap-3">
+					<input
+						type="text"
+						name="name"
+						placeholder="Token name (e.g. Claude Desktop)"
+						maxlength="100"
+						required
+						class="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-text-bright placeholder:text-text-subtle focus:outline-none focus:ring-2 focus:ring-neon-cyan/40 transition"
+					/>
+					<button type="submit" class="shrink-0 rounded-xl bg-neon-cyan/20 border border-neon-cyan/30 px-5 py-2.5 text-sm font-medium text-neon-cyan hover:bg-neon-cyan/30 transition">
+						Create token
+					</button>
+				</form>
+			</div>
+			<!-- Token List -->
+			if len(data.Tokens) > 0 {
+				<div class="card-glass rounded-2xl overflow-hidden">
+					<div class="px-6 py-4 border-b border-white/[0.08]">
+						<h2 class="text-lg font-semibold text-text-bright">Your tokens</h2>
+					</div>
+					<div class="divide-y divide-white/[0.06]">
+						for _, token := range data.Tokens {
+							<div class="flex items-center justify-between px-6 py-4 group">
+								<div class="flex items-center gap-3 min-w-0">
+									<span class="text-text-subtle shrink-0">
+										@icon.Key(16)
+									</span>
+									<div class="min-w-0">
+										<div class="text-sm font-medium text-text-bright truncate">{ token.Name }</div>
+										<div class="text-xs text-text-subtle font-mono mt-0.5">
+											{ "vel_..." + token.Suffix }
+											<span class="text-text-subtle/60 ml-2">
+												if token.LastUsedAt != nil {
+													{ "Last used " + token.LastUsedAt.Format("Jan 2, 2006") }
+												} else {
+													Never used
+												}
+											</span>
+										</div>
+									</div>
+								</div>
+								<button
+									hx-delete={ "/settings/tokens/" + token.ID.String() }
+									hx-confirm="Delete this API token? Any MCP clients using it will lose access."
+									class="shrink-0 p-2 rounded-lg text-text-subtle hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition"
+									title="Delete token"
+								>
+									@icon.Trash(16)
+								</button>
+							</div>
+						}
+					</div>
+				</div>
+			} else {
+				<div class="card-glass rounded-2xl px-6 py-10 text-center">
+					<span class="text-text-subtle">
+						@icon.Key(32)
+					</span>
+					<p class="text-sm text-text-subtle mt-3">No API tokens yet. Create one to authenticate your MCP client.</p>
+				</div>
+			}
+		</div>
+	}
+}
+
+templ newTokenBanner(rawToken string) {
+	<div class="rounded-xl border border-neon-cyan/30 bg-neon-cyan/10 px-5 py-4">
+		<p class="text-sm font-semibold text-neon-cyan mb-2">Token created — copy it now, it won't be shown again</p>
+		<div class="flex items-center gap-2">
+			<code id="new-token-value" class="flex-1 rounded-lg bg-black/30 px-3 py-2 text-sm font-mono text-text-bright break-all select-all">{ rawToken }</code>
+			<button
+				type="button"
+				onclick="navigator.clipboard.writeText(document.getElementById('new-token-value').textContent).then(function(){var b=event.currentTarget;b.classList.add('text-green-400');setTimeout(function(){b.classList.remove('text-green-400')},1500)})"
+				class="shrink-0 p-2 rounded-lg text-text-subtle hover:text-neon-cyan transition"
+				title="Copy to clipboard"
+			>
+				@icon.Copy(18)
+			</button>
+		</div>
+	</div>
+}

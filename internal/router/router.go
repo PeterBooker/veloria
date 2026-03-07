@@ -14,6 +14,7 @@ import (
 	"veloria/assets"
 	"veloria/internal/admin"
 	api "veloria/internal/api"
+	"veloria/internal/auth"
 	"veloria/internal/core"
 	ogimage "veloria/internal/image"
 	veloriamd "veloria/internal/middleware"
@@ -21,6 +22,7 @@ import (
 	"veloria/internal/report"
 	"veloria/internal/search"
 	"veloria/internal/service"
+	"veloria/internal/settings"
 	"veloria/internal/theme"
 	"veloria/internal/web"
 )
@@ -150,6 +152,14 @@ func New(deps RouterDeps) *chi.Mux {
 		// Report a search (requires login - dynamically checked)
 		r.With(dynamicRequireAuth(reg)).Post("/search/{uuid}/report", report.SubmitReport(deps.WebDeps))
 
+		// Settings routes (requires login)
+		r.Route("/settings", func(r chi.Router) {
+			r.Use(dynamicRequireAuth(reg))
+			r.Get("/tokens", settings.TokensPage(deps.WebDeps))
+			r.Post("/tokens", settings.CreateToken(deps.WebDeps))
+			r.Delete("/tokens/{id}", settings.DeleteToken(deps.WebDeps))
+		})
+
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
 			r.Use(dynamicRequireAuth(reg))
@@ -165,12 +175,14 @@ func New(deps RouterDeps) *chi.Mux {
 
 	// MCP (Model Context Protocol) endpoint - dynamically resolved.
 	// Exempt from handler timeout (streaming transport) with extended write deadline.
+	// Bearer token auth is optional — unauthenticated access still allowed.
 	if opts.MCPEnabled {
 		mcpHandler := dynamicMCPHandler(reg)
+		bearerAuth := auth.BearerTokenMiddleware(reg.DB)
 		if opts.RateLimitEnabled {
-			r.With(mcpWriteDeadline, httprate.LimitByIP(100, time.Minute)).Mount("/mcp", mcpHandler)
+			r.With(mcpWriteDeadline, bearerAuth, httprate.LimitByIP(100, time.Minute)).Mount("/mcp", mcpHandler)
 		} else {
-			r.With(mcpWriteDeadline).Mount("/mcp", mcpHandler)
+			r.With(mcpWriteDeadline, bearerAuth).Mount("/mcp", mcpHandler)
 		}
 	}
 
