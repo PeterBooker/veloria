@@ -295,7 +295,7 @@ func extractBeforeContext(buf []byte, lineStart int, n int) []string {
 		if j := bytes.LastIndexByte(buf[:end], '\n'); j >= 0 {
 			start = j + 1
 		}
-		lines = append(lines, strings.ToValidUTF8(string(buf[start:end]), "\uFFFD"))
+		lines = append(lines, string(buf[start:end]))
 		end = start
 		if end > 0 {
 			end-- // skip \n before this line
@@ -321,11 +321,11 @@ func extractAfterContext(buf []byte, lineEnd int, n int) []string {
 		nlIdx := bytes.IndexByte(buf[pos:], '\n')
 		if nlIdx < 0 {
 			if pos < len(buf) {
-				lines = append(lines, strings.ToValidUTF8(string(buf[pos:]), "\uFFFD"))
+				lines = append(lines, string(buf[pos:]))
 			}
 			break
 		}
-		lines = append(lines, strings.ToValidUTF8(string(buf[pos:pos+nlIdx]), "\uFFFD"))
+		lines = append(lines, string(buf[pos:pos+nlIdx]))
 		pos = pos + nlIdx + 1
 	}
 	return lines
@@ -541,9 +541,8 @@ func grepData(buf []byte, re *cregexp.Regexp, fre *regexp.Regexp, contextLines i
 		// Track line numbers
 		lineno += countNL(buf[chunkStart:lineStart])
 
-		// Extract matched line without trailing newline/CR.
-		// Replace invalid UTF-8 so proto3 string marshaling never fails.
-		line := strings.ToValidUTF8(string(bytes.TrimRight(buf[lineStart:lineEnd], "\r\n")), "\uFFFD")
+		// Extract matched line without trailing newline/CR
+		line := string(bytes.TrimRight(buf[lineStart:lineEnd], "\r\n"))
 		line = truncateMatchLine(line, fre)
 
 		match := &Match{
