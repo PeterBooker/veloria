@@ -1,7 +1,7 @@
 # Claude Code Agent Instructions for Veloria
 
 **System:** Veloria - Code Search Engine for the WordPress Ecosystem
-**Tech Stack:** Go 1.26.0, PostgreSQL 17, MinIO/S3, google/codesearch
+**Tech Stack:** Go 1.26.0, PostgreSQL 17, MinIO/S3, trigram search (forked google/codesearch)
 **Status:** Production - High-Performance Search Service
 
 ---
@@ -93,6 +93,11 @@ Skills are defined in [.claude/skills/](.claude/skills/) and invoked with `/skil
 | [/profile](.claude/skills/profile/SKILL.md) | CPU and memory profiling with pprof | Investigating high resource usage |
 | [/race-check](.claude/skills/race-check/SKILL.md) | Detect data races in concurrent code | After changes to mutexes/goroutines |
 | [/migrate](.claude/skills/migrate/SKILL.md) | Create and manage database migrations | Schema changes, new tables/indexes |
+| [/lint](.claude/skills/lint/SKILL.md) | Run golangci-lint | Code quality checks |
+| [/security-scan](.claude/skills/security-scan/SKILL.md) | Run gosec security scanner | Before committing security-sensitive code |
+| [/generate](.claude/skills/generate/SKILL.md) | Run go generate | After templ/frontend/protobuf changes |
+| [/integration-test](.claude/skills/integration-test/SKILL.md) | Run integration tests | After DB/API/storage changes |
+| [/reindex](.claude/skills/reindex/SKILL.md) | Queue a reindex for an extension | Testing indexing changes |
 
 ### /benchmark
 
@@ -158,7 +163,7 @@ Create and manage database migrations with goose.
 ### System Purpose
 
 Veloria provides:
-1. **Index Management** - Trigram-based code indexes using google/codesearch
+1. **Index Management** - Trigram-based code indexes (forked from google/codesearch)
 2. **Hot-Swap Updates** - Zero-downtime index updates
 3. **REST API** - Search and metadata endpoints
 4. **Web UI** - Browse repositories and execute searches
@@ -171,7 +176,7 @@ Veloria provides:
 | Language | Go 1.26.0 (min 1.26.0) |
 | Router | chi/v5 |
 | Database | PostgreSQL 17 (GORM) |
-| Search Engine | google/codesearch (trigram) |
+| Search Engine | Trigram indexing (forked from google/codesearch, in `internal/codesearch/`) |
 | Object Storage | MinIO/S3 |
 | Cache | Ristretto |
 | Logging | zap |
@@ -188,6 +193,7 @@ Veloria provides:
 | `internal/repo` | Thread-safe repository with index management |
 | `internal/index` | Trigram index wrapper (google/codesearch) |
 | `internal/plugin`, `theme`, `core`, `search` | HTTP handlers per domain |
+| `internal/report` | Search report/flagging handlers |
 | `internal/service` | Service registry for dynamic dependency resolution |
 | `internal/storage` | S3 result storage with compression |
 | `internal/cache` | Ristretto cache wrapper |
@@ -224,7 +230,7 @@ Veloria provides:
 ```
 veloria/
 ├── cmd/                           # Entry points
-│   ├── veloria/                   # Single binary (serve, index, migrate, wipe, maintenance, version)
+│   ├── veloria/                   # Single binary (serve, index, migrate, wipe, maintenance, user, reindex, stats, version)
 │   └── veloria-converter/         # One-off converter utility
 │
 ├── internal/                      # Core application code
@@ -442,7 +448,7 @@ When adding new Tailwind classes in templates, they are automatically picked up 
 ### Development Environment
 
 ```bash
-# Start dependencies
+# Start dev stack (PostgreSQL, MinIO, Mailpit, Grafana observability)
 docker compose up -d
 
 # Build frontend assets (required after CSS/template changes)
@@ -452,7 +458,7 @@ go generate ./assets/...
 go run ./cmd/veloria
 
 # Index a single extension (subprocess mode)
-go run ./cmd/veloria index --type=plugin --slug=akismet
+go run ./cmd/veloria index --repo=plugins --slug=akismet --zipurl=https://downloads.wordpress.org/plugin/akismet.zip
 
 # Run migrations
 go run ./cmd/veloria migrate up
@@ -696,7 +702,16 @@ Available at `/metrics`:
 - `http_response_time_seconds` - Request latency histogram
 - `search_queue_size` - Current search queue depth
 - `searches_completed_total` - Completed searches counter
-- `plugins_count`, `themes_count`, `cores_count` - Repository sizes
+- `search_count` - Total searches counter
+- `search_duration_seconds` - Search latency histogram
+- `plugin_count`, `theme_count`, `core_count` - Repository sizes (gauges)
+- `indexing_tasks_total` - Indexing tasks counter
+- `indexing_task_duration_seconds` - Indexing task latency histogram
+- `mcp_tool_use_count`, `mcp_tool_use_duration_seconds` - MCP tool usage
+- `circuit_breaker_state_changes_total` - Circuit breaker transitions
+- `indexer_adhoc_queue_length` - Adhoc reindex queue depth
+- `datasource_consecutive_failures` - Per-datasource failure count
+- `datasource_last_success_timestamp` - Per-datasource last success
 
 ### Health Checks
 
