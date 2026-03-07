@@ -247,7 +247,12 @@ func flushQuiet(ix *cindex.IndexWriter) {
 
 // IndexDirToFile creates a trigram index from indexSrc and writes it to trigramsPath.
 // Only files with extensions in indexableExtensions() are added to the index.
-func IndexDirToFile(indexSrc string, trigramsPath string) *cindex.IndexWriter {
+//
+// If storePath is non-empty, file paths stored in the index use storePath as
+// their prefix instead of indexSrc. This allows building the index from a
+// staging directory while recording the final production paths, so the index
+// is ready to use immediately after an atomic rename of the source directory.
+func IndexDirToFile(indexSrc string, trigramsPath string, storePath string) *cindex.IndexWriter {
 	// Ensure parent directory exists and "touch" the trigrams file.
 	if err := os.MkdirAll(filepath.Dir(trigramsPath), 0o750); err != nil {
 		log.Fatalf("failed to create index directory %q: %v", filepath.Dir(trigramsPath), err)
@@ -268,41 +273,61 @@ func IndexDirToFile(indexSrc string, trigramsPath string) *cindex.IndexWriter {
 
 	textExts := indexableExtensions()
 
+	// Use storePath for paths recorded in the index; fall back to indexSrc.
+	rootPath := indexSrc
+	if storePath != "" {
+		rootPath = storePath
+	}
+
 	var roots []cindex.Path
-	roots = append(roots, cindex.MakePath(filepath.Join(indexSrc)))
+	roots = append(roots, cindex.MakePath(filepath.Join(rootPath)))
 	ix.AddRoots(roots)
 
-	for _, root := range roots {
-		if err := filepath.Walk(root.String(), func(path string, info os.FileInfo, err error) error {
-			if _, elem := filepath.Split(path); elem != "" {
-				// Skip temporary or hidden files/dirs.
-				if elem[0] == '.' || elem[0] == '#' || elem[0] == '~' || elem[len(elem)-1] == '~' {
-					if info.IsDir() {
-						return filepath.SkipDir
-					}
-					return nil
+	walkRoot := filepath.Join(indexSrc)
+	if err := filepath.Walk(walkRoot, func(path string, info os.FileInfo, err error) error {
+		if _, elem := filepath.Split(path); elem != "" {
+			// Skip temporary or hidden files/dirs.
+			if elem[0] == '.' || elem[0] == '#' || elem[0] == '~' || elem[len(elem)-1] == '~' {
+				if info.IsDir() {
+					return filepath.SkipDir
 				}
+				return nil
 			}
+		}
 
-			if err != nil {
-				log.Printf("%s: %s", path, err)
+		if err != nil {
+			log.Printf("%s: %s", path, err)
+			return nil
+		}
+
+		if info != nil && info.Mode()&os.ModeType == 0 {
+			// Only index files with known text extensions.
+			ext := strings.ToLower(filepath.Ext(path))
+			if !textExts[ext] {
 				return nil
 			}
 
-			if info != nil && info.Mode()&os.ModeType == 0 {
-				// Only index files with known text extensions.
-				ext := strings.ToLower(filepath.Ext(path))
-				if !textExts[ext] {
+			// Rewrite the stored path to use the final directory.
+			indexedPath := path
+			if storePath != "" {
+				rel, relErr := filepath.Rel(indexSrc, path)
+				if relErr != nil {
+					log.Printf("failed to compute relative path from %q to %q: %v", indexSrc, path, relErr)
 					return nil
 				}
-				if err := ix.AddFile(path); err != nil {
-					return nil
-				}
+				indexedPath = filepath.Join(storePath, rel)
 			}
-			return nil
-		}); err != nil {
-			log.Printf("failed to walk %s: %v", root, err)
+
+			f, openErr := os.Open(path) // #nosec G304 -- path from internal index walk
+			if openErr != nil {
+				return nil
+			}
+			_ = ix.Add(indexedPath, f)
+			_ = f.Close()
 		}
+		return nil
+	}); err != nil {
+		log.Printf("failed to walk %s: %v", walkRoot, err)
 	}
 
 	flushQuiet(ix)

@@ -3,6 +3,7 @@ package index
 import (
 	"fmt"
 	"regexp/syntax"
+	"slices"
 )
 
 // getRegexpPattern wraps a pattern with regex flags.
@@ -39,10 +40,5 @@ func hasEmptyCapture(re *syntax.Regexp) bool {
 			return true
 		}
 	}
-	for _, sub := range re.Sub {
-		if hasEmptyCapture(sub) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(re.Sub, hasEmptyCapture)
 }
