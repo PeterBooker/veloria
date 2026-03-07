@@ -567,7 +567,7 @@ func searchCacheKey(repoType string, term string, params *SearchParams) string {
 }
 
 // Search searches the specified source for the given term.
-func (m *Manager) Search(repoType string, term string, params *SearchParams) (*SearchResponse, error) {
+func (m *Manager) Search(ctx context.Context, repoType string, term string, params *SearchParams) (*SearchResponse, error) {
 	if params == nil {
 		params = &SearchParams{}
 	}
@@ -598,7 +598,7 @@ func (m *Manager) Search(repoType string, term string, params *SearchParams) (*S
 		MaxResults:        100,
 	}
 
-	results, err := ds.Search(term, opt, params.OnProgress)
+	results, err := ds.Search(ctx, term, opt, params.OnProgress)
 	if err != nil {
 		return nil, err
 	}

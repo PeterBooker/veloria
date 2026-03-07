@@ -108,7 +108,7 @@ func (s *DirectService) Search(ctx context.Context, params SearchParams) (string
 	}
 	defer releaseSearchSlot()
 
-	results, err := s.manager.Search(params.Repo, params.Query, &manager.SearchParams{
+	results, err := s.manager.Search(ctx, params.Repo, params.Query, &manager.SearchParams{
 		FileMatch:        params.FileMatch,
 		ExcludeFileMatch: params.ExcludeFileMatch,
 		CaseInsensitive:  !params.CaseSensitive,

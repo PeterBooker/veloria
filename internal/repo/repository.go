@@ -360,7 +360,7 @@ func (r *ExtensionStore[T]) UpdateIndex(idx *index.Index, slug string) error {
 // and searches extensions concurrently with a worker pool.
 // If progressFn is non-nil, it is called after each extension is searched
 // with the number of extensions searched so far and the total count.
-func (r *ExtensionStore[T]) Search(term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error) {
+func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error) {
 	// Compile search patterns once for reuse across all extensions
 	cs, err := index.CompileSearch(term, opt)
 	if err != nil {
@@ -400,8 +400,18 @@ func (r *ExtensionStore[T]) Search(term string, opt *index.SearchOptions, progre
 		if totalMatches.Load() >= globalMatchCap {
 			break
 		}
+		if ctx.Err() != nil {
+			break
+		}
 
-		sem <- struct{}{}
+		select {
+		case <-ctx.Done():
+		case sem <- struct{}{}:
+		}
+
+		if ctx.Err() != nil {
+			break
+		}
 
 		if totalMatches.Load() >= globalMatchCap {
 			<-sem
@@ -452,6 +462,10 @@ func (r *ExtensionStore[T]) Search(term string, opt *index.SearchOptions, progre
 	}
 
 	wg.Wait()
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	return results, nil
 }

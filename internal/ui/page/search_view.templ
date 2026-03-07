@@ -168,8 +168,20 @@ templ searchContentInner(data ui.SearchViewData) {
 				<path d="M8 11h6"></path>
 			</svg>
 		}
+	} else if data.Search.Status == searchmodel.StatusFailed {
+		<!-- Failed State -->
+		<div class="glass-inner text-center py-12 lg:py-16">
+			<div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-red-500/10 border border-red-500/20 mb-4 lg:mb-6">
+				@icon.Close(40)
+			</div>
+			<h3 class="text-xl lg:text-2xl text-text-body mb-2">Search failed</h3>
+			<p class="text-text-muted text-sm lg:text-base mb-6">This search could not be completed. It may have timed out or encountered an unexpected error.</p>
+			<a href="/" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-text-bright bg-white/5 border border-white/10 rounded-lg hover:bg-white/[0.08] transition">
+				Try a new search
+			</a>
+		</div>
 	} else {
-		<!-- Processing/Unavailable State -->
+		<!-- Processing/Queued State -->
 		<div class="glass-inner text-center py-12 lg:py-16">
 			<div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/5 border border-white/10 mb-4 lg:mb-6">
 				@icon.Spinner(40)

@@ -135,8 +135,11 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 func runAPISearchAsync(db *gorm.DB, m *manager.Manager, s3 storage.ResultStorage, searchID uuid.UUID, req SearchRequest) {
 	db.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusProcessing)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
 	searchStart := time.Now()
-	results, err := m.Search(req.Repo, req.Term, &manager.SearchParams{
+	results, err := m.Search(ctx, req.Repo, req.Term, &manager.SearchParams{
 		FileMatch:        req.FileMatch,
 		ExcludeFileMatch: req.ExcludeFileMatch,
 		CaseInsensitive:  !req.CaseSensitive,
