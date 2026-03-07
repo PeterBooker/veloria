@@ -1,6 +1,7 @@
 package manager_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -32,7 +33,7 @@ func newTestManager(t *testing.T, sources ...repo.DataSource) *manager.Manager {
 func TestSearch_UnknownType(t *testing.T) {
 	m := newTestManager(t)
 
-	_, err := m.Search("nonexistent", "term", nil)
+	_, err := m.Search(context.Background(), "nonexistent", "term", nil)
 	if err == nil {
 		t.Fatal("expected error for unknown extension type")
 	}
@@ -41,13 +42,13 @@ func TestSearch_UnknownType(t *testing.T) {
 func TestSearch_EmptyResults(t *testing.T) {
 	ds := &testutil.FakeDataSource{
 		TypeVal: repo.TypePlugins,
-		SearchFunc: func(_ string, _ *index.SearchOptions, _ func(int, int)) ([]*repo.SearchResult, error) {
+		SearchFunc: func(_ context.Context, _ string, _ *index.SearchOptions, _ func(int, int)) ([]*repo.SearchResult, error) {
 			return nil, nil
 		},
 	}
 
 	m := newTestManager(t, ds)
-	resp, err := m.Search("plugins", "missing-term", nil)
+	resp, err := m.Search(context.Background(), "plugins", "missing-term", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -67,7 +68,7 @@ func TestSearch_SortsByActiveInstalls(t *testing.T) {
 
 	ds := &testutil.FakeDataSource{
 		TypeVal: repo.TypePlugins,
-		SearchFunc: func(_ string, _ *index.SearchOptions, _ func(int, int)) ([]*repo.SearchResult, error) {
+		SearchFunc: func(_ context.Context, _ string, _ *index.SearchOptions, _ func(int, int)) ([]*repo.SearchResult, error) {
 			return []*repo.SearchResult{
 				{Extension: p1, Matches: []*index.FileMatch{{Filename: "a.php", Matches: []*index.Match{{}}}}},
 				{Extension: p2, Matches: []*index.FileMatch{{Filename: "b.php", Matches: []*index.Match{{}}}}},
@@ -76,7 +77,7 @@ func TestSearch_SortsByActiveInstalls(t *testing.T) {
 	}
 
 	m := newTestManager(t, ds)
-	resp, err := m.Search("plugins", "test", nil)
+	resp, err := m.Search(context.Background(), "plugins", "test", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

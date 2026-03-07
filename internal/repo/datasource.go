@@ -1,6 +1,10 @@
 package repo
 
-import "veloria/internal/index"
+import (
+	"context"
+
+	"veloria/internal/index"
+)
 
 // DataSource abstracts what the Manager needs from each extension store.
 // Defined in the repo package (where the implementations live) rather than
@@ -11,7 +15,7 @@ type DataSource interface {
 	Load() error
 	Stats() (total int, indexed int)
 	IndexStatus() map[string]bool
-	Search(term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error)
+	Search(ctx context.Context, term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error)
 	PrepareUpdates() ([]IndexTask, error)
 	ResumeUnindexed() []IndexTask
 	GetExtension(slug string) (Extension, bool)

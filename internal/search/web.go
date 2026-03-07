@@ -345,7 +345,10 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 	d.DB().Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusProcessing)
 	defer d.Progress.Delete(searchID)
 
-	results, err := d.Search().Search(repo, term, &manager.SearchParams{
+	searchCtx, searchCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer searchCancel()
+
+	results, err := d.Search().Search(searchCtx, repo, term, &manager.SearchParams{
 		FileMatch:        fileMatch,
 		ExcludeFileMatch: excludeMatch,
 		CaseInsensitive:  caseInsensitive,

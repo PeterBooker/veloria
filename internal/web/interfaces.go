@@ -1,12 +1,14 @@
 package web
 
 import (
+	"context"
+
 	"veloria/internal/manager"
 )
 
 // SearchService performs code searches across extension stores.
 type SearchService interface {
-	Search(repoType string, term string, params *manager.SearchParams) (*manager.SearchResponse, error)
+	Search(ctx context.Context, repoType string, term string, params *manager.SearchParams) (*manager.SearchResponse, error)
 }
 
 // ReindexService queues ad-hoc re-index tasks.
