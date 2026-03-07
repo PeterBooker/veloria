@@ -322,10 +322,42 @@ templ Docs(pd ui.PageData) {
 							</code>
 						</div>
 					</div>
+					<!-- Authentication -->
+					<div class="mb-6">
+						<h3 class="text-xl font-semibold text-neon-purple mb-3">Authentication (Optional)</h3>
+						<p class="text-sm text-text-body leading-relaxed mb-3">
+							The MCP endpoint works without authentication, but you can optionally log in to link searches to your account. Authenticated searches appear in your <a href="/searches/own" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">My Searches</a> list.
+						</p>
+						<ol class="list-decimal list-inside space-y-2 text-sm text-text-body leading-relaxed mb-3">
+							<li>Log in to Veloria via GitHub, GitLab, or Atlassian</li>
+							<li>Go to <a href="/settings/tokens" class="text-neon-cyan hover:text-neon-cyan/80 underline underline-offset-2">Settings &rarr; API Tokens</a> and create a token</li>
+							<li>Add the token to your MCP client configuration as a Bearer token</li>
+						</ol>
+						<p class="text-sm text-text-body leading-relaxed mb-3">
+							<strong class="text-text-bright font-semibold">Claude Desktop</strong> — add <code class="text-neon-cyan font-mono text-xs">headers</code> to your config:
+						</p>
+						<div class="docs-code mb-3">
+							<code>
+								@templ.Raw(`{"mcpServers": {"veloria": {"type": "streamable-http", "url": "https://veloria.dev/mcp", "headers": {"Authorization": "Bearer vel_YOUR_TOKEN"}}}}`)
+							</code>
+						</div>
+						<p class="text-sm text-text-body leading-relaxed mb-3">
+							<strong class="text-text-bright font-semibold">Claude Code:</strong>
+						</p>
+						<div class="docs-code mb-3"><code>claude mcp add --transport http --header "Authorization: Bearer vel_YOUR_TOKEN" veloria https://veloria.dev/mcp</code></div>
+						<p class="text-sm text-text-body leading-relaxed mb-3">
+							<strong class="text-text-bright font-semibold">VS Code Copilot</strong> — add <code class="text-neon-cyan font-mono text-xs">headers</code> to your settings:
+						</p>
+						<div class="docs-code mb-3">
+							<code>
+								@templ.Raw(`{"mcp": {"servers": {"veloria": {"type": "http", "url": "https://veloria.dev/mcp", "headers": {"Authorization": "Bearer vel_YOUR_TOKEN"}}}}}`)
+							</code>
+						</div>
+					</div>
 					<!-- Note -->
 					<div class="glass-inner rounded-xl p-4">
 						<p class="text-sm text-text-muted leading-relaxed">
-							<strong class="text-neon-gold font-semibold">Note:</strong> The remote server at <code class="text-neon-cyan font-mono text-xs">https://veloria.dev/mcp</code> requires no API keys or additional configuration.
+							<strong class="text-neon-gold font-semibold">Note:</strong> Authentication is optional. The remote server at <code class="text-neon-cyan font-mono text-xs">https://veloria.dev/mcp</code> works without any API keys — tokens are only needed to link searches to your account.
 						</p>
 					</div>
 				</section>

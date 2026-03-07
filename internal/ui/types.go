@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"veloria/internal/auth"
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/user"
@@ -246,4 +247,12 @@ type ExtensionData struct {
 	FileCount        int
 	TotalSize        int64
 	LargestFiles     []FileStat
+}
+
+// TokensPageData contains data for the API tokens settings page.
+type TokensPageData struct {
+	PageData
+	Tokens      []auth.APIToken
+	NewRawToken string // shown once after creation
+	Error       string
 }
