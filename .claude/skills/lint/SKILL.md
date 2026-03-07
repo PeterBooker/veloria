@@ -1,9 +1,8 @@
 ---
 name: lint
 description: Run golangci-lint and static analysis on Go code. Use before pushing or to check code quality.
-disable-model-invocation: true
-argument-hint: [package-path]
-allowed-tools: Bash(golangci-lint *, go install ./..., go vet *), Read, Glob, Grep
+disable-model-invocation: false
+argument-hint: "package-path"
 ---
 
 # Go Linting
@@ -17,12 +16,7 @@ Run golangci-lint to check code quality and catch issues before CI.
 
 ## Steps
 
-1. **Ensure binary is current**
-   ```bash
-   go install ./...
-   ```
-
-2. **Run golangci-lint**
+1. **Run golangci-lint**
    ```bash
    golangci-lint run $ARGUMENTS 2>&1
    ```
@@ -63,13 +57,13 @@ Run golangci-lint to check code quality and catch issues before CI.
 
 ## Configuration
 
-The project uses `.golangci.yml` in the repo root. Current exclusions:
-- `internal/codesearch` - excluded from linting and formatting
+The project uses `.golangci.yml` in the repo root. Read this file to understand which linters are enabled/disabled before interpreting results.
+
+Current exclusions:
+- `internal/codesearch/` - excluded from linting and formatting (forked upstream code)
 
 ## CI Alignment
 
-The CI pipeline runs:
-- `go vet ./...`
-- `gosec` (see `/security-scan` skill)
+The CI pipeline runs `golangci-lint`, `go vet ./...`, and `gosec` (see `/security-scan` skill).
 
 Running `/lint` locally before pushing catches most CI failures.

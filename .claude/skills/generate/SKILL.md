@@ -2,7 +2,6 @@
 name: generate
 description: Run go generate to build templ templates and frontend assets. Use after changing templates or CSS/JS.
 disable-model-invocation: true
-allowed-tools: Bash(go generate *, go install ./..., npm *), Read, Glob, Grep
 ---
 
 # Generate Assets
@@ -60,6 +59,7 @@ Run `/generate` after changing:
 
 - Node.js and npm must be available
 - npm dependencies are installed automatically by the generate step
+- `templ` CLI must be installed (`go install github.com/a-h/templ/cmd/templ@latest` if missing)
 
 ## CI Alignment
 

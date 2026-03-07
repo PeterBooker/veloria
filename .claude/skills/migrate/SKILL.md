@@ -2,8 +2,7 @@
 name: migrate
 description: Create and manage database migrations using goose. Use for schema changes, new tables, or index optimization.
 disable-model-invocation: true
-argument-hint: [create|up|down|status|validate] [name]
-allowed-tools: Bash(go install ./..., veloria *, goose *, ls *), Read, Glob, Grep, Write
+argument-hint: "create|up|down|status|validate name"
 ---
 
 # Database Migration Management
