@@ -169,6 +169,7 @@ func persistSearchResults(db *gorm.DB, s3 storage.ResultStorage, searchID uuid.U
 	protoResults := searchmodel.SearchResponseToProto(results)
 	size, err := s3.UploadResult(ctx, searchID.String(), protoResults)
 	if err != nil {
+		slog.Error("search result upload failed", "id", searchID, "error", err)
 		db.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
 		return
 	}
