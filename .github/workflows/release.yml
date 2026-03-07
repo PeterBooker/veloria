@@ -43,7 +43,6 @@ jobs:
         run: |
           LDFLAGS="-s -w -X veloria/internal/config.Version=${{ steps.version.outputs.version }}"
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria ./cmd/veloria
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="${LDFLAGS}" -o veloria-converter ./cmd/veloria-converter
 
       - name: Deploy to production
         env:
@@ -57,22 +56,17 @@ jobs:
           ssh-keyscan -H "${HOST}" >> ~/.ssh/known_hosts
 
           rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria "${USER}@${HOST}:/opt/veloria/veloria.new"
-          rsync -avz -e "ssh -i ~/.ssh/deploy_key" veloria-converter "${USER}@${HOST}:/opt/veloria/veloria-converter.new"
 
           ssh -i ~/.ssh/deploy_key "${USER}@${HOST}" << 'ENDSSH'
             set -e
             cd /opt/veloria
 
             chmod +x veloria.new
-            chmod +x veloria-converter.new
 
-            # Back up current binaries
-            for bin in veloria veloria-converter; do
-              [ -f "$bin" ] && cp "$bin" "$bin.prev"
-            done
+            # Back up current binary
+            [ -f veloria ] && cp veloria veloria.prev
 
             mv veloria.new veloria
-            mv veloria-converter.new veloria-converter
 
             sudo systemctl restart veloria
             sleep 3
