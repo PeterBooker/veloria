@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
+	"veloria/internal/index"
 	"veloria/internal/manager"
 	"veloria/internal/repo"
 	searchmodel "veloria/internal/search/model"
@@ -98,6 +99,10 @@ func NewDirectService(m *manager.Manager, db *gorm.DB, s3 storage.ResultStorage)
 }
 
 func (s *DirectService) Search(ctx context.Context, params SearchParams) (string, *SearchResponse, error) {
+	if err := index.ValidatePattern(params.Query); err != nil {
+		return "", nil, fmt.Errorf("invalid regex pattern: %w", err)
+	}
+
 	if err := acquireSearchSlot(ctx); err != nil {
 		return "", nil, fmt.Errorf("search queue full, try again later")
 	}
