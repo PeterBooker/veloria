@@ -443,6 +443,9 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 				r.l.Warn("Failed to search extension", zap.String("slug", e.GetSlug()), zap.Error(err))
 				return
 			}
+			if resp == nil {
+				return
+			}
 
 			if len(resp.Matches) > 0 {
 				matchCount := int64(0)

@@ -251,7 +251,11 @@ func TestValidatePattern(t *testing.T) {
 	}{
 		{"simple literal", "exec", false},
 		{"escaped parens", `exec\(\)`, false},
-		{"bare parens (valid empty group)", "exec()", false},
+		{"bare parens (empty capture)", "exec()", true},
+		{"multiple empty captures", "foo()bar()", true},
+		{"nested empty capture", "foo(())", true},
+		{"non-empty capture", "(foo)", false},
+		{"capture with alternation", "(foo|bar)", false},
 		{"unmatched close paren", `exec\()`, true},
 		{"escaped open paren (valid literal)", `exec\(`, false},
 		{"valid regex with alternation", `foo|bar`, false},
