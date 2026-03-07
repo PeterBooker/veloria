@@ -447,7 +447,7 @@ func (a *App) serveControlSocket(ln net.Listener) {
 }
 
 func (a *App) handleControlConn(conn net.Conn) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	var req ctlRequest

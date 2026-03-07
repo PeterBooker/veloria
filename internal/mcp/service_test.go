@@ -69,8 +69,12 @@ func TestReadFileRange_Gzip(t *testing.T) {
 	if _, err := gz.Write([]byte("alpha\nbeta\ngamma\n")); err != nil {
 		t.Fatal(err)
 	}
-	gz.Close()
-	f.Close()
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	lines, total, err := readFileRange(path, 1, 500)
 	if err != nil {
@@ -202,8 +206,12 @@ func TestGrepSingleFile_Gzip(t *testing.T) {
 	if _, err := gz.Write([]byte("alpha\nbeta\ngamma\n")); err != nil {
 		t.Fatal(err)
 	}
-	gz.Close()
-	f.Close()
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	re := regexp.MustCompile(`beta`)
 	matches, err := grepSingleFile(path, re, 0)

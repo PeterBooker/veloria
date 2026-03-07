@@ -30,7 +30,7 @@ func (c *ReindexCmd) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to control socket at %s: %w\nIs the server running?", sockPath, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	req := ctlRequest{

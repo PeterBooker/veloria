@@ -34,7 +34,7 @@ func (c *MigrateCmd) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	goose.SetBaseFS(migrations.FS)
 
