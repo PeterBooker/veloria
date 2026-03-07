@@ -16,32 +16,32 @@ import (
 var Version = "dev"
 
 type Config struct {
-	Name                   string        `env:"NAME" envDefault:"Veloria Core"`
-	Port                   int           `env:"PORT" envDefault:"9071" validate:"min=1,max=65535"`
-	Env                    string        `env:"ENV" envDefault:"development"`
-	WorkingDir             string        `envDefault:"/"`
-	DataDir                string        `env:"DATA_DIR" envDefault:"/etc/veloria/data" validate:"required"`
-	HTTPTimeout            int64         `env:"HTTP_TIMEOUT" envDefault:"2500"`
-	HTTPHandlerTimeout     time.Duration `env:"HTTP_HANDLER_TIMEOUT" envDefault:"30s"`
-	HTTPReadTimeout        time.Duration `env:"HTTP_READ_TIMEOUT" envDefault:"30s"`
-	HTTPReadHeaderTimeout  time.Duration `env:"HTTP_READ_HEADER_TIMEOUT" envDefault:"5s"`
-	HTTPWriteTimeout       time.Duration `env:"HTTP_WRITE_TIMEOUT" envDefault:"30s"`
-	HTTPIdleTimeout        time.Duration `env:"HTTP_IDLE_TIMEOUT" envDefault:"60s"`
-	HTTPShutdownTimeout    time.Duration `env:"HTTP_SHUTDOWN_TIMEOUT" envDefault:"10s"`
-	HTTPRateLimitEnabled   bool          `env:"HTTP_RATE_LIMIT_ENABLED" envDefault:"true"`
-	DBHost                 string        `env:"DB_HOST" envDefault:"localhost" validate:"required"`
-	DBPort                 int           `env:"DB_PORT" envDefault:"5432" validate:"min=1,max=65535"`
-	DBName                 string        `env:"DB_DATABASE" envDefault:"veloria" validate:"required"`
-	DBUser                 string        `env:"DB_USERNAME" envDefault:"root" validate:"required"`
-	DBPass                 string        `env:"DB_PASSWORD" envDefault:""`
-	DBSSLMode              string        `env:"DB_SSLMODE" envDefault:""`
-	DBTimeZone             string        `env:"DB_TIMEZONE" envDefault:""`
-	DBConnectTimeout       int           `env:"DB_CONNECT_TIMEOUT" envDefault:"5"`
-	DBPingTimeout          time.Duration `env:"DB_PING_TIMEOUT" envDefault:"3s"`
-	DBMaxIdleConns         int           `env:"DB_MAX_IDLE_CONNS" envDefault:"10"`
-	DBMaxOpenConns         int           `env:"DB_MAX_OPEN_CONNS" envDefault:"100"`
-	DBConnMaxIdleTime      time.Duration `env:"DB_CONN_MAX_IDLE_TIME" envDefault:"10m"`
-	DBConnMaxLifetime      time.Duration `env:"DB_CONN_MAX_LIFETIME" envDefault:"1h"`
+	Name                  string        `env:"NAME" envDefault:"Veloria Core"`
+	Port                  int           `env:"PORT" envDefault:"9071" validate:"min=1,max=65535"`
+	Env                   string        `env:"ENV" envDefault:"development"`
+	WorkingDir            string        `envDefault:"/"`
+	DataDir               string        `env:"DATA_DIR" envDefault:"/etc/veloria/data" validate:"required"`
+	HTTPTimeout           int64         `env:"HTTP_TIMEOUT" envDefault:"2500"`
+	HTTPHandlerTimeout    time.Duration `env:"HTTP_HANDLER_TIMEOUT" envDefault:"30s"`
+	HTTPReadTimeout       time.Duration `env:"HTTP_READ_TIMEOUT" envDefault:"30s"`
+	HTTPReadHeaderTimeout time.Duration `env:"HTTP_READ_HEADER_TIMEOUT" envDefault:"5s"`
+	HTTPWriteTimeout      time.Duration `env:"HTTP_WRITE_TIMEOUT" envDefault:"30s"`
+	HTTPIdleTimeout       time.Duration `env:"HTTP_IDLE_TIMEOUT" envDefault:"60s"`
+	HTTPShutdownTimeout   time.Duration `env:"HTTP_SHUTDOWN_TIMEOUT" envDefault:"10s"`
+	HTTPRateLimitEnabled  bool          `env:"HTTP_RATE_LIMIT_ENABLED" envDefault:"true"`
+	DBHost                string        `env:"DB_HOST" envDefault:"localhost" validate:"required"`
+	DBPort                int           `env:"DB_PORT" envDefault:"5432" validate:"min=1,max=65535"`
+	DBName                string        `env:"DB_DATABASE" envDefault:"veloria" validate:"required"`
+	DBUser                string        `env:"DB_USERNAME" envDefault:"root" validate:"required"`
+	DBPass                string        `env:"DB_PASSWORD" envDefault:""`
+	DBSSLMode             string        `env:"DB_SSLMODE" envDefault:""`
+	DBTimeZone            string        `env:"DB_TIMEZONE" envDefault:""`
+	DBConnectTimeout      int           `env:"DB_CONNECT_TIMEOUT" envDefault:"5"`
+	DBPingTimeout         time.Duration `env:"DB_PING_TIMEOUT" envDefault:"3s"`
+	DBMaxIdleConns        int           `env:"DB_MAX_IDLE_CONNS" envDefault:"10"`
+	DBMaxOpenConns        int           `env:"DB_MAX_OPEN_CONNS" envDefault:"100"`
+	DBConnMaxIdleTime     time.Duration `env:"DB_CONN_MAX_IDLE_TIME" envDefault:"10m"`
+	DBConnMaxLifetime     time.Duration `env:"DB_CONN_MAX_LIFETIME" envDefault:"1h"`
 	// S3/MinIO Configuration
 	S3Endpoint     string        `env:"S3_ENDPOINT" envDefault:"localhost:9000"`
 	S3Bucket       string        `env:"S3_BUCKET" envDefault:"veloria-searches"`

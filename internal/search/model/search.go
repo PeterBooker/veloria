@@ -14,21 +14,21 @@ const (
 )
 
 type Search struct {
-	ID          uuid.UUID  `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Status      string     `json:"status"`
-	Private     bool       `json:"private"`
-	Term        string     `json:"term"`
-	Repo        string     `json:"repo"`
-	Progress    uint8      `json:"progress" gorm:"-"`
+	ID              uuid.UUID  `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Status          string     `json:"status"`
+	Private         bool       `json:"private"`
+	Term            string     `json:"term"`
+	Repo            string     `json:"repo"`
+	Progress        uint8      `json:"progress" gorm:"-"`
 	ResultsSize     *int64     `json:"results_size,omitempty" gorm:"column:results_size"`
 	TotalMatches    *int       `json:"total_matches,omitempty" gorm:"column:total_matches"`
 	TotalExtensions *int       `json:"total_extensions,omitempty" gorm:"column:total_extensions"`
 	Results         any        `json:"results,omitempty" gorm:"-"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	DeletedAt   *time.Time `json:"deleted_at,omitempty"`
-	UserID      *uuid.UUID `json:"user_id" gorm:"type:uuid"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	CompletedAt     *time.Time `json:"completed_at,omitempty"`
+	DeletedAt       *time.Time `json:"deleted_at,omitempty"`
+	UserID          *uuid.UUID `json:"user_id" gorm:"type:uuid"`
 }
 
 type Result struct {

@@ -459,8 +459,8 @@ func fetchLargestExtensions(d *Deps, table string, limit int, orderCol string) [
 
 	var extensions []LargestExtension
 	d.DB().Table(table).
-		Select(slugCol+" AS slug, "+nameCol+" AS name, total_size, file_count").
-		Where("deleted_at IS NULL AND "+orderCol+" > 0").
+		Select(slugCol + " AS slug, " + nameCol + " AS name, total_size, file_count").
+		Where("deleted_at IS NULL AND " + orderCol + " > 0").
 		Order(orderCol + " DESC").
 		Limit(limit).
 		Scan(&extensions)

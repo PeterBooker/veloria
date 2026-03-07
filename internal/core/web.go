@@ -51,16 +51,16 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		pd.OG.Description = "WordPress " + row.Version + " core source code indexed by Veloria."
 
 		data := web.ExtensionData{
-			PageData:     pd,
+			PageData:       pd,
 			DataSourceType: "cores",
-			Name:         html.UnescapeString(row.Name),
-			Slug:         row.Version,
-			Version:      row.Version,
-			DownloadLink: fmt.Sprintf("https://wordpress.org/wordpress-%s.zip", row.Version),
-			Indexed:      indexStatus[row.Version],
-			FileCount:    row.FileCount,
-			TotalSize:    row.TotalSize,
-			LargestFiles: web.ParseLargestFiles(row.LargestFiles, 25),
+			Name:           html.UnescapeString(row.Name),
+			Slug:           row.Version,
+			Version:        row.Version,
+			DownloadLink:   fmt.Sprintf("https://wordpress.org/wordpress-%s.zip", row.Version),
+			Indexed:        indexStatus[row.Version],
+			FileCount:      row.FileCount,
+			TotalSize:      row.TotalSize,
+			LargestFiles:   web.ParseLargestFiles(row.LargestFiles, 25),
 		}
 
 		d.RenderComponent(w, r, page.Extension(data))

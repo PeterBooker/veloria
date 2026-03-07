@@ -254,10 +254,10 @@ func parseRetryAfterHeader(val string) time.Duration {
 // download will never succeed and should not be retried.
 func isPermanentHTTPFailure(code int) bool {
 	switch code {
-	case http.StatusBadRequest,  // 400
-		http.StatusForbidden,    // 403
-		http.StatusNotFound,     // 404
-		http.StatusGone:         // 410
+	case http.StatusBadRequest, // 400
+		http.StatusForbidden, // 403
+		http.StatusNotFound,  // 404
+		http.StatusGone:      // 410
 		return true
 	}
 	return false
@@ -270,5 +270,5 @@ type exitError struct {
 	msg  string
 }
 
-func (e *exitError) Error() string  { return e.msg }
-func (e *exitError) ExitCode() int  { return e.code }
+func (e *exitError) Error() string { return e.msg }
+func (e *exitError) ExitCode() int { return e.code }

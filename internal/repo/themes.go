@@ -57,10 +57,10 @@ type Theme struct {
 	ClosedAt *time.Time `json:"closed_at,omitempty" gorm:"default:null"`
 
 	// Index state tracking (persisted for durable retry)
-	RetryCount   int        `json:"-" gorm:"default:0"`
+	RetryCount    int        `json:"-" gorm:"default:0"`
 	LastAttemptAt *time.Time `json:"-" gorm:"default:null"`
-	IndexedAt    *time.Time `json:"-" gorm:"default:null"`
-	IndexStatus  string     `json:"-" gorm:"default:'pending'"`
+	IndexedAt     *time.Time `json:"-" gorm:"default:null"`
+	IndexStatus   string     `json:"-" gorm:"default:'pending'"`
 
 	LastUpdated time.Time `json:"-" gorm:"-"`
 }

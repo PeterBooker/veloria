@@ -26,4 +26,3 @@ func SamplePlugin() *repo.Plugin {
 		DownloadLink:     "https://downloads.wordpress.org/plugin/test-plugin.1.0.0.zip",
 	}
 }
-

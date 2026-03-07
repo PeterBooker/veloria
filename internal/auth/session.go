@@ -11,8 +11,8 @@ import (
 	"github.com/markbates/goth/gothic"
 	"gorm.io/gorm"
 
-	"veloria/internal/user"
 	"veloria/internal/config"
+	"veloria/internal/user"
 )
 
 type contextKey string

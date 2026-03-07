@@ -193,10 +193,10 @@ func SearchExtensionsPartial(d *web.Deps) http.HandlerFunc {
 		data := web.SearchExtensionsData{
 			SearchID:         s.ID.String(),
 			SearchDataSource: s.Repo,
-			Extensions: summaries[start:end],
-			Page:       page,
-			TotalPages: totalPages,
-			Search:     r.URL.Query().Get("search"),
+			Extensions:       summaries[start:end],
+			Page:             page,
+			TotalPages:       totalPages,
+			Search:           r.URL.Query().Get("search"),
 		}
 
 		d.RenderComponent(w, r, partial.SearchExtensions(data))
@@ -542,7 +542,7 @@ func ExtensionResultsPage(d *web.Deps) http.HandlerFunc {
 		data := web.ExtensionResultsData{
 			SearchID:         s.ID.String(),
 			SearchDataSource: s.Repo,
-			Result:     match,
+			Result:           match,
 		}
 
 		d.RenderComponent(w, r, partial.SearchExtensionResults(data))
@@ -559,8 +559,8 @@ func ContextPage(d *web.Deps) http.HandlerFunc {
 
 		data := web.SearchContextData{
 			DataSource: repoType,
-			Slug:     slug,
-			Filename: filename,
+			Slug:       slug,
+			Filename:   filename,
 		}
 		if d.Sources() == nil {
 			data.Error = "Search context is unavailable."
