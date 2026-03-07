@@ -12,8 +12,9 @@ var cli struct {
 	Maintenance MaintenanceCmd `cmd:"" help:"Toggle maintenance mode on the running server."`
 	User        UserCmd        `cmd:"" help:"Manage user accounts."`
 	Reindex     ReindexCmd     `cmd:"" help:"Queue a re-index for an extension on the running server."`
-	Stats       StatsCmd       `cmd:"" help:"Print index statistics."`
-	Version     VersionCmd     `cmd:"" help:"Print version information."`
+	DeleteSearch DeleteSearchCmd `cmd:"delete-search" help:"Delete a single search by ID."`
+	Stats        StatsCmd       `cmd:"" help:"Print index statistics."`
+	Version      VersionCmd     `cmd:"" help:"Print version information."`
 }
 
 func main() {
