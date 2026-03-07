@@ -736,9 +736,9 @@ func (r *ExtensionStore[T]) RecordIndexSuccess(slug string) {
 	err := r.db.Table(tableName).
 		Where(identifierCol+" = ?", slug).
 		Updates(map[string]any{
-			"index_status":   "indexed",
-			"indexed_at":     now,
-			"retry_count":    0,
+			"index_status":    "indexed",
+			"indexed_at":      now,
+			"retry_count":     0,
 			"last_attempt_at": now,
 		}).Error
 	if err != nil {

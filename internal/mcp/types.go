@@ -14,28 +14,28 @@ type SearchParams struct {
 
 // SearchResponse holds the results of a code search.
 type SearchResponse struct {
-	TotalMatches     int                `json:"total_matches"`
-	TotalExtensions  int                `json:"total_extensions"`
-	Extensions       []ExtensionResult  `json:"extensions"`
+	TotalMatches    int               `json:"total_matches"`
+	TotalExtensions int               `json:"total_extensions"`
+	Extensions      []ExtensionResult `json:"extensions"`
 }
 
 // ExtensionResult holds search results for a single extension.
 type ExtensionResult struct {
-	Slug           string       `json:"slug"`
-	Name           string       `json:"name"`
-	Version        string       `json:"version"`
-	ActiveInstalls int          `json:"active_installs"`
-	TotalMatches   int          `json:"total_matches"`
+	Slug           string        `json:"slug"`
+	Name           string        `json:"name"`
+	Version        string        `json:"version"`
+	ActiveInstalls int           `json:"active_installs"`
+	TotalMatches   int           `json:"total_matches"`
 	Matches        []MatchDetail `json:"matches,omitempty"`
 }
 
 // MatchDetail holds a single code match.
 type MatchDetail struct {
-	File       string   `json:"file"`
-	Line       int      `json:"line"`
-	Content    string   `json:"content"`
-	Before     []string `json:"before,omitempty"`
-	After      []string `json:"after,omitempty"`
+	File    string   `json:"file"`
+	Line    int      `json:"line"`
+	Content string   `json:"content"`
+	Before  []string `json:"before,omitempty"`
+	After   []string `json:"after,omitempty"`
 }
 
 // ListParams holds the parameters for listing extensions.

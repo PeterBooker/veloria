@@ -86,7 +86,7 @@ type customStatusErr struct {
 	msg  string
 }
 
-func (e *customStatusErr) Error() string  { return e.msg }
+func (e *customStatusErr) Error() string   { return e.msg }
 func (e *customStatusErr) StatusCode() int { return e.code }
 
 func TestWriteError_WithAPIError(t *testing.T) {

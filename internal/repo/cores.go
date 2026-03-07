@@ -26,10 +26,10 @@ import (
 type Core struct {
 	*IndexedExtension `gorm:"-" json:"-"`
 
-	ID       uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Name     string    `json:"name"`
-	Version  string    `json:"version"`
-	ZipURL string `json:"-" gorm:"-"`
+	ID      uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Name    string    `json:"name"`
+	Version string    `json:"version"`
+	ZipURL  string    `json:"-" gorm:"-"`
 
 	// Index stats
 	FileCount    int                            `json:"-" gorm:"default:0"`
@@ -37,10 +37,10 @@ type Core struct {
 	LargestFiles datatypes.JSONSlice[*FileStat] `json:"-" gorm:"type:jsonb;default:'[]'::jsonb"`
 
 	// Index state tracking (persisted for durable retry)
-	RetryCount   int        `json:"-" gorm:"default:0"`
+	RetryCount    int        `json:"-" gorm:"default:0"`
 	LastAttemptAt *time.Time `json:"-" gorm:"default:null"`
-	IndexedAt    *time.Time `json:"-" gorm:"default:null"`
-	IndexStatus  string     `json:"-" gorm:"default:'pending'"`
+	IndexedAt     *time.Time `json:"-" gorm:"default:null"`
+	IndexStatus   string     `json:"-" gorm:"default:'pending'"`
 }
 
 // Implement Extension interface

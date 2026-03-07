@@ -93,4 +93,3 @@ func (f *FakeDataSource) RecordIndexFailure(_ string) {}
 
 // Compile-time interface check.
 var _ repo.DataSource = (*FakeDataSource)(nil)
-

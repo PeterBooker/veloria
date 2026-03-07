@@ -136,10 +136,10 @@ func ReportsPage(d *web.Deps) http.HandlerFunc {
 				SearchID:         row.SearchID.String(),
 				SearchTerm:       row.SearchTerm,
 				SearchDataSource: row.SearchRepo,
-				SearchPrivate: row.SearchPrivate,
-				ReporterName:  row.ReporterName,
-				Reason:        row.Reason,
-				ReportedAt:    row.ReportedAt.Format("2006-01-02 15:04"),
+				SearchPrivate:    row.SearchPrivate,
+				ReporterName:     row.ReporterName,
+				Reason:           row.Reason,
+				ReportedAt:       row.ReportedAt.Format("2006-01-02 15:04"),
 			}
 		}
 

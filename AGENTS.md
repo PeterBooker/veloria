@@ -660,7 +660,7 @@ import _ "net/http/pprof"
 
 ### Go Style
 
-- **Formatting:** `gofmt` / `goimports`
+- **Formatting:** Always run `go fmt ./...` after making any code changes
 - **Linting:** golangci-lint configuration
 - **Error handling:** Wrap errors with context (`fmt.Errorf("doing X: %w", err)`)
 - **Logging:** Use zap with structured fields
