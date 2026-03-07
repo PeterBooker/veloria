@@ -470,7 +470,7 @@ func readFileRange(path string, startLine, maxLines int) ([]string, int, error) 
 	if err != nil {
 		return nil, 0, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var r io.Reader = file
 
@@ -486,7 +486,7 @@ func readFileRange(path string, startLine, maxLines int) ([]string, int, error) 
 		if err != nil {
 			return nil, 0, err
 		}
-		defer gz.Close()
+		defer func() { _ = gz.Close() }()
 		r = gz
 	}
 
@@ -702,7 +702,7 @@ func grepSingleFile(path string, re *regexp.Regexp, contextLines int) ([]GrepLin
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var r io.Reader = file
 
@@ -718,7 +718,7 @@ func grepSingleFile(path string, re *regexp.Regexp, contextLines int) ([]GrepLin
 		if err != nil {
 			return nil, err
 		}
-		defer gz.Close()
+		defer func() { _ = gz.Close() }()
 		r = gz
 	}
 

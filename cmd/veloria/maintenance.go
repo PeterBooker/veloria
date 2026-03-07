@@ -50,7 +50,7 @@ func sendMaintenance(enabled bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to control socket at %s: %w\nIs the server running?", sockPath, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	if err := json.NewEncoder(conn).Encode(ctlRequest{Action: "maintenance", Enabled: enabled}); err != nil {

@@ -24,7 +24,7 @@ func (c *WipeSearchesCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	s3, err := storage.NewS3Client(cfg, zap.NewNop())
 	if err != nil {

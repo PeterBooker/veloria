@@ -160,7 +160,7 @@ func TestDownloadZip_PermanentFailure(t *testing.T) {
 
 func TestDownloadZip_InvalidZipContent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "<html>Error</html>")
+		_, _ = fmt.Fprint(w, "<html>Error</html>")
 	}))
 	defer srv.Close()
 
@@ -184,7 +184,7 @@ func TestDownloadZip_429RetriesAndSucceeds(t *testing.T) {
 			return
 		}
 		// Return a valid zip (just the magic bytes + minimal content).
-		w.Write([]byte{'P', 'K', 0x03, 0x04})
+		_, _ = w.Write([]byte{'P', 'K', 0x03, 0x04})
 	}))
 	defer srv.Close()
 
@@ -223,7 +223,7 @@ func TestDownloadZip_GitHubAcceptHeader(t *testing.T) {
 	var gotAccept string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAccept = r.Header.Get("Accept")
-		w.Write([]byte{'P', 'K', 0x03, 0x04})
+		_, _ = w.Write([]byte{'P', 'K', 0x03, 0x04})
 	}))
 	defer srv.Close()
 

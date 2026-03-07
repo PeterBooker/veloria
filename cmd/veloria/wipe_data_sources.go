@@ -22,7 +22,7 @@ func (c *WipeDataSourcesCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if !c.Force {
 		if !confirmWipe("This will permanently delete ALL plugins, themes, and cores from the database and disk.") {

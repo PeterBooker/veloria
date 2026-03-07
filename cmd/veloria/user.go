@@ -46,7 +46,7 @@ func (c *UserDeleteCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if !c.Force {
 		if !confirmWipe(fmt.Sprintf("This will soft-delete the user %q.", c.Email)) {
@@ -80,7 +80,7 @@ func setUserAdmin(email string, admin bool) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	res, err := db.ExecContext(context.Background(),
 		"UPDATE users SET is_admin = $1, updated_at = now() WHERE email = $2 AND deleted_at IS NULL",
