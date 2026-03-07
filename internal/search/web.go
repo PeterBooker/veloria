@@ -370,6 +370,7 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 	protoResults := searchmodel.SearchResponseToProto(results)
 	size, err := d.S3().UploadResult(ctx, searchID.String(), protoResults)
 	if err != nil {
+		slog.Error("search result upload failed", "id", searchID, "term", term, "error", err)
 		d.DB().Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
 		return
 	}
