@@ -32,38 +32,46 @@ type SearchRequest struct {
 }
 
 func ViewSearchV1(reg *service.Registry) http.Handler {
-	return api.Handler[uuid.UUID, searchmodel.Search]{
-		Decode: func(r *http.Request) (uuid.UUID, error) {
-			if reg.DB() == nil {
-				return uuid.Nil, api.ErrUnavailable("searches are unavailable")
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if reg.DB() == nil {
+			api.WriteError(w, api.ErrUnavailable("searches are unavailable"))
+			return
+		}
+
+		id, err := api.DecodeIDParam(r, "id")
+		if err != nil {
+			api.WriteError(w, err)
+			return
+		}
+
+		db := reg.DB()
+		var s searchmodel.Search
+		if err := db.First(&s, "id = ?", id).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				api.WriteError(w, api.ErrNotFound("search not found"))
+				return
 			}
-			return api.DecodeIDParam(r, "id")
-		},
-		Endpoint: func(ctx context.Context, id uuid.UUID) (searchmodel.Search, error) {
-			db := reg.DB()
-			var s searchmodel.Search
-			if err := db.First(&s, "id = ?", id).Error; err != nil {
-				if err == gorm.ErrRecordNotFound {
-					return s, api.ErrNotFound("search not found")
+			api.WriteError(w, api.ErrInternal("error fetching search"))
+			return
+		}
+
+		if s.Status == searchmodel.StatusCompleted {
+			if s3 := reg.S3(); s3 != nil {
+				sctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+				defer cancel()
+
+				var protoResults typespb.SearchResponse
+				if err := s3.DownloadResult(sctx, s.ID.String(), &protoResults); err == nil {
+					s.Results = searchmodel.SearchResponseFromProto(&protoResults)
 				}
-				return s, api.ErrInternal("error fetching search")
 			}
+			w.Header().Set("Cache-Control", "public, max-age=14400")
+		} else {
+			w.Header().Set("Cache-Control", "no-store")
+		}
 
-			if s.Status == searchmodel.StatusCompleted {
-				if s3 := reg.S3(); s3 != nil {
-					sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-					defer cancel()
-
-					var protoResults typespb.SearchResponse
-					if err := s3.DownloadResult(sctx, s.ID.String(), &protoResults); err == nil {
-						s.Results = searchmodel.SearchResponseFromProto(&protoResults)
-					}
-				}
-			}
-
-			return s, nil
-		},
-	}
+		api.WriteSuccessJSON(w, http.StatusOK, s)
+	})
 }
 
 func CreateSearchV1(reg *service.Registry) http.Handler {
