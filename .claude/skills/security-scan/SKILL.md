@@ -2,8 +2,7 @@
 name: security-scan
 description: Run gosec and govulncheck to find security vulnerabilities. Use before releases or after dependency changes.
 disable-model-invocation: true
-argument-hint: [package-path]
-allowed-tools: Bash(gosec *, govulncheck *, go install *), Read, Glob, Grep
+argument-hint: "package-path"
 ---
 
 # Security Scanning

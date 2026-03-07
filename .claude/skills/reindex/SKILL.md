@@ -2,8 +2,7 @@
 name: reindex
 description: Trigger reindexing of a specific WordPress extension. Use to rebuild the search index for a plugin, theme, or core version.
 disable-model-invocation: true
-argument-hint: [repo] [slug]
-allowed-tools: Bash(veloria *, go install ./..., curl *), Read, Glob, Grep
+argument-hint: "repo slug"
 ---
 
 # Reindex Extension
@@ -19,8 +18,8 @@ Trigger reindexing of a specific WordPress plugin, theme, or core version.
 ## Steps
 
 1. **Parse arguments**
-   - `$ARGUMENTS[0]` or `$0`: Repository type (`plugins`, `themes`, or `cores`)
-   - `$ARGUMENTS[1]` or `$1`: Extension slug (or version for cores)
+   - `$REPO`: Repository type (`plugins`, `themes`, or `cores`)
+   - `$SLUG`: Extension slug (or version for cores)
    - Both are required
 
 2. **Ensure binary is current**
@@ -30,26 +29,26 @@ Trigger reindexing of a specific WordPress plugin, theme, or core version.
 
 3. **Check if the server is running**
    ```bash
-   curl -s http://localhost:8585/api/health 2>&1
+   curl -s http://localhost:8585/up 2>&1
    ```
 
 4. **If server is running**, trigger reindex via API:
    ```bash
-   curl -s -X POST "http://localhost:8585/api/reindex/$0/$1" 2>&1
+   curl -s -X POST "http://localhost:8585/api/reindex/$REPO/$SLUG" 2>&1
    ```
 
 5. **If server is not running**, use the index CLI directly:
    - First, determine the zip URL for the extension
    - Then run:
      ```bash
-     veloria index --repo=$0 --slug=$1 --zipurl="$ZIP_URL" 2>&1
+     veloria index --repo=$REPO --slug=$SLUG --zipurl="$ZIP_URL" 2>&1
      ```
 
 6. **Report results**
    ```
    ## Reindex Results
 
-   - Extension: $0/$1
+   - Extension: $REPO/$SLUG
    - Method: API / CLI
    - Status: success / failed
    - Details: [output from command]

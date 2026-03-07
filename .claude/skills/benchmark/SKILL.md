@@ -2,8 +2,7 @@
 name: benchmark
 description: Run Go benchmarks and compare results to detect performance regressions. Use before and after performance-related changes.
 disable-model-invocation: true
-argument-hint: [package-path]
-allowed-tools: Bash(go install ./..., go test *), Read, Glob, Grep
+argument-hint: "package-path"
 ---
 
 # Performance Benchmarking
@@ -23,12 +22,7 @@ Run Go benchmarks to measure and compare performance. Flags regressions exceedin
    - Otherwise, find packages with `*_test.go` files containing `Benchmark` functions
    - Focus on performance-critical packages: `internal/index/`, `internal/repo/`, `internal/api/`
 
-2. **Ensure binary is current**
-   ```bash
-   go install ./...
-   ```
-
-3. **Run benchmarks**
+2. **Run benchmarks**
    ```bash
    go test -bench=. -benchmem -count=5 $ARGUMENTS 2>&1
    ```

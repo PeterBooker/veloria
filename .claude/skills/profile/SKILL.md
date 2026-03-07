@@ -2,8 +2,7 @@
 name: profile
 description: Run CPU and memory profiling with pprof to identify performance hotspots. Use when investigating high resource usage.
 disable-model-invocation: true
-argument-hint: [cpu|memory|all] [package-path]
-allowed-tools: Bash(go install ./..., go test *, go tool pprof *), Read, Glob, Grep, Write
+argument-hint: "cpu|memory|all package-path"
 ---
 
 # CPU and Memory Profiling
@@ -19,15 +18,10 @@ Profile Go code to identify CPU hotspots and memory allocators using pprof.
 ## Steps
 
 1. **Parse arguments**
-   - `$ARGUMENTS[0]` or `$0`: Profile type (`cpu`, `memory`, or `all`)
-   - `$ARGUMENTS[1]` or `$1`: Package path (defaults to `./...`)
+   - First argument: Profile type (`cpu`, `memory`, or `all`)
+   - Second argument: Package path (defaults to `./...`)
 
-2. **Ensure binary is current**
-   ```bash
-   go install ./...
-   ```
-
-3. **Create profile output directory**
+2. **Create profile output directory**
    ```bash
    mkdir -p .profiles
    ```
@@ -36,12 +30,12 @@ Profile Go code to identify CPU hotspots and memory allocators using pprof.
 
    For CPU profiling:
    ```bash
-   go test -cpuprofile=.profiles/cpu.prof -bench=. $1 2>&1
+   go test -cpuprofile=.profiles/cpu.prof -bench=. $PACKAGE 2>&1
    ```
 
    For memory profiling:
    ```bash
-   go test -memprofile=.profiles/mem.prof -bench=. $1 2>&1
+   go test -memprofile=.profiles/mem.prof -bench=. $PACKAGE 2>&1
    ```
 
 5. **Analyze CPU profile**

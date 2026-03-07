@@ -2,8 +2,7 @@
 name: integration-test
 description: Run integration tests that require Docker (Postgres, MinIO via testcontainers). Use to validate database and storage behavior.
 disable-model-invocation: true
-argument-hint: [package-path]
-allowed-tools: Bash(go test *, go install ./..., docker *), Read, Glob, Grep
+argument-hint: "package-path"
 ---
 
 # Integration Tests
@@ -27,12 +26,7 @@ Run integration tests that use testcontainers-go for Postgres and MinIO.
    ```
    If Docker is not available, inform the user and stop.
 
-2. **Ensure binary is current**
-   ```bash
-   go install ./...
-   ```
-
-3. **Run integration tests**
+2. **Run integration tests**
 
    For a specific package:
    ```bash

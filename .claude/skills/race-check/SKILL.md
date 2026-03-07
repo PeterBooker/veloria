@@ -2,8 +2,7 @@
 name: race-check
 description: Run Go race detector to find data races in concurrent code. Use after any change to mutexes, goroutines, or channels.
 disable-model-invocation: true
-argument-hint: [package-path]
-allowed-tools: Bash(go install ./..., go test *), Read, Glob, Grep
+argument-hint: "package-path"
 ---
 
 # Race Condition Detection
@@ -21,12 +20,7 @@ Run Go's race detector to identify data races in concurrent code.
    - If `$ARGUMENTS` specifies a package, use that
    - Otherwise, run on all packages with tests
 
-2. **Ensure binary is current**
-   ```bash
-   go install ./...
-   ```
-
-3. **Run race detector**
+2. **Run race detector**
    ```bash
    go test -race -timeout 5m $ARGUMENTS 2>&1
    ```

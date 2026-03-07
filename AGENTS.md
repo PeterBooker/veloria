@@ -89,15 +89,46 @@ Skills are defined in [.claude/skills/](.claude/skills/) and invoked with `/skil
 
 | Skill | Purpose | When to Use |
 |-------|---------|-------------|
+| [/test](.claude/skills/test/SKILL.md) | Run unit tests | After any code change |
+| [/check](.claude/skills/check/SKILL.md) | Pre-push quality gate (vet + lint + tests) | Before pushing code |
 | [/benchmark](.claude/skills/benchmark/SKILL.md) | Run and compare Go benchmarks | Before/after performance changes |
 | [/profile](.claude/skills/profile/SKILL.md) | CPU and memory profiling with pprof | Investigating high resource usage |
 | [/race-check](.claude/skills/race-check/SKILL.md) | Detect data races in concurrent code | After changes to mutexes/goroutines |
+| [/coverage](.claude/skills/coverage/SKILL.md) | Test coverage analysis | Finding untested code paths |
 | [/migrate](.claude/skills/migrate/SKILL.md) | Create and manage database migrations | Schema changes, new tables/indexes |
 | [/lint](.claude/skills/lint/SKILL.md) | Run golangci-lint | Code quality checks |
-| [/security-scan](.claude/skills/security-scan/SKILL.md) | Run gosec security scanner | Before committing security-sensitive code |
+| [/security-scan](.claude/skills/security-scan/SKILL.md) | Run gosec + govulncheck | Before committing security-sensitive code |
+| [/deps](.claude/skills/deps/SKILL.md) | Tidy and verify Go modules | After adding/removing imports |
 | [/generate](.claude/skills/generate/SKILL.md) | Run go generate | After templ/frontend/protobuf changes |
 | [/integration-test](.claude/skills/integration-test/SKILL.md) | Run integration tests | After DB/API/storage changes |
 | [/reindex](.claude/skills/reindex/SKILL.md) | Queue a reindex for an extension | Testing indexing changes |
+
+### /test
+
+Run Go unit tests with optional package targeting.
+
+```
+/test                             # All packages
+/test ./internal/repo/...         # Specific package
+/test -v ./internal/manager/...   # Verbose output
+```
+
+**Use when:** After any code change to verify correctness.
+
+---
+
+### /check
+
+Run the full pre-push quality gate: vet, lint, and tests with race detection.
+
+```
+/check                            # All packages
+/check ./internal/repo/...        # Specific package
+```
+
+**Use when:** Before pushing code. Mirrors CI checks.
+
+---
 
 ### /benchmark
 
@@ -142,6 +173,19 @@ Run Go's race detector to find data races.
 
 ---
 
+### /coverage
+
+Run tests with coverage profiling to identify untested code paths.
+
+```
+/coverage                         # All packages
+/coverage ./internal/repo/...     # Specific package
+```
+
+**Use when:** Finding gaps in test coverage, before releases.
+
+---
+
 ### /migrate
 
 Create and manage database migrations with goose.
@@ -155,6 +199,18 @@ Create and manage database migrations with goose.
 ```
 
 **Use when:** Adding tables/columns, creating indexes, modifying schema.
+
+---
+
+### /deps
+
+Tidy and verify Go module dependencies.
+
+```
+/deps                             # Tidy, verify, and report changes
+```
+
+**Use when:** After adding/removing imports, before creating a PR.
 
 ---
 
