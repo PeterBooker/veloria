@@ -38,10 +38,10 @@ jobs:
       - name: Test
         run: go test -v ./...
 
-      # - name: golangci-lint
-      #   uses: golangci/golangci-lint-action@v9
-      #   with:
-      #     version: v2.6
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.11
 
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@v2.22.10
