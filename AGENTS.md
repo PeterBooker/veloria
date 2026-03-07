@@ -286,8 +286,7 @@ Veloria provides:
 ```
 veloria/
 ├── cmd/                           # Entry points
-│   ├── veloria/                   # Single binary (serve, index, migrate, wipe, maintenance, user, reindex, stats, version)
-│   └── veloria-converter/         # One-off converter utility
+│   └── veloria/                   # Single binary (serve, index, migrate, wipe, maintenance, user, reindex, stats, version)
 │
 ├── internal/                      # Core application code
 │   ├── admin/                     # Admin web handlers (reindex, maintenance)
