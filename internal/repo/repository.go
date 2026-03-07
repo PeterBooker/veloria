@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -367,7 +368,10 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 		return nil, err
 	}
 
-	// Snapshot the extension list and release the lock quickly
+	// Snapshot the extension list and release the lock quickly.
+	// Sort by slug for deterministic iteration order - Go map iteration is
+	// randomised, so without sorting the globalMatchCap early-exit could
+	// include different extensions on each run.
 	r.mu.RLock()
 	extensions := make([]T, 0, len(r.List))
 	for _, ext := range r.List {
@@ -376,6 +380,10 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 		}
 	}
 	r.mu.RUnlock()
+
+	slices.SortFunc(extensions, func(a, b T) int {
+		return strings.Compare(a.GetSlug(), b.GetSlug())
+	})
 
 	if len(extensions) == 0 {
 		return nil, nil
