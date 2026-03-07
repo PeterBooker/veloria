@@ -1,6 +1,9 @@
 package index
 
-import "regexp/syntax"
+import (
+	"fmt"
+	"regexp/syntax"
+)
 
 // getRegexpPattern wraps a pattern with regex flags.
 func getRegexpPattern(pat string, ignoreCase bool) string {
@@ -10,8 +13,36 @@ func getRegexpPattern(pat string, ignoreCase bool) string {
 	return "(?m)" + pat
 }
 
-// ValidatePattern checks whether pat is a valid regular expression.
+// ValidatePattern checks whether pat is a valid regular expression
+// and rejects patterns with empty capture groups like exec() which
+// are almost always user mistakes (meant as literal parentheses).
 func ValidatePattern(pat string) error {
-	_, err := syntax.Parse("(?m)"+pat, syntax.Perl)
-	return err
+	re, err := syntax.Parse("(?m)"+pat, syntax.Perl)
+	if err != nil {
+		return err
+	}
+	if hasEmptyCapture(re) {
+		return fmt.Errorf("empty parentheses in pattern; use \\( and \\) for literal parentheses")
+	}
+	return nil
+}
+
+// hasEmptyCapture walks the syntax tree and returns true if any
+// capture group is empty (matches only the empty string).
+func hasEmptyCapture(re *syntax.Regexp) bool {
+	if re.Op == syntax.OpCapture {
+		if len(re.Sub) == 0 {
+			return true
+		}
+		// A capture with a single empty-match child, e.g. ()
+		if len(re.Sub) == 1 && re.Sub[0].Op == syntax.OpEmptyMatch {
+			return true
+		}
+	}
+	for _, sub := range re.Sub {
+		if hasEmptyCapture(sub) {
+			return true
+		}
+	}
+	return false
 }
