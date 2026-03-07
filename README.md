@@ -4,11 +4,18 @@ A code search engine for the WordPress ecosystem. Veloria downloads, indexes, an
 
 ## Features
 
-- **Trigram-based code search** using [google/codesearch](https://github.com/google/codesearch)
+- **Trigram-based code search** (forked from google/codesearch)
 - **Three repository types**: Plugins, Themes, and Core releases
-- **Automatic updates**: Polls WordPress.org APIs for recently updated extensions
-- **Hot-swap indexing**: Update indexes without downtime
-- **RESTful JSON API**: Simple interface for search and metadata queries
+- **Dual-source architecture**: WordPress.org and AspireCloud/FAIR API
+- **Automatic updates**: Polls APIs for recently updated extensions
+- **Hot-swap indexing**: Atomic index swaps without downtime
+- **Search moderation**: Automatically flags searches containing URLs or offensive content
+- **Search persistence**: Results stored in S3 with sharing, CSV export, and OG image previews
+- **OAuth authentication**: GitHub, GitLab, and Atlassian login with role-based access
+- **MCP server**: Model Context Protocol endpoint for AI-assisted code exploration
+- **RESTful JSON API**: Search, metadata, and management endpoints with rate limiting
+- **Maintenance mode**: Toggle via CLI with health check bypass
+- **Full observability**: OpenTelemetry traces, metrics, and logs via Grafana stack
 
 ## Quick Start
 
@@ -35,17 +42,8 @@ go build -o veloria ./cmd/veloria
 
 ### Configuration
 
-Create a `.env` file (or set environment variables):
-
 ```bash
-ENV=development
-PORT=9071
-DATA_DIR=/etc/veloria/data
-DB_HOST=localhost
-DB_PORT=5432
-DB_DATABASE=veloria
-DB_USERNAME=postgres
-DB_PASSWORD=
+cp .env.example .env
 ```
 
 See [Configuration Reference](docs/configuration.md) for all options.
@@ -53,7 +51,7 @@ See [Configuration Reference](docs/configuration.md) for all options.
 ### Running
 
 ```bash
-# Start PostgreSQL (using Docker)
+# Start dev stack (PostgreSQL, MinIO, Mailpit, Grafana observability)
 docker compose up -d
 
 # Run database migrations
@@ -81,29 +79,6 @@ The core component exposes a REST API, which is used by the frontend.
 | [Contributing](.github/CONTRIBUTING.md) | Contribution workflow and PR requirements |
 | [Security Policy](.github/SECURITY.md) | Vulnerability reporting and response policy |
 | [Code of Conduct](.github/CODE_OF_CONDUCT.md) | Community behavior standards |
-
-## Project Structure
-
-```
-veloria/
-├── cmd/
-│   └── veloria/            # Single binary (subcommands: serve, index, migrate, wipe, maintenance, version)
-├── internal/
-│   ├── api/               # HTTP handlers
-│   ├── config/            # Configuration
-│   ├── index/             # Trigram indexing
-│   ├── manager/           # Repository orchestration
-│   ├── repo/              # Data repositories (generic)
-│   ├── router/            # HTTP routing
-│   ├── service/           # Service registry for dynamic dependency resolution
-│   ├── ui/                # Templ components (layouts, pages, partials)
-│   └── web/               # Shared web deps and interfaces
-├── assets/                # Embedded static assets (go:embed)
-│   └── static/            # CSS, JS, fonts (generated — do not edit)
-├── frontend/              # Frontend build (Tailwind v4, npm)
-│   └── css/main.css       # Tailwind input + theme tokens
-└── docs/                  # Documentation
-```
 
 ## How It Works
 
@@ -147,12 +122,19 @@ See [Development Guide](docs/development.md) for complete instructions.
 ## Tech Stack
 
 - **Language**: Go 1.26.0
-- **Database**: PostgreSQL (metadata storage)
-- **Search**: google/codesearch (trigram indexing)
-- **HTTP Router**: chi
-- **ORM**: GORM
-- **Templating**: templ
-- **Monitoring**: Prometheus metrics, OpenTelemetry
+- **Database**: PostgreSQL 17+ (GORM, goose migrations)
+- **Search**: Trigram indexing (forked from google/codesearch)
+- **Storage**: S3/MinIO (search results, protobuf serialization)
+- **HTTP**: chi router, httprate rate limiting
+- **Auth**: OAuth2 via goth (GitHub, GitLab, Atlassian), gorilla/sessions
+- **Templating**: templ (server-side), htmx + ECharts (client-side)
+- **Frontend**: Tailwind CSS v4, lightningcss
+- **CLI**: Kong (subcommands: serve, index, migrate, wipe, maintenance, user, reindex, stats, version)
+- **Config**: caarlos0/env with go-playground/validator
+- **Resilience**: sony/gobreaker circuit breaker, token bucket rate limiting
+- **Observability**: OpenTelemetry → Grafana Alloy → Tempo (traces), Loki (logs), Prometheus (metrics), Grafana (dashboards)
+- **Logging**: zap
+- **Error Tracking**: Sentry
 
 ## Contributing
 
