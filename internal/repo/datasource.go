@@ -15,7 +15,7 @@ type DataSource interface {
 	Load() error
 	Stats() (total int, indexed int)
 	IndexStatus() map[string]bool
-	Search(ctx context.Context, term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error)
+	Search(ctx context.Context, term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, int, error)
 	PrepareUpdates() ([]IndexTask, error)
 	ResumeUnindexed() []IndexTask
 	GetExtension(slug string) (Extension, bool)

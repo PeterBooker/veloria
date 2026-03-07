@@ -361,11 +361,11 @@ func (r *ExtensionStore[T]) UpdateIndex(idx *index.Index, slug string) error {
 // and searches extensions concurrently with a worker pool.
 // If progressFn is non-nil, it is called after each extension is searched
 // with the number of extensions searched so far and the total count.
-func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, error) {
+func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, int, error) {
 	// Compile search patterns once for reuse across all extensions
 	cs, err := index.CompileSearch(term, opt)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// Snapshot the extension list and release the lock quickly.
@@ -373,6 +373,7 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 	// randomised, so without sorting the globalMatchCap early-exit could
 	// include different extensions on each run.
 	r.mu.RLock()
+	totalExtensions := r.Total
 	extensions := make([]T, 0, len(r.List))
 	for _, ext := range r.List {
 		if ie := ext.GetIndexedExtension(); ie != nil && ie.HasIndex() {
@@ -386,7 +387,7 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 	})
 
 	if len(extensions) == 0 {
-		return nil, nil
+		return nil, totalExtensions, nil
 	}
 
 	// Parallel search with worker pool
@@ -483,10 +484,10 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 	wg.Wait()
 
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return results, nil
+	return results, totalExtensions, nil
 }
 
 // PrepareUpdates fetches pending items, saves them to the database, and returns

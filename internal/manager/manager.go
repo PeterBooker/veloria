@@ -598,7 +598,7 @@ func (m *Manager) Search(ctx context.Context, repoType string, term string, para
 		MaxResults:        100,
 	}
 
-	results, err := ds.Search(ctx, term, opt, params.OnProgress)
+	results, totalExtensions, err := ds.Search(ctx, term, opt, params.OnProgress)
 	if err != nil {
 		return nil, err
 	}
@@ -625,7 +625,7 @@ func (m *Manager) Search(ctx context.Context, repoType string, term string, para
 		return response.Results[i].Slug < response.Results[j].Slug
 	})
 
-	response.Total = len(response.Results)
+	response.Total = totalExtensions
 
 	if m.cache != nil {
 		m.cache.Set(cacheKey, response, 60*time.Second)

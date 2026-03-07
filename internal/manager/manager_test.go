@@ -42,8 +42,8 @@ func TestSearch_UnknownType(t *testing.T) {
 func TestSearch_EmptyResults(t *testing.T) {
 	ds := &testutil.FakeDataSource{
 		TypeVal: repo.TypePlugins,
-		SearchFunc: func(_ context.Context, _ string, _ *index.SearchOptions, _ func(int, int)) ([]*repo.SearchResult, error) {
-			return nil, nil
+		SearchFunc: func(_ context.Context, _ string, _ *index.SearchOptions, _ func(int, int)) ([]*repo.SearchResult, int, error) {
+			return nil, 0, nil
 		},
 	}
 
@@ -68,11 +68,11 @@ func TestSearch_SortsByActiveInstalls(t *testing.T) {
 
 	ds := &testutil.FakeDataSource{
 		TypeVal: repo.TypePlugins,
-		SearchFunc: func(_ context.Context, _ string, _ *index.SearchOptions, _ func(int, int)) ([]*repo.SearchResult, error) {
+		SearchFunc: func(_ context.Context, _ string, _ *index.SearchOptions, _ func(int, int)) ([]*repo.SearchResult, int, error) {
 			return []*repo.SearchResult{
 				{Extension: p1, Matches: []*index.FileMatch{{Filename: "a.php", Matches: []*index.Match{{}}}}},
 				{Extension: p2, Matches: []*index.FileMatch{{Filename: "b.php", Matches: []*index.Match{{}}}}},
-			}, nil
+			}, 2, nil
 		},
 	}
 
