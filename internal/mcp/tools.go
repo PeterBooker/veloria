@@ -139,7 +139,7 @@ func handleSearchCode(svc SearchService) server.ToolHandlerFunc {
 
 		searchID, resp, err := svc.Search(ctx, params)
 		if err != nil {
-			return mcp.NewToolResultError("search failed, please try again"), nil
+			return mcp.NewToolResultError(fmt.Sprintf("search failed: %s", err)), nil
 		}
 
 		var text string

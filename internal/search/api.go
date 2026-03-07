@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	api "veloria/internal/api"
+	"veloria/internal/index"
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/service"
@@ -85,6 +87,11 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 			return
 		}
 
+		if err := index.ValidatePattern(req.Term); err != nil {
+			api.WriteError(w, api.ErrBadRequest("invalid regex pattern: "+err.Error()))
+			return
+		}
+
 		if req.Repo == "" {
 			req.Repo = "plugins"
 		}
@@ -141,6 +148,7 @@ func runAPISearchAsync(db *gorm.DB, m *manager.Manager, s3 storage.ResultStorage
 	telemetry.SearchDuration.Record(context.Background(), searchElapsed, metric.WithAttributes(repoAttr))
 
 	if err != nil {
+		slog.Error("search failed", "id", searchID, "term", req.Term, "error", err)
 		db.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
 		return
 	}

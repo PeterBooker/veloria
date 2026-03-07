@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"log/slog"
 	"math"
 	"net/http"
 	"regexp"
@@ -17,6 +18,7 @@ import (
 
 	api "veloria/internal/api"
 	"veloria/internal/auth"
+	"veloria/internal/index"
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
 	typespb "veloria/internal/types"
@@ -293,6 +295,10 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			renderSearchError(d, w, r, "Search term is required")
 			return
 		}
+		if err := index.ValidatePattern(term); err != nil {
+			renderSearchError(d, w, r, "Invalid regex pattern: "+err.Error())
+			return
+		}
 		if repo == "" {
 			repo = "plugins"
 		}
@@ -348,6 +354,7 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 		},
 	})
 	if err != nil {
+		slog.Error("search failed", "id", searchID, "term", term, "error", err)
 		d.DB().Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)
 		return
 	}

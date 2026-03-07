@@ -242,3 +242,32 @@ func TestTruncateContextLines(t *testing.T) {
 		t.Errorf("second short line was modified: %q", got[2])
 	}
 }
+
+func TestValidatePattern(t *testing.T) {
+	tests := []struct {
+		name    string
+		pat     string
+		wantErr bool
+	}{
+		{"simple literal", "exec", false},
+		{"escaped parens", `exec\(\)`, false},
+		{"bare parens (valid empty group)", "exec()", false},
+		{"unmatched close paren", `exec\()`, true},
+		{"escaped open paren (valid literal)", `exec\(`, false},
+		{"valid regex with alternation", `foo|bar`, false},
+		{"valid character class", `[a-z]+`, false},
+		{"invalid character class", `[a-`, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidatePattern(tt.pat)
+			if tt.wantErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
