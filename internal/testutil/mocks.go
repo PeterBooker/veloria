@@ -15,7 +15,7 @@ type FakeDataSource struct {
 	LoadFunc             func() error
 	StatsFunc            func() (int, int)
 	IndexStatusFunc      func() map[string]bool
-	SearchFunc           func(ctx context.Context, term string, opt *index.SearchOptions, fn func(int, int)) ([]*repo.SearchResult, error)
+	SearchFunc           func(ctx context.Context, term string, opt *index.SearchOptions, fn func(int, int)) ([]*repo.SearchResult, int, error)
 	PrepareUpdatesFunc   func() ([]repo.IndexTask, error)
 	ResumeUnindexedFunc  func() []repo.IndexTask
 	GetExtensionFunc     func(slug string) (repo.Extension, bool)
@@ -46,11 +46,11 @@ func (f *FakeDataSource) IndexStatus() map[string]bool {
 	return nil
 }
 
-func (f *FakeDataSource) Search(ctx context.Context, term string, opt *index.SearchOptions, fn func(int, int)) ([]*repo.SearchResult, error) {
+func (f *FakeDataSource) Search(ctx context.Context, term string, opt *index.SearchOptions, fn func(int, int)) ([]*repo.SearchResult, int, error) {
 	if f.SearchFunc != nil {
 		return f.SearchFunc(ctx, term, opt, fn)
 	}
-	return nil, nil
+	return nil, 0, nil
 }
 
 func (f *FakeDataSource) PrepareUpdates() ([]repo.IndexTask, error) {
