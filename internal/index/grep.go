@@ -22,7 +22,7 @@ func ValidatePattern(pat string) error {
 		return err
 	}
 	if hasEmptyCapture(re) {
-		return fmt.Errorf("empty parentheses in pattern; use \\( and \\) for literal parentheses")
+		return fmt.Errorf("use \\( and \\) for literal parentheses")
 	}
 	return nil
 }
