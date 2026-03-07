@@ -349,10 +349,18 @@ input[type="radio"]:checked + label .neon-indicator { display: block; }
 
 /* ── View Transitions ── */
 @view-transition { navigation: auto; }
-::view-transition-old(root) { animation: page-fade-out 150ms ease-out; }
-::view-transition-new(root) { animation: page-fade-in 200ms ease-in; }
-@keyframes page-fade-out { from { opacity: 1; } to { opacity: 0; } }
-@keyframes page-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+@property --vt-wipe { syntax: "<number>"; initial-value: 0; inherits: false; }
+@media (prefers-reduced-motion: no-preference) {
+    @keyframes wipe { to { --vt-wipe: 1; } }
+    ::view-transition-old(root),
+    ::view-transition-new(root) { backface-visibility: hidden; mix-blend-mode: normal; }
+    ::view-transition-old(root) { animation: none; }
+    ::view-transition-new(root) {
+        animation: wipe 0.4s cubic-bezier(0.45, 0, 0.35, 1) both;
+        mask-image: linear-gradient(180deg, #000 calc(-70% + 170% * var(--vt-wipe)), transparent calc(170% * var(--vt-wipe)));
+    }
+}
 @media (prefers-reduced-motion: reduce) {
     ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
