@@ -106,6 +106,9 @@ templ searchContentInner(data ui.SearchViewData) {
 		@shared.ErrorAlert(data.Error)
 	}
 	if data.TotalExtensions > 0 {
+		if data.MatchCapReached {
+			@shared.InfoAlert("This search hit the maximum cap of 100,000 matches and was terminated before finishing. Some extensions may not have been searched.")
+		}
 		<!-- Results Summary -->
 		<div class="glass-inner p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
 			<p class="text-text-body text-base">
