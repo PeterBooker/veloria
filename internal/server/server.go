@@ -31,7 +31,12 @@ type Server struct {
 // Otherwise: plain HTTP on the configured port.
 func New(handler http.Handler, c *config.Config, l *zap.Logger) (*Server, error) {
 	// Wrap the root handler with OTel HTTP instrumentation.
-	instrumentedHandler := otelhttp.NewHandler(handler, "veloria")
+	// Exclude long-lived streaming endpoints that skew duration metrics.
+	instrumentedHandler := otelhttp.NewHandler(handler, "veloria",
+		otelhttp.WithFilter(func(r *http.Request) bool {
+			return r.URL.Path != "/mcp"
+		}),
+	)
 
 	s := &Server{
 		logger: l,
