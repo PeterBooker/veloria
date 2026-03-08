@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 const UserAgent = "Veloria/1.0"
@@ -16,7 +18,7 @@ type httpClients struct {
 }
 
 func newHTTPClients() *httpClients {
-	transport := newTransport()
+	transport := otelhttp.NewTransport(newTransport())
 	return &httpClients{
 		api: &http.Client{
 			Timeout:   30 * time.Second,
