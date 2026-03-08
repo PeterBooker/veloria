@@ -121,12 +121,11 @@ func New(ctx context.Context) (*App, error) {
 	}
 
 	r := router.New(router.RouterDeps{
-		Logger:            l,
-		Registry:          reg,
-		WebDeps:           deps,
-		OGGen:             ogGen,
-		PrometheusHandler: tel.PrometheusHandler,
-		HealthHandler:     health.Handler(healthChecker),
+		Logger:        l,
+		Registry:      reg,
+		WebDeps:       deps,
+		OGGen:         ogGen,
+		HealthHandler: health.Handler(healthChecker),
 		Options: router.Options{
 			HandlerTimeout:   c.HTTPHandlerTimeout,
 			RateLimitEnabled: c.HTTPRateLimitEnabled,

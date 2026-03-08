@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -26,7 +26,9 @@ func newTracerProvider(ctx context.Context, cfg *config.Config, res *resource.Re
 		}
 		return newTracerProviderWithExporter(cfg, res, exporter), nil
 	case "otlp":
-		exporter, err := newOTLPTraceExporter(ctx, cfg)
+		// The HTTP exporter reads OTEL_EXPORTER_OTLP_ENDPOINT and
+		// OTEL_EXPORTER_OTLP_HEADERS from the environment automatically.
+		exporter, err := otlptracehttp.New(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
 		}
@@ -43,14 +45,4 @@ func newTracerProviderWithExporter(cfg *config.Config, res *resource.Resource, e
 		),
 		trace.WithResource(res),
 	)
-}
-
-func newOTLPTraceExporter(ctx context.Context, cfg *config.Config) (trace.SpanExporter, error) {
-	opts := []otlptracegrpc.Option{
-		otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
-	}
-	if cfg.OTLPInsecure {
-		opts = append(opts, otlptracegrpc.WithInsecure())
-	}
-	return otlptracegrpc.New(ctx, opts...)
 }

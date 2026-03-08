@@ -87,9 +87,10 @@ type Config struct {
 	ReconnectInterval time.Duration `env:"RECONNECT_INTERVAL" envDefault:"30s"`
 
 	// OpenTelemetry Configuration
+	// OTelExporterType selects the exporter: "none" (default), "stdout", or "otlp".
+	// When "otlp", the SDK reads standard env vars automatically:
+	//   OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_HEADERS, OTEL_EXPORTER_OTLP_PROTOCOL
 	OTelExporterType     string        `env:"OTEL_EXPORTER_TYPE" envDefault:"none"`
-	OTLPEndpoint         string        `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:"localhost:4317"`
-	OTLPInsecure         bool          `env:"OTEL_EXPORTER_OTLP_INSECURE" envDefault:"true"`
 	TraceBatchTimeout    time.Duration `env:"OTEL_TRACE_BATCH_TIMEOUT" envDefault:"5s"`
 	LogBatchTimeout      time.Duration `env:"OTEL_LOG_BATCH_TIMEOUT" envDefault:"5s"`
 	EnableRuntimeMetrics bool          `env:"OTEL_ENABLE_RUNTIME_METRICS" envDefault:"true"`

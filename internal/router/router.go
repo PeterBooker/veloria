@@ -37,13 +37,12 @@ type Options struct {
 // RouterDeps holds all dependencies needed to construct the router.
 // Optional fields may be nil when the corresponding subsystem is unavailable.
 type RouterDeps struct {
-	Logger            *zap.Logger
-	Registry          *service.Registry
-	WebDeps           *web.Deps
-	OGGen             *ogimage.Generator // OG image generator; or nil
-	PrometheusHandler http.Handler       // Prometheus metrics handler; or nil
-	HealthHandler     http.HandlerFunc   // Health readiness endpoint; or nil
-	Options           Options
+	Logger        *zap.Logger
+	Registry      *service.Registry
+	WebDeps       *web.Deps
+	OGGen         *ogimage.Generator // OG image generator; or nil
+	HealthHandler http.HandlerFunc   // Health readiness endpoint; or nil
+	Options       Options
 }
 
 func New(deps RouterDeps) *chi.Mux {
@@ -85,11 +84,6 @@ func New(deps RouterDeps) *chi.Mux {
 	// Readiness / health check
 	if deps.HealthHandler != nil {
 		r.Get("/health", deps.HealthHandler)
-	}
-
-	// Metrics
-	if deps.PrometheusHandler != nil {
-		r.Handle("/metrics", deps.PrometheusHandler)
 	}
 
 	// Auth routes - dynamically resolved
@@ -235,7 +229,7 @@ func maintenanceMiddleware(reg *service.Registry) func(http.Handler) http.Handle
 			}
 			// Allow health/liveness/admin endpoints through
 			switch {
-			case r.URL.Path == "/up", r.URL.Path == "/health", r.URL.Path == "/metrics":
+			case r.URL.Path == "/up", r.URL.Path == "/health":
 				next.ServeHTTP(w, r)
 			case strings.HasPrefix(r.URL.Path, "/admin/"):
 				next.ServeHTTP(w, r)

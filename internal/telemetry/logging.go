@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -42,7 +42,9 @@ func newLoggerProvider(ctx context.Context, cfg *config.Config, res *resource.Re
 	case "stdout":
 		exporter, err = stdoutlog.New()
 	case "otlp":
-		exporter, err = newOTLPLogExporter(ctx, cfg)
+		// The HTTP exporter reads OTEL_EXPORTER_OTLP_ENDPOINT and
+		// OTEL_EXPORTER_OTLP_HEADERS from the environment automatically.
+		exporter, err = otlploghttp.New(ctx)
 	default:
 		return nil, fmt.Errorf("unsupported exporter type: %s", cfg.OTelExporterType)
 	}
@@ -66,14 +68,4 @@ func newLoggerProvider(ctx context.Context, cfg *config.Config, res *resource.Re
 		Provider: provider,
 		Logger:   zapLogger,
 	}, nil
-}
-
-func newOTLPLogExporter(ctx context.Context, cfg *config.Config) (sdklog.Exporter, error) {
-	opts := []otlploggrpc.Option{
-		otlploggrpc.WithEndpoint(cfg.OTLPEndpoint),
-	}
-	if cfg.OTLPInsecure {
-		opts = append(opts, otlploggrpc.WithInsecure())
-	}
-	return otlploggrpc.New(ctx, opts...)
 }
