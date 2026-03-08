@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 	"errors"
-	"net/http"
 
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
@@ -19,8 +18,6 @@ import (
 type Telemetry struct {
 	// Logger is the configured Zap logger with OTel integration.
 	Logger *zap.Logger
-	// PrometheusHandler is the HTTP handler for /metrics endpoint (nil if not enabled).
-	PrometheusHandler http.Handler
 
 	shutdownFuncs []func(context.Context) error
 }
@@ -59,14 +56,13 @@ func Setup(ctx context.Context, cfg *config.Config) (*Telemetry, error) {
 	otel.SetTracerProvider(tp)
 	t.shutdownFuncs = append(t.shutdownFuncs, tp.Shutdown)
 
-	// Set up meter provider (always Prometheus-scraped, never pushed).
-	metricsResult, err := newMeterProvider(cfg, res)
+	// Set up meter provider.
+	mp, err := newMeterProvider(ctx, cfg, res)
 	if err != nil {
 		return t, errors.Join(err, t.Shutdown(ctx))
 	}
-	otel.SetMeterProvider(metricsResult.Provider)
-	t.shutdownFuncs = append(t.shutdownFuncs, metricsResult.Provider.Shutdown)
-	t.PrometheusHandler = metricsResult.PrometheusHandler
+	otel.SetMeterProvider(mp)
+	t.shutdownFuncs = append(t.shutdownFuncs, mp.Shutdown)
 
 	// Register application metric instruments now that the meter provider is set.
 	if err := InitMetrics(); err != nil {

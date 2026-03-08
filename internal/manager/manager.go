@@ -314,7 +314,7 @@ func (m *Manager) runTasks(ctx context.Context, l *zap.Logger, sem chan struct{}
 				}
 			}
 
-			// Record Prometheus metrics.
+			// Record metrics.
 			repoAttr := attribute.String("repo_type", string(t.ExtensionType))
 			statusAttr := attribute.String("status", status)
 			if telemetry.IndexingTasksTotal != nil {
