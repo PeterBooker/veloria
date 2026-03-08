@@ -29,7 +29,8 @@ func newLoggerProvider(ctx context.Context, cfg *config.Config, res *resource.Re
 		// No OTel log export — Zap works standalone with local output only.
 		zapLogger := velorialog.NewZapLogger(velorialog.Config{
 			ServiceName: cfg.Name,
-			Development: isDev || cfg.AppDebug,
+			Development: isDev,
+			Debug:       cfg.AppDebug,
 		}, nil)
 
 		return &LoggingResult{Logger: zapLogger}, nil
@@ -61,7 +62,8 @@ func newLoggerProvider(ctx context.Context, cfg *config.Config, res *resource.Re
 
 	zapLogger := velorialog.NewZapLogger(velorialog.Config{
 		ServiceName: cfg.Name,
-		Development: isDev || cfg.AppDebug,
+		Development: isDev,
+		Debug:       cfg.AppDebug,
 	}, provider)
 
 	return &LoggingResult{

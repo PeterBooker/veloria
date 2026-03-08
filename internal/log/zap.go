@@ -13,16 +13,17 @@ import (
 // Config holds logging configuration.
 type Config struct {
 	ServiceName string
-	Development bool
+	Development bool // Controls output format (console vs JSON)
+	Debug       bool // Enables debug/info level output (errors/warnings always logged)
 }
 
 // NewZapLogger creates a Zap logger that bridges to OpenTelemetry.
-// In development mode, it uses a console encoder with colored output at Debug level.
-// In production mode, it uses JSON encoding at Warn level.
-// Both modes tee output to both local output and OTel.
+// Development controls the output format: console with color (dev) or JSON (prod).
+// Debug controls the minimum log level: Debug (on) or Warn (off).
+// Errors and warnings are always logged regardless of Debug setting.
 func NewZapLogger(cfg Config, otelProvider *sdklog.LoggerProvider) *zap.Logger {
 	level := zapcore.WarnLevel
-	if cfg.Development {
+	if cfg.Development || cfg.Debug {
 		level = zapcore.DebugLevel
 	}
 
