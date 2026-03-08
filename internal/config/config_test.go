@@ -56,7 +56,7 @@ func TestConfigDefaults(t *testing.T) {
 }
 
 func TestConfigWithEnv(t *testing.T) {
-	setEnv(t, "NAME", "fundy_blaze")
+	setEnv(t, "APP_NAME", "fundy_blaze")
 	setEnv(t, "PORT", "8080")
 	setEnv(t, "ENV", "production")
 	setEnv(t, "DATA_DIR", "/custom/data/dir")

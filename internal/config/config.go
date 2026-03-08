@@ -16,7 +16,7 @@ import (
 var Version = "dev"
 
 type Config struct {
-	Name                  string        `env:"NAME" envDefault:"Veloria Core"`
+	Name                  string        `env:"APP_NAME" envDefault:"Veloria Core"`
 	Port                  int           `env:"PORT" envDefault:"9071" validate:"min=1,max=65535"`
 	Env                   string        `env:"ENV" envDefault:"development"`
 	WorkingDir            string        `envDefault:"/"`
@@ -90,10 +90,12 @@ type Config struct {
 	// OTelExporterType selects the exporter: "none" (default), "stdout", or "otlp".
 	// When "otlp", the SDK reads standard env vars automatically:
 	//   OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_HEADERS, OTEL_EXPORTER_OTLP_PROTOCOL
-	OTelExporterType     string        `env:"OTEL_EXPORTER_TYPE" envDefault:"none"`
-	TraceBatchTimeout    time.Duration `env:"OTEL_TRACE_BATCH_TIMEOUT" envDefault:"5s"`
-	LogBatchTimeout      time.Duration `env:"OTEL_LOG_BATCH_TIMEOUT" envDefault:"5s"`
-	EnableRuntimeMetrics bool          `env:"OTEL_ENABLE_RUNTIME_METRICS" envDefault:"true"`
+	OTelExporterType       string        `env:"OTEL_EXPORTER_TYPE" envDefault:"none"`
+	OTelServiceNamespace   string        `env:"OTEL_SERVICE_NAMESPACE" envDefault:"veloria"`
+	OTelServiceInstanceID  string        `env:"OTEL_SERVICE_INSTANCE_ID" envDefault:""`
+	TraceBatchTimeout      time.Duration `env:"OTEL_TRACE_BATCH_TIMEOUT" envDefault:"5s"`
+	LogBatchTimeout        time.Duration `env:"OTEL_LOG_BATCH_TIMEOUT" envDefault:"5s"`
+	EnableRuntimeMetrics   bool          `env:"OTEL_ENABLE_RUNTIME_METRICS" envDefault:"true"`
 
 	// Application URL (production TLS via certmagic)
 	AppURL             string   `env:"APP_URL" envDefault:""`
