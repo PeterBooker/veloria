@@ -14,6 +14,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"gorm.io/gorm"
 
 	api "veloria/internal/api"
@@ -21,6 +23,7 @@ import (
 	"veloria/internal/index"
 	"veloria/internal/manager"
 	searchmodel "veloria/internal/search/model"
+	"veloria/internal/telemetry"
 	typespb "veloria/internal/types"
 	uipage "veloria/internal/ui/page"
 	"veloria/internal/ui/partial"
@@ -349,6 +352,7 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 	searchCtx, searchCancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer searchCancel()
 
+	searchStart := time.Now()
 	results, err := d.Search().Search(searchCtx, repo, term, &manager.SearchParams{
 		FileMatch:        fileMatch,
 		ExcludeFileMatch: excludeMatch,
@@ -357,6 +361,15 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 			d.Progress.Set(searchID, searched, total)
 		},
 	})
+	searchElapsed := time.Since(searchStart).Seconds()
+
+	attrs := metric.WithAttributes(
+		attribute.String("source", repo),
+		attribute.String("type", "web"),
+	)
+	telemetry.SearchCount.Add(context.Background(), 1, attrs)
+	telemetry.SearchDuration.Record(context.Background(), searchElapsed, attrs)
+
 	if err != nil {
 		slog.Error("search failed", "id", searchID, "term", term, "error", err)
 		d.DB().Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusFailed)

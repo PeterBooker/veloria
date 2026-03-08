@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"gorm.io/gorm"
 
 	"veloria/internal/index"
@@ -21,6 +23,7 @@ import (
 	"veloria/internal/repo"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/storage"
+	"veloria/internal/telemetry"
 	typespb "veloria/internal/types"
 	"veloria/internal/web"
 )
@@ -108,12 +111,22 @@ func (s *DirectService) Search(ctx context.Context, params SearchParams) (string
 	}
 	defer releaseSearchSlot()
 
+	searchStart := time.Now()
 	results, err := s.manager.Search(ctx, params.Repo, params.Query, &manager.SearchParams{
 		FileMatch:        params.FileMatch,
 		ExcludeFileMatch: params.ExcludeFileMatch,
 		CaseInsensitive:  !params.CaseSensitive,
 		LinesOfContext:   contextLinesToUint(params.ContextLines),
 	})
+	searchElapsed := time.Since(searchStart).Seconds()
+
+	attrs := metric.WithAttributes(
+		attribute.String("source", params.Repo),
+		attribute.String("type", "mcp"),
+	)
+	telemetry.SearchCount.Add(context.Background(), 1, attrs)
+	telemetry.SearchDuration.Record(context.Background(), searchElapsed, attrs)
+
 	if err != nil {
 		return "", nil, fmt.Errorf("search failed: %w", err)
 	}

@@ -154,9 +154,12 @@ func runAPISearchAsync(db *gorm.DB, m *manager.Manager, s3 storage.ResultStorage
 	})
 	searchElapsed := time.Since(searchStart).Seconds()
 
-	repoAttr := attribute.String("repo", req.Repo)
-	telemetry.SearchCount.Add(context.Background(), 1, metric.WithAttributes(repoAttr))
-	telemetry.SearchDuration.Record(context.Background(), searchElapsed, metric.WithAttributes(repoAttr))
+	attrs := metric.WithAttributes(
+		attribute.String("source", req.Repo),
+		attribute.String("type", "api"),
+	)
+	telemetry.SearchCount.Add(context.Background(), 1, attrs)
+	telemetry.SearchDuration.Record(context.Background(), searchElapsed, attrs)
 
 	if err != nil {
 		slog.Error("search failed", "id", searchID, "term", req.Term, "error", err)
