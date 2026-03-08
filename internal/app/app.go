@@ -342,7 +342,7 @@ func (a *App) initDB() error {
 	c := a.Config
 
 	var logLevel gormlogger.LogLevel
-	if c.AppDebug {
+	if c.DBDebug {
 		logLevel = gormlogger.Info
 	} else {
 		logLevel = gormlogger.Error

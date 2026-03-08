@@ -80,8 +80,11 @@ type Config struct {
 	// MCP: enable the remote MCP server endpoint
 	MCPEnabled bool `env:"MCP_ENABLED" envDefault:"true"`
 
-	// Debug mode: controls informational (non-error/warning) log output
+	// Debug mode: enables extra informational log output (errors/warnings always logged)
 	AppDebug bool `env:"APP_DEBUG" envDefault:"false"`
+
+	// DB debug mode: logs all SQL queries (default: only errors)
+	DBDebug bool `env:"DB_DEBUG" envDefault:"false"`
 
 	// Reconnect interval: how often to retry failed service connections
 	ReconnectInterval time.Duration `env:"RECONNECT_INTERVAL" envDefault:"30s"`
