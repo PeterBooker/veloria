@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -357,6 +358,10 @@ func (a *App) initDB() error {
 	db, err := gorm.Open(postgres.Open(dbString), &gorm.Config{Logger: dbLogger})
 	if err != nil {
 		return fmt.Errorf("DB connection start failure: %w", err)
+	}
+
+	if err := db.Use(otelgorm.NewPlugin()); err != nil {
+		return fmt.Errorf("failed to register otelgorm plugin: %w", err)
 	}
 
 	sqlDB, err := db.DB()
