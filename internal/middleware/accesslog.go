@@ -29,13 +29,15 @@ func AccessLog(logger *zap.Logger) func(http.Handler) http.Handler {
 					zap.String("request_id", middleware.GetReqID(r.Context())),
 				}
 
+				msg := r.Method + " " + r.URL.Path
+
 				switch {
 				case status >= 500:
-					logger.Error("HTTP request", fields...)
+					logger.Error(msg, fields...)
 				case status >= 400:
-					logger.Warn("HTTP request", fields...)
+					logger.Warn(msg, fields...)
 				default:
-					logger.Info("HTTP request", fields...)
+					logger.Info(msg, fields...)
 				}
 			}()
 
