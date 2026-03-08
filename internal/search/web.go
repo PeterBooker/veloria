@@ -80,6 +80,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 		if s.Status == searchmodel.StatusCompleted {
 			if s.TotalMatches != nil {
 				data.TotalMatches = *s.TotalMatches
+				data.MatchCapReached = *s.TotalMatches >= 100_000
 			}
 			if s.TotalExtensions != nil {
 				data.TotalExtensions = *s.TotalExtensions
