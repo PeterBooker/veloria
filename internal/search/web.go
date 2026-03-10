@@ -396,7 +396,7 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 		"results_size":     size,
 		"completed_at":     now,
 		"total_matches":    totalMatches,
-		"total_extensions": results.Total,
+		"total_extensions": len(results.Results),
 	})
 }
 
