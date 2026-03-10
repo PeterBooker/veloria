@@ -571,7 +571,7 @@ type extensionRow struct {
 // convertManagerResponse converts a manager.SearchResponse to our MCP SearchResponse.
 func convertManagerResponse(results *manager.SearchResponse) *SearchResponse {
 	resp := &SearchResponse{
-		TotalExtensions: results.Total,
+		TotalExtensions: len(results.Results),
 		Extensions:      make([]ExtensionResult, 0, len(results.Results)),
 	}
 

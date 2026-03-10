@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"

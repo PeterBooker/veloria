@@ -169,7 +169,7 @@ func runAPISearchAsync(db *gorm.DB, m *manager.Manager, s3 storage.ResultStorage
 
 	now := time.Now()
 	totalMatches := web.CountTotalMatches(results)
-	persistSearchResults(db, s3, searchID, results, now, totalMatches, results.Total)
+	persistSearchResults(db, s3, searchID, results, now, totalMatches, len(results.Results))
 }
 
 // persistSearchResults uploads search results to S3 and updates the DB record.
