@@ -186,7 +186,7 @@ templ Extension(data ui.ExtensionData) {
 		if data.Indexed && len(data.LargestFiles) > 0 {
 			<!-- Largest Files -->
 			<div class="glass-inner overflow-hidden mb-6">
-				<div class="px-6 py-4" style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+				<div class="px-6 py-4 border-b-medium">
 					<h2 class="text-xl font-semibold text-text-bright">Largest Files</h2>
 					<p class="text-sm text-text-muted">Top { strconv.Itoa(len(data.LargestFiles)) } by size</p>
 				</div>

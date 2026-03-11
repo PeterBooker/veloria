@@ -7,7 +7,7 @@ import (
 
 templ Base(pd ui.PageData) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang="en" data-theme="dark">
 	<head>
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -16,6 +16,7 @@ templ Base(pd ui.PageData) {
 		@Head(pd)
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
 		<link rel="icon" href="/favicon.ico" sizes="32x32"/>
+		@themeInitScript()
 		<link rel="stylesheet" href={ "/static/css/styles.css?v=" + pd.Version }/>
 		<script src={ "/static/js/htmx.min.js?v=" + pd.Version }></script>
 	</head>
@@ -34,6 +35,7 @@ templ Base(pd ui.PageData) {
 		@nav.Footer(pd.Version, pd.RequestStart)
 		<div id="context-modal"></div>
 		@mobileMenuScript()
+		@themeToggleScript()
 	</body>
 	</html>
 }
@@ -46,6 +48,28 @@ templ neonGrid() {
 		<div class="neon-blob-4"></div>
 		<div class="neon-scanlines"></div>
 	</div>
+}
+
+// themeInitScript runs before CSS loads to avoid flash-of-wrong-theme.
+templ themeInitScript() {
+	<script>
+		(function() {
+			var t = localStorage.getItem('veloria-theme');
+			if (!t) t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+			document.documentElement.dataset.theme = t;
+		})();
+	</script>
+}
+
+templ themeToggleScript() {
+	<script>
+		function toggleTheme() {
+			var html = document.documentElement;
+			var next = html.dataset.theme === 'light' ? 'dark' : 'light';
+			html.dataset.theme = next;
+			localStorage.setItem('veloria-theme', next);
+		}
+	</script>
 }
 
 templ mobileMenuScript() {

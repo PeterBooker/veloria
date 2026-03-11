@@ -20,7 +20,7 @@ templ DataSourceItems(data ui.DataSourceItemsData) {
 	if len(data.Items) > 0 {
 		<div>
 			for _, item := range data.Items {
-				<a href={ templ.SafeURL("/data-sources/" + data.DataSource + "/" + item.Slug) } class="px-6 py-4 flex items-center justify-between hover:bg-white/[0.08] transition-colors block" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+				<a href={ templ.SafeURL("/data-sources/" + data.DataSource + "/" + item.Slug) } class="px-6 py-4 flex items-center justify-between hover:bg-white/[0.08] transition-colors block border-b-medium">
 					<div class="flex items-center gap-4">
 						<div>
 							<h3 class="text-text-bright font-medium">{ item.Name }</h3>
@@ -42,7 +42,7 @@ templ DataSourceItems(data ui.DataSourceItemsData) {
 		</div>
 		<!-- Pagination -->
 		if data.TotalPages > 1 {
-			<div class="px-6 py-4 flex items-center justify-between" style="border-top: 1px solid rgba(255,255,255,0.08);">
+			<div class="px-6 py-4 flex items-center justify-between border-t-medium">
 				<p class="text-sm text-text-muted">
 					{ fmt.Sprintf("Page %d of %d", data.Page, data.TotalPages) }
 				</p>

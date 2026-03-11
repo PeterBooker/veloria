@@ -18,6 +18,10 @@ templ DesktopHeader(currentPath string, u *user.User) {
 						@DesktopNavLink(item)
 					}
 					<div class="w-px h-6 mx-2 bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
+					<button onclick="toggleTheme()" class="btn-icon-theme" aria-label="Toggle theme" hx-boost="false">
+						<span class="theme-sun">@icon.Sun(18)</span>
+						<span class="theme-moon">@icon.Moon(18)</span>
+					</button>
 					if u != nil {
 						@userSection(u)
 					} else {
