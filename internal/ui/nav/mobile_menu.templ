@@ -12,9 +12,15 @@ templ MobileHeader(currentPath string, u *user.User) {
 				@icon.Logo(28)
 				<span class="text-lg font-bold tracking-wide text-text-bright">Veloria</span>
 			</a>
-			<button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-xl hover:bg-white/5 transition" aria-label="Open menu" aria-expanded="false" id="mobile-menu-button" hx-boost="false">
-				@icon.Menu(24)
-			</button>
+			<div class="flex items-center gap-1">
+				<button onclick="toggleTheme()" class="btn-icon-theme" aria-label="Toggle theme" hx-boost="false">
+					<span class="theme-sun">@icon.Sun(20)</span>
+					<span class="theme-moon">@icon.Moon(20)</span>
+				</button>
+				<button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-xl hover:bg-white/5 transition" aria-label="Open menu" aria-expanded="false" id="mobile-menu-button" hx-boost="false">
+					@icon.Menu(24)
+				</button>
+			</div>
 		</div>
 	</header>
 	<!-- Mobile Menu Overlay -->
