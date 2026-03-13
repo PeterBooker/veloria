@@ -39,6 +39,9 @@ templ userSection(u *user.User) {
 			</div>
 		}
 		<span class="text-sm text-text-body">{ u.Name }</span>
+		<a href="/settings/tokens" class="nav-link text-text-subtle hover:text-text-muted" title="API Tokens">
+			@icon.Key(18)
+		</a>
 		<a href="/logout" hx-boost="false" class="nav-link text-text-subtle hover:text-text-muted text-[18px]">Sign out</a>
 	</div>
 }

@@ -18,6 +18,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"gorm.io/gorm"
 
+	"veloria/internal/auth"
 	"veloria/internal/index"
 	"veloria/internal/manager"
 	"veloria/internal/repo"
@@ -183,6 +184,10 @@ func (s *DirectService) persistSearch(ctx context.Context, params SearchParams, 
 		Private: true, // MCP searches are private by default
 		Term:    params.Query,
 		Repo:    params.Repo,
+	}
+	// Associate with the authenticated user so the search appears in "My Searches".
+	if u := auth.UserFromContext(ctx); u != nil {
+		search.UserID = &u.ID
 	}
 	search.CompletedAt = &now
 	search.TotalMatches = &resp.TotalMatches
