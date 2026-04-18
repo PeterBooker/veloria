@@ -52,23 +52,26 @@ templ themePrePaintScript() {
 templ themeToggleScript() {
 	<script>
 		(function () {
-			function setTheme(t) {
-				document.documentElement.setAttribute('data-theme', t);
-				try { localStorage.setItem('veloria.theme', t); } catch (_) {}
+			function current() { return document.documentElement.getAttribute('data-theme') || 'dark'; }
+			function sync() {
+				var t = current();
 				document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
 					btn.setAttribute('aria-pressed', String(t === 'light'));
 				});
 			}
-			function current() { return document.documentElement.getAttribute('data-theme') || 'dark'; }
-			document.addEventListener('click', function (e) {
-				var btn = e.target.closest('[data-theme-toggle]');
-				if (!btn) return;
-				e.preventDefault();
-				setTheme(current() === 'dark' ? 'light' : 'dark');
-			});
-			document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
-				btn.setAttribute('aria-pressed', String(current() === 'light'));
-			});
+			if (!window.__veloriaThemeInit) {
+				window.__veloriaThemeInit = true;
+				document.addEventListener('click', function (e) {
+					var btn = e.target.closest('[data-theme-toggle]');
+					if (!btn) return;
+					e.preventDefault();
+					var next = current() === 'dark' ? 'light' : 'dark';
+					document.documentElement.setAttribute('data-theme', next);
+					try { localStorage.setItem('veloria.theme', next); } catch (_) {}
+					sync();
+				});
+			}
+			sync();
 		})();
 	</script>
 }
@@ -90,11 +93,14 @@ templ mobileMenuScript() {
 				document.body.style.overflow = '';
 			}
 		}
-		document.addEventListener('keydown', function (e) {
-			if (e.key === 'Escape') {
-				var menu = document.getElementById('mobile-menu');
-				if (menu && !menu.hasAttribute('hidden')) toggleMobileMenu();
-			}
-		});
+		if (!window.__veloriaMobileMenuInit) {
+			window.__veloriaMobileMenuInit = true;
+			document.addEventListener('keydown', function (e) {
+				if (e.key === 'Escape') {
+					var menu = document.getElementById('mobile-menu');
+					if (menu && !menu.hasAttribute('hidden')) toggleMobileMenu();
+				}
+			});
+		}
 	</script>
 }
