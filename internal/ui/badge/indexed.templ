@@ -2,12 +2,11 @@ package badge
 
 templ Indexed(indexed bool) {
 	if indexed {
-		<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-green-500/10 text-green-400 border-l-2 border-green-400">
+		<span class="pill pill--success">
+			<span class="pill-dot" aria-hidden="true"></span>
 			Indexed
 		</span>
 	} else {
-		<span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-white/5 text-text-muted border-l-2 border-white/20">
-			Pending
-		</span>
+		<span class="pill">Pending</span>
 	}
 }

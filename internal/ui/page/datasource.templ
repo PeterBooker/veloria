@@ -37,49 +37,49 @@ templ DataSource(data ui.DataSourceData) {
 	@layout.Base(data.PageData) {
 		<!-- Heading -->
 		<div class="mb-6 pt-8 lg:pt-10">
-			<nav class="text-sm text-text-subtle mb-3">
-				<a href="/data-sources" class="hover:text-neon-pink hover:underline hover:underline-offset-2 transition-colors">Data Sources</a>
+			<nav class="text-sm text-text-faint mb-3">
+				<a href="/data-sources" class="hover:text-accent-text hover:underline hover:underline-offset-2 transition-colors">Data Sources</a>
 				<span class="mx-2">/</span>
-				<span class="text-text-body font-medium">{ data.DataSourceSummary.Title }</span>
+				<span class="text-text-dim font-medium">{ data.DataSourceSummary.Title }</span>
 			</nav>
 			<div class="flex items-center gap-4">
-				<div class="w-14 h-14 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-neon-pink">
+				<div class="w-14 h-14 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center text-accent-text">
 					@icon.DataSource(data.DataSourceSummary.Type, 28)
 				</div>
 				<div>
-					<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright">{ data.DataSourceSummary.Title }</h1>
-					<p class="text-sm text-text-body">{ "WordPress " + data.DataSourceSummary.Type + " data source" }</p>
+					<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text">{ data.DataSourceSummary.Title }</h1>
+					<p class="text-sm text-text-dim">{ "WordPress " + data.DataSourceSummary.Type + " data source" }</p>
 				</div>
 			</div>
 		</div>
 		<!-- Index Status -->
-		<div class="glass-inner p-6 mb-6">
+		<div class="card p-6 mb-6">
 			<div class="flex items-center justify-between mb-4">
-				<h2 class="text-xl font-semibold text-text-bright">Index Status</h2>
-				<span class="text-sm text-text-muted">{ ui.FormatPercent(data.DataSourceSummary.IndexedPercent) + " complete" }</span>
+				<h2 class="text-xl font-semibold text-text">Index Status</h2>
+				<span class="text-sm text-text-faint">{ ui.FormatPercent(data.DataSourceSummary.IndexedPercent) + " complete" }</span>
 			</div>
 			<div class="grid grid-cols-3 gap-6 mb-4">
 				<div>
-					<p class="text-sm text-text-muted mb-1">Total Items</p>
-					<p class="text-2xl font-bold text-text-bright">{ ui.FormatNumber(data.DataSourceSummary.Total) }</p>
+					<p class="text-sm text-text-faint mb-1">Total Items</p>
+					<p class="text-2xl font-bold text-text">{ ui.FormatNumber(data.DataSourceSummary.Total) }</p>
 				</div>
 				<div>
-					<p class="text-sm text-text-muted mb-1">Indexed</p>
-					<p class="text-2xl font-bold text-text-bright">
+					<p class="text-sm text-text-faint mb-1">Indexed</p>
+					<p class="text-2xl font-bold text-text">
 						{ ui.FormatNumber(data.DataSourceSummary.Indexed) }
-						<span class="text-sm font-normal text-text-subtle">{ "(" + ui.FormatPercent(data.DataSourceSummary.IndexedPercent) + ")" }</span>
+						<span class="text-sm font-normal text-text-faint">{ "(" + ui.FormatPercent(data.DataSourceSummary.IndexedPercent) + ")" }</span>
 					</p>
 				</div>
 				<div>
-					<p class="text-sm text-text-muted mb-1">Not Indexed</p>
-					<p class="text-2xl font-bold text-text-subtle">{ ui.FormatNumber(data.DataSourceSummary.Total - data.DataSourceSummary.Indexed) }</p>
+					<p class="text-sm text-text-faint mb-1">Not Indexed</p>
+					<p class="text-2xl font-bold text-text-faint">{ ui.FormatNumber(data.DataSourceSummary.Total - data.DataSourceSummary.Indexed) }</p>
 				</div>
 			</div>
 			<div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
 				if data.DataSourceSummary.Total > 0 {
-					<div class="h-full rounded-full" style={ fmt.Sprintf("width: %.2f%%; background: linear-gradient(135deg, #ff2d7b, #b44dff);", data.DataSourceSummary.IndexedPercent) }></div>
+					<div class="h-full rounded-full" style={ fmt.Sprintf("width: %.2f%%; background: var(--accent);", data.DataSourceSummary.IndexedPercent) }></div>
 				} else {
-					<div class="h-full bg-text-subtle rounded-full"></div>
+					<div class="h-full bg-text-faint rounded-full"></div>
 				}
 			</div>
 		</div>
@@ -87,18 +87,18 @@ templ DataSource(data ui.DataSourceData) {
 		if data.ActiveInstalls.JSON != "" || data.FileCount.JSON != "" || data.FileSize.JSON != "" {
 			<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
 				if data.ActiveInstalls.JSON != "" {
-					<div class="glass-inner p-6">
+					<div class="card p-6">
 						<div class="flex items-center justify-between mb-2">
-							<h3 class="text-xl font-semibold text-text-bright">Active Installs</h3>
-							<span class="text-xs text-text-subtle">{ "Max " + ui.FormatCompact(int(data.ActiveInstalls.Max)) }</span>
+							<h3 class="text-xl font-semibold text-text">Active Installs</h3>
+							<span class="text-xs text-text-faint">{ "Max " + ui.FormatCompact(int(data.ActiveInstalls.Max)) }</span>
 						</div>
 						<div id="chart-active-installs" style="width:100%;height:200px;" data-chart={ data.ActiveInstalls.JSON }></div>
 					</div>
 				}
 				if data.FileCount.JSON != "" || data.FileSize.JSON != "" {
-					<div class="glass-inner p-6">
+					<div class="card p-6">
 						<div class="flex items-center justify-between mb-2">
-							<h3 class="text-xl font-semibold text-text-bright">File Stats</h3>
+							<h3 class="text-xl font-semibold text-text">File Stats</h3>
 						</div>
 						<div id="chart-file-stats" style="width:100%;height:200px;" data-size-chart={ data.FileSize.JSON } data-count-chart={ data.FileCount.JSON }></div>
 					</div>
@@ -119,9 +119,9 @@ templ DataSource(data ui.DataSourceData) {
 			</div>
 		}
 		<!-- Failed Indexing -->
-		<div class="glass-inner overflow-hidden mb-6">
-			<div class="px-6 py-4 border-b-medium">
-				<h2 class="text-xl font-semibold text-text-bright">Failed Indexing</h2>
+		<div class="card overflow-hidden mb-6">
+			<div class="px-6 py-4 border-b border-border">
+				<h2 class="text-xl font-semibold text-text">Failed Indexing</h2>
 			</div>
 			<div
 				id="failed-indexing"
@@ -131,13 +131,13 @@ templ DataSource(data ui.DataSourceData) {
 			></div>
 		</div>
 		<!-- Items List -->
-		<div class="glass-inner overflow-hidden">
-			<div class="px-6 py-4 flex items-center justify-between gap-4 border-b-medium">
-				<h2 class="text-xl font-semibold text-text-bright flex-shrink-0">
+		<div class="card overflow-hidden">
+			<div class="px-6 py-4 flex items-center justify-between gap-4 border-b border-border">
+				<h2 class="text-xl font-semibold text-text flex-shrink-0">
 					{ datasourceTypeLabel(data.DataSourceSummary.Type) }
 				</h2>
 				<div class="relative w-full max-w-xs">
-					<div class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-subtle pointer-events-none">
+					<div class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-faint pointer-events-none">
 						@icon.Search(16)
 					</div>
 					<input
@@ -150,7 +150,7 @@ templ DataSource(data ui.DataSourceData) {
 						hx-target="#datasource-items"
 						hx-swap="innerHTML"
 						hx-include="this"
-						class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-text-body focus:outline-none focus:border-neon-cyan/40 focus:ring-2 focus:ring-neon-cyan/20 transition"
+						class="field w-full pl-9"
 					/>
 				</div>
 			</div>
@@ -161,10 +161,10 @@ templ DataSource(data ui.DataSourceData) {
 				hx-swap="innerHTML"
 			>
 				<div class="px-6 py-12 flex items-center justify-center">
-					<span class="text-brand-500">
+					<span class="text-accent">
 						@icon.Spinner(20)
 					</span>
-					<span class="ml-2 text-sm text-text-muted">Loading...</span>
+					<span class="ml-2 text-sm text-text-faint">Loading...</span>
 				</div>
 			</div>
 		</div>
@@ -172,23 +172,23 @@ templ DataSource(data ui.DataSourceData) {
 }
 
 templ largestBySize(dsType string, extensions []ui.LargestExtension) {
-	<div class="glass-inner overflow-hidden">
-		<div class="px-6 py-4 border-b-medium">
-			<h2 class="text-xl font-semibold text-text-bright">Largest by Size</h2>
-			<p class="text-sm text-text-muted">{ "Top " + strconv.Itoa(len(extensions)) + " " + datasourceTypeLabel(dsType) }</p>
+	<div class="card overflow-hidden">
+		<div class="px-6 py-4 border-b border-border">
+			<h2 class="text-xl font-semibold text-text">Largest by Size</h2>
+			<p class="text-sm text-text-faint">{ "Top " + strconv.Itoa(len(extensions)) + " " + datasourceTypeLabel(dsType) }</p>
 		</div>
 		<div class="p-6">
 			<div class="space-y-3">
 				for _, ext := range extensions {
 					<a href={ templ.SafeURL("/data-sources/" + dsType + "/" + ext.Slug) } class="group block">
 						<div class="flex items-center justify-between text-sm mb-1">
-							<span class="text-text-body group-hover:text-brand-600 group-hover:underline font-medium truncate transition-colors duration-200">{ ext.Name }</span>
-							<span class="text-text-muted ml-2 flex-shrink-0">{ ui.FormatBytes(ext.TotalSize) }</span>
+							<span class="text-text-dim group-hover:text-accent-text group-hover:underline font-medium truncate transition-colors duration-200">{ ext.Name }</span>
+							<span class="text-text-faint ml-2 flex-shrink-0">{ ui.FormatBytes(ext.TotalSize) }</span>
 						</div>
 						<div class="h-1 bg-white/[0.04] rounded-full overflow-hidden">
 							<div
 								class="h-full rounded-full transition-all duration-300 opacity-50 group-hover:opacity-80"
-								style={ "width: " + barWidth(ext.TotalSize, maxTotalSize(extensions)) + "; background: linear-gradient(135deg, #ff2d7b, #b44dff);" }
+								style={ "width: " + barWidth(ext.TotalSize, maxTotalSize(extensions)) + "; background: var(--accent);" }
 							></div>
 						</div>
 					</a>
@@ -199,23 +199,23 @@ templ largestBySize(dsType string, extensions []ui.LargestExtension) {
 }
 
 templ largestByFileCount(dsType string, extensions []ui.LargestExtension) {
-	<div class="glass-inner overflow-hidden">
-		<div class="px-6 py-4 border-b-medium">
-			<h2 class="text-xl font-semibold text-text-bright">Most Files</h2>
-			<p class="text-sm text-text-muted">{ "Top " + strconv.Itoa(len(extensions)) + " " + datasourceTypeLabel(dsType) }</p>
+	<div class="card overflow-hidden">
+		<div class="px-6 py-4 border-b border-border">
+			<h2 class="text-xl font-semibold text-text">Most Files</h2>
+			<p class="text-sm text-text-faint">{ "Top " + strconv.Itoa(len(extensions)) + " " + datasourceTypeLabel(dsType) }</p>
 		</div>
 		<div class="p-6">
 			<div class="space-y-3">
 				for _, ext := range extensions {
 					<a href={ templ.SafeURL("/data-sources/" + dsType + "/" + ext.Slug) } class="group block">
 						<div class="flex items-center justify-between text-sm mb-1">
-							<span class="text-text-body group-hover:text-brand-600 group-hover:underline font-medium truncate transition-colors duration-200">{ ext.Name }</span>
-							<span class="text-text-muted ml-2 flex-shrink-0">{ ui.FormatNumber(ext.FileCount) + " files" }</span>
+							<span class="text-text-dim group-hover:text-accent-text group-hover:underline font-medium truncate transition-colors duration-200">{ ext.Name }</span>
+							<span class="text-text-faint ml-2 flex-shrink-0">{ ui.FormatNumber(ext.FileCount) + " files" }</span>
 						</div>
 						<div class="h-1 bg-white/[0.04] rounded-full overflow-hidden">
 							<div
 								class="h-full rounded-full transition-all duration-300 opacity-50 group-hover:opacity-80"
-								style={ "width: " + barWidthInt(ext.FileCount, maxFileCount(extensions)) + "; background: linear-gradient(135deg, #b44dff, #00e5ff);" }
+								style={ "width: " + barWidthInt(ext.FileCount, maxFileCount(extensions)) + "; background: var(--accent-2);" }
 							></div>
 						</div>
 					</a>
@@ -249,8 +249,11 @@ templ datasourceChartsInit() {
 	<script>
 	(function() {
 		function init() {
-			var brand500 = '#ff2d7b';
-			var brand300 = '#b44dff';
+			var cs = getComputedStyle(document.documentElement);
+			var brand500 = cs.getPropertyValue('--accent').trim() || '#22d3ee';
+			var brand300 = cs.getPropertyValue('--accent-2').trim() || '#ec4899';
+			var textFaint = cs.getPropertyValue('--text-faint').trim() || '#858599';
+			var borderColor = cs.getPropertyValue('--border').trim() || 'rgba(255,255,255,0.06)';
 
 			function fmtBytes(b) {
 				if (b >= 1073741824) return (b/1073741824).toFixed(1)+' GB';
@@ -272,12 +275,12 @@ templ datasourceChartsInit() {
 				chart.setOption({
 					grid: { top: 10, right: 16, bottom: 24, left: 50 },
 					xAxis: { type: 'category', show: false, data: data.map(function(_,i){return i;}) },
-					yAxis: { type: 'value', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
+					yAxis: { type: 'value', axisLabel: { fontSize: 10, color: textFaint, formatter: function(v){return fmtCompact(v);} }, splitLine: { lineStyle: { color: borderColor } } },
 					tooltip: { trigger: 'axis', formatter: function(p){ return 'Active installs: '+fmtCompact(p[0].value); } },
 					series: [{
 						type: 'line', data: data, showSymbol: false, smooth: true,
 						lineStyle: { color: brand500, width: 2 },
-						areaStyle: { color: 'rgba(255,45,123,0.08)' },
+						areaStyle: { color: 'rgba(34,211,238,0.08)' },
 						itemStyle: { color: brand500 }
 					}]
 				});
@@ -303,11 +306,11 @@ templ datasourceChartsInit() {
 						grid: { top: 10, right: 60, bottom: 24, left: 50 },
 						xAxis: { type: 'category', show: false, data: (sizeData.length ? sizeData : countData).map(function(_,i){return i;}) },
 						yAxis: [
-							{ type: 'value', position: 'left', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtBytes(v);} }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)' } } },
-							{ type: 'value', position: 'right', axisLabel: { fontSize: 10, color: '#4e5666', formatter: function(v){return fmtCompact(v);} }, splitLine: { show: false } }
+							{ type: 'value', position: 'left', axisLabel: { fontSize: 10, color: textFaint, formatter: function(v){return fmtBytes(v);} }, splitLine: { lineStyle: { color: borderColor } } },
+							{ type: 'value', position: 'right', axisLabel: { fontSize: 10, color: textFaint, formatter: function(v){return fmtCompact(v);} }, splitLine: { show: false } }
 						],
 						tooltip: { trigger: 'axis', formatter: function(p){ var s=''; for(var i=0;i<p.length;i++){s+=p[i].marker+' '+p[i].seriesName+': '+(p[i].seriesName==='Total size'?fmtBytes(p[i].value):fmtCompact(p[i].value))+'<br>';} return s; } },
-						legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: '#7a8394' } },
+						legend: { bottom: 0, itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 10, color: textFaint } },
 						series: series
 					});
 					window.addEventListener('resize', function(){ chart.resize(); });

@@ -21,55 +21,39 @@ templ datasourceIcon(dsType string, size int) {
 
 templ DataSources(data ui.DataSourcesData) {
 	@layout.Base(data.PageData) {
-		<!-- Heading -->
-		<div class="mb-6 pt-8 lg:pt-10">
-			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Data Sources</h1>
-			<p class="text-sm text-text-body">Browse indexed WordPress data sources</p>
-		</div>
-		<!-- Data Source Cards -->
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-			for _, ds := range data.DataSourceSummaries {
-				<a href={ templ.SafeURL("/data-sources/" + ds.Type) } class="glass-inner group block p-6 hover:shadow-lg hover:border-brand-300 transition-all duration-300">
-					<div class="flex items-center gap-4 mb-4">
-						<div class="w-12 h-12 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center group-hover:border-brand-200 transition-colors">
-							<span class={ datasourceIconColor(ds.Type) }>
-								@datasourceIcon(ds.Type, 24)
-							</span>
+		<section class="view">
+			<div style="margin-bottom: var(--s-6);">
+				<span class="eyebrow">Data sources</span>
+				<h1 style="font-size: var(--fs-h2); font-weight:700; letter-spacing: var(--ls-tight); line-height: var(--lh-tight); margin: var(--s-2) 0 var(--s-1); color: var(--text);">Data Sources</h1>
+				<p style="color: var(--text-dim); font-size: var(--fs-minor);">Browse indexed WordPress data sources</p>
+			</div>
+			<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--s-3);">
+				for _, ds := range data.DataSourceSummaries {
+					<a href={ templ.SafeURL("/data-sources/" + ds.Type) } class="card" style="padding: var(--s-5); text-decoration: none; display:block;">
+						<div style="display:flex; align-items:center; gap: var(--s-3); margin-bottom: var(--s-4);">
+							<div style="width:44px; height:44px; border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; color: var(--accent-text);">
+								@datasourceIcon(ds.Type, 22)
+							</div>
+							<div>
+								<h3 style="font-size: var(--fs-lead); font-weight: 600; color: var(--text); margin-bottom: 2px;">{ ds.Title }</h3>
+								<p style="font-size: var(--fs-micro); color: var(--text-faint); text-transform: capitalize;">{ ds.Type } data source</p>
+							</div>
 						</div>
-						<div>
-							<h3 class="text-xl font-semibold text-text-bright group-hover:text-brand-600 transition-colors">{ ds.Title }</h3>
-							<p class="text-sm text-text-subtle capitalize">{ ds.Type } data source</p>
+						<div style="display:flex; align-items:center; justify-content:space-between; font-size: var(--fs-micro); color: var(--text-dim); margin-bottom: var(--s-3); font-family: var(--font-mono);">
+							<span><strong style="color: var(--text); font-weight:600;">{ ui.FormatNumber(ds.Total) }</strong> total</span>
+							<span><strong style="color: var(--text); font-weight:600;">{ ui.FormatNumber(ds.Indexed) }</strong> indexed</span>
 						</div>
-					</div>
-					<div class="flex items-center justify-between text-sm text-text-muted mb-3">
-						<span>
-							<span class="text-text-bright font-semibold">{ ui.FormatNumber(ds.Total) }</span> total
-						</span>
-						<span>
-							<span class="text-text-bright font-semibold">{ ui.FormatNumber(ds.Indexed) }</span> indexed
-						</span>
-					</div>
-					<div class="h-2 bg-white/[0.06] rounded-full overflow-hidden">
-						if ds.Total > 0 {
-							<div class="h-full rounded-full transition-all duration-300" style={ fmt.Sprintf("width: %.2f%%; background: linear-gradient(135deg, #ff2d7b, #b44dff)", ds.IndexedPercent) }></div>
-						} else {
-							<div class="h-full bg-text-subtle rounded-full"></div>
-						}
-					</div>
-					<p class="mt-3 text-xs text-text-subtle text-right">{ ui.FormatPercent(ds.IndexedPercent) } indexed</p>
-				</a>
-			}
-		</div>
-	}
-}
-
-func datasourceIconColor(dsType string) string {
-	switch dsType {
-	case "plugins":
-		return "text-neon-pink"
-	case "themes":
-		return "text-neon-purple"
-	default:
-		return "text-neon-cyan"
+						<div class="progress">
+							if ds.Total > 0 {
+								<div class="progress__bar" style={ fmt.Sprintf("width: %.2f%%", ds.IndexedPercent) }></div>
+							} else {
+								<div class="progress__bar" style="width: 0%;"></div>
+							}
+						</div>
+						<p style="margin-top: var(--s-2); font-size: var(--fs-micro); color: var(--text-faint); text-align: right; font-family: var(--font-mono);">{ ui.FormatPercent(ds.IndexedPercent) } indexed</p>
+					</a>
+				}
+			</div>
+		</section>
 	}
 }

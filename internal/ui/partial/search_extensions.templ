@@ -19,67 +19,58 @@ func searchExtensionsURL(searchID string, page int, search string) string {
 func extDetailAttrs(searchID, slug string) templ.Attributes {
 	jsCall := "toggleExtDetail(this, '/search/" + searchID + "/extension/" + slug + "', 'ext-detail-" + slug + "')"
 	return templ.Attributes{
-		"role":        "button",
-		"tabindex":    "0",
 		"aria-expanded": "false",
-		"onclick":     jsCall,
-		"onkeydown":   "if(event.key==='Enter'||event.key===' '){event.preventDefault();" + jsCall + "}",
+		"aria-controls": "ext-detail-" + slug,
+		"onclick":       jsCall,
+		"onkeydown":     "if(event.key==='Enter'||event.key===' '){event.preventDefault();" + jsCall + "}",
 	}
 }
 
 templ SearchExtensions(data ui.SearchExtensionsData) {
 	if len(data.Extensions) > 0 {
-		<div class="flex flex-col gap-3">
+		<div id="result-list" aria-label="Search results">
 			for _, ext := range data.Extensions {
-				<!-- Extension Row -->
-				<article class="rounded-xl overflow-hidden bg-[rgba(0,0,0,0.4)] border border-white/[0.08] hover:border-white/[0.14] transition-colors">
-					<!-- Clickable Header -->
-					<div
-						class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 lg:px-5 py-3.5 bg-white/[0.03] hover:bg-white/[0.06] transition-colors cursor-pointer"
+				<article class="result">
+					<button
+						type="button"
+						class="result__head"
 						{ extDetailAttrs(data.SearchID, ext.Slug)... }
 					>
-						<div class="flex items-center gap-3 text-text-body min-w-0">
-							<svg data-chevron class="w-4 h-4 text-text-subtle shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-								<polyline points="9 18 15 12 9 6"></polyline>
-							</svg>
-							<div class="min-w-0">
-								<span class="text-text-bright text-sm lg:text-base font-semibold block truncate">{ ext.Name }</span>
-								<span class="text-text-subtle text-xs font-mono block truncate">{ ext.Slug }/{ ext.Version }</span>
-							</div>
+						<div class="result__info">
+							<div class="result__title">{ ext.Name }</div>
+							<div class="result__slug">{ ext.Slug }/{ ext.Version }</div>
 						</div>
-						<div class="flex flex-wrap items-center gap-2.5 sm:gap-4 pl-7 sm:pl-0">
-							@badge.DataSourceType(data.SearchDataSource)
-							if ext.ActiveInstalls > 0 {
-								<span class="text-text-muted text-xs whitespace-nowrap">{ ui.FormatInstalls(ext.ActiveInstalls) } installs</span>
-							}
-							<span class="text-neon-cyan text-sm font-bold whitespace-nowrap">{ ui.FormatNumber(ext.TotalMatches) } matches</span>
-						</div>
-					</div>
-					<!-- Detail Container (hidden until header clicked) -->
-					<div data-detail class="hidden border-t border-white/[0.08]">
+						@badge.DataSourceType(data.SearchDataSource)
+						if ext.ActiveInstalls > 0 {
+							<span class="result__installs">{ ui.FormatInstalls(ext.ActiveInstalls) } installs</span>
+						} else {
+							<span class="result__installs">—</span>
+						}
+						<span class="result__matches">{ ui.FormatNumber(ext.TotalMatches) } { matchLabel(ext.TotalMatches) }</span>
+						<span class="result__chev" aria-hidden="true">›</span>
+					</button>
+					<div class="result__body" hidden>
 						<div id={ "ext-detail-" + ext.Slug }>
-							<div class="flex items-center justify-center gap-2 py-8 text-text-subtle" role="status" aria-label="Loading">
-								<div class="w-4 h-4 border-2 border-white/[0.06] border-t-neon-pink rounded-full animate-spin" aria-hidden="true"></div>
-								<span class="text-xs">Loading matches...</span>
+							<div class="codeline" role="status" aria-label="Loading">
+								<div class="codeline__ln">…</div>
+								<div class="codeline__src" style="color: var(--text-faint);">Loading matches…</div>
+								<span></span>
 							</div>
 						</div>
 					</div>
 				</article>
 			}
 		</div>
-		<!-- Pagination -->
 		if data.TotalPages > 1 {
-			<div class="mt-4 flex items-center justify-between">
-				<p class="text-sm text-text-muted">
-					{ fmt.Sprintf("Page %d of %d", data.Page, data.TotalPages) }
-				</p>
-				<div class="flex items-center gap-2">
+			<div style="margin-top: var(--s-5); display:flex; align-items:center; justify-content:space-between; gap: var(--s-3); flex-wrap: wrap;">
+				<p class="eyebrow" style="color: var(--text-dim);">{ fmt.Sprintf("Page %d of %d", data.Page, data.TotalPages) }</p>
+				<div style="display:flex; gap: var(--s-2);">
 					if data.Page > 1 {
 						<button
 							hx-get={ searchExtensionsURL(data.SearchID, data.Page-1, data.Search) }
 							hx-target="#search-extensions"
 							hx-swap="innerHTML"
-							class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+							class="btn"
 						>
 							Previous
 						</button>
@@ -89,7 +80,7 @@ templ SearchExtensions(data ui.SearchExtensionsData) {
 							hx-get={ searchExtensionsURL(data.SearchID, data.Page+1, data.Search) }
 							hx-target="#search-extensions"
 							hx-swap="innerHTML"
-							class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+							class="btn"
 						>
 							Next
 						</button>
@@ -98,12 +89,21 @@ templ SearchExtensions(data ui.SearchExtensionsData) {
 			</div>
 		}
 	} else {
-		<div class="text-center py-12">
-			if data.Search != "" {
-				<p class="text-text-muted text-sm">No extensions matching "{ data.Search }".</p>
-			} else {
-				<p class="text-text-muted text-sm">No matching extensions found.</p>
-			}
+		<div class="empty">
+			<div class="empty__title" style="font-size: var(--fs-minor); font-weight: 500;">
+				if data.Search != "" {
+					No extensions matching "{ data.Search }".
+				} else {
+					No matching extensions found.
+				}
+			</div>
 		</div>
 	}
+}
+
+func matchLabel(n int) string {
+	if n == 1 {
+		return "match"
+	}
+	return "matches"
 }

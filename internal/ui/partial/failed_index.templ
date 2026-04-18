@@ -13,44 +13,40 @@ func failedIndexURL(dsType string, page int) string {
 
 templ FailedIndex(data ui.FailedIndexData) {
 	if len(data.Events) > 0 {
-		<div class="overflow-x-auto">
-			<table class="w-full">
-				<thead style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
+		<div style="overflow-x:auto;">
+			<table class="table" style="border:0; border-radius:0; box-shadow:none;">
+				<thead>
 					<tr>
-						<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body">Slug</th>
-						<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body">Error</th>
-						<th scope="col" class="px-5 py-3 text-left text-sm font-medium text-text-body whitespace-nowrap">Time</th>
+						<th scope="col">Slug</th>
+						<th scope="col">Error</th>
+						<th scope="col" style="white-space:nowrap;">Time</th>
 					</tr>
 				</thead>
 				<tbody>
 					for _, ev := range data.Events {
-						<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-							<td class="px-5 py-3">
-								<a href={ templ.SafeURL("/data-sources/" + data.DataSource + "/" + ev.Slug) } class="text-sm text-brand-600 hover:underline hover:underline-offset-2 font-medium transition-colors">{ ev.Slug }</a>
+						<tr>
+							<td>
+								<a href={ templ.SafeURL("/data-sources/" + data.DataSource + "/" + ev.Slug) } style="color: var(--accent-text); font-family: var(--font-mono); font-size: var(--fs-micro); text-decoration:none;">{ ev.Slug }</a>
 							</td>
-							<td class="px-5 py-3 max-w-md">
-								<span class="text-sm text-text-muted truncate block" title={ ev.ErrorMessage }>{ ev.ErrorMessage }</span>
+							<td style="max-width: 480px;">
+								<span style="color: var(--text-faint); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title={ ev.ErrorMessage }>{ ev.ErrorMessage }</span>
 							</td>
-							<td class="px-5 py-3 whitespace-nowrap">
-								<span class="text-sm text-text-subtle">{ ui.TimeAgo(ev.CreatedAt) }</span>
-							</td>
+							<td style="white-space:nowrap; color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-micro);">{ ui.TimeAgo(ev.CreatedAt) }</td>
 						</tr>
 					}
 				</tbody>
 			</table>
 		</div>
 		if data.TotalPages > 1 {
-			<div class="px-6 py-4 flex items-center justify-between" style="border-top: 1px solid rgba(255,255,255,0.08);">
-				<p class="text-sm text-text-muted">
-					{ fmt.Sprintf("Page %d of %d (%d total)", data.Page, data.TotalPages, data.TotalCount) }
-				</p>
-				<div class="flex items-center gap-2">
+			<div style="display:flex; align-items:center; justify-content:space-between; padding: var(--s-3) var(--s-5); border-top: 1px solid var(--border);">
+				<p class="eyebrow" style="color: var(--text-dim);">{ fmt.Sprintf("Page %d of %d (%d total)", data.Page, data.TotalPages, data.TotalCount) }</p>
+				<div style="display:flex; gap: var(--s-2);">
 					if data.Page > 1 {
 						<button
 							hx-get={ failedIndexURL(data.DataSource, data.Page-1) }
 							hx-target="#failed-indexing"
 							hx-swap="innerHTML"
-							class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+							class="btn"
 						>
 							Previous
 						</button>
@@ -60,7 +56,7 @@ templ FailedIndex(data ui.FailedIndexData) {
 							hx-get={ failedIndexURL(data.DataSource, data.Page+1) }
 							hx-target="#failed-indexing"
 							hx-swap="innerHTML"
-							class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+							class="btn"
 						>
 							Next
 						</button>
@@ -69,8 +65,8 @@ templ FailedIndex(data ui.FailedIndexData) {
 			</div>
 		}
 	} else {
-		<div class="px-6 py-8 text-center">
-			<p class="text-text-muted">No failed indexing attempts.</p>
+		<div style="padding: var(--s-8) var(--s-5); text-align:center; color: var(--text-faint);">
+			<p>No failed indexing attempts.</p>
 		</div>
 	}
 }

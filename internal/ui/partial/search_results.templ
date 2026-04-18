@@ -1,14 +1,7 @@
 package partial
 
+import "veloria/internal/ui/shared"
+
 templ SearchError(errMsg string) {
-	<div class="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-		<div class="flex items-center gap-2">
-			<svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<circle cx="12" cy="12" r="10"></circle>
-				<line x1="12" y1="8" x2="12" y2="12"></line>
-				<line x1="12" y1="16" x2="12.01" y2="16"></line>
-			</svg>
-			<strong>Error:</strong> { errMsg }
-		</div>
-	</div>
+	@shared.ErrorAlert(errMsg)
 }

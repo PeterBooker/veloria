@@ -20,39 +20,34 @@ templ DataSourceItems(data ui.DataSourceItemsData) {
 	if len(data.Items) > 0 {
 		<div>
 			for _, item := range data.Items {
-				<a href={ templ.SafeURL("/data-sources/" + data.DataSource + "/" + item.Slug) } class="px-6 py-4 flex items-center justify-between hover:bg-white/[0.08] transition-colors block" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-					<div class="flex items-center gap-4">
-						<div>
-							<h3 class="text-text-bright font-medium">{ item.Name }</h3>
-							<p class="text-sm text-text-subtle">{ item.Slug }</p>
-						</div>
+				<a href={ templ.SafeURL("/data-sources/" + data.DataSource + "/" + item.Slug) } style="display:flex; align-items:center; justify-content:space-between; gap: var(--s-4); padding: var(--s-3) var(--s-5); border-bottom: 1px solid var(--border); text-decoration:none; color:inherit; transition: background var(--dur-fast) var(--ease);" class="datasource-item">
+					<div>
+						<h3 style="color: var(--text); font-weight:600;">{ item.Name }</h3>
+						<p style="font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-faint);">{ item.Slug }</p>
 					</div>
-					<div class="flex items-center gap-4">
+					<div style="display:flex; align-items:center; gap: var(--s-4); flex-wrap: wrap;">
 						if item.FileCount > 0 {
-							<span class="text-sm text-text-subtle">{ ui.FormatCompact(item.FileCount) } files</span>
+							<span style="font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-faint);">{ ui.FormatCompact(item.FileCount) } files</span>
 						}
 						if item.TotalSize > 0 {
-							<span class="text-sm text-text-subtle">{ ui.FormatBytes(item.TotalSize) }</span>
+							<span style="font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-faint);">{ ui.FormatBytes(item.TotalSize) }</span>
 						}
-						<span class="text-sm text-text-muted">v{ item.Version }</span>
+						<span style="font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-dim);">v{ item.Version }</span>
 						@badge.Indexed(item.Indexed)
 					</div>
 				</a>
 			}
 		</div>
-		<!-- Pagination -->
 		if data.TotalPages > 1 {
-			<div class="px-6 py-4 flex items-center justify-between" style="border-top: 1px solid rgba(255,255,255,0.08);">
-				<p class="text-sm text-text-muted">
-					{ fmt.Sprintf("Page %d of %d", data.Page, data.TotalPages) }
-				</p>
-				<div class="flex items-center gap-2">
+			<div style="display:flex; align-items:center; justify-content:space-between; padding: var(--s-3) var(--s-5); border-top: 1px solid var(--border);">
+				<p class="eyebrow" style="color: var(--text-dim);">{ fmt.Sprintf("Page %d of %d", data.Page, data.TotalPages) }</p>
+				<div style="display:flex; gap: var(--s-2);">
 					if data.Page > 1 {
 						<button
 							hx-get={ datasourceItemsURL(data.DataSource, data.Page-1, data.Search) }
 							hx-target="#datasource-items"
 							hx-swap="innerHTML"
-							class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+							class="btn"
 						>
 							Previous
 						</button>
@@ -62,7 +57,7 @@ templ DataSourceItems(data ui.DataSourceItemsData) {
 							hx-get={ datasourceItemsURL(data.DataSource, data.Page+1, data.Search) }
 							hx-target="#datasource-items"
 							hx-swap="innerHTML"
-							class="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-text-body text-sm hover:bg-white/10 transition-colors cursor-pointer"
+							class="btn"
 						>
 							Next
 						</button>
@@ -71,11 +66,11 @@ templ DataSourceItems(data ui.DataSourceItemsData) {
 			</div>
 		}
 	} else {
-		<div class="px-6 py-12 text-center">
+		<div style="padding: var(--s-10) var(--s-5); text-align:center; color: var(--text-faint);">
 			if data.Search != "" {
-				<p class="text-text-muted">No items matching "{ data.Search }".</p>
+				<p>No items matching "{ data.Search }".</p>
 			} else {
-				<p class="text-text-muted">No items found in this data source.</p>
+				<p>No items found in this data source.</p>
 			}
 		</div>
 	}

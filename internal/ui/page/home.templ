@@ -8,209 +8,148 @@ import (
 
 templ Home(data ui.HomeData) {
 	@layout.Base(data.PageData) {
-		<div class="flex flex-col flex-1">
-			if !data.SearchEnabled {
-				<div class="mt-6 mb-4">
-					<div class="rounded-xl px-4 py-3 text-sm bg-brand-100 border border-brand-300 text-brand-400">
-						<strong>Search temporarily unavailable.</strong>
-						if data.SearchDisabledReason != "" {
-							{ data.SearchDisabledReason }
-						} else {
-							Please try again later.
-						}
+		<section class="view">
+			<div class="page page--narrow" style="padding: 0;">
+				if !data.SearchEnabled {
+					<div class="alert alert--info" role="status">
+						@icon.Info(18)
+						<div>
+							<strong>Search temporarily unavailable.</strong>
+							if data.SearchDisabledReason != "" {
+								{ " " + data.SearchDisabledReason }
+							} else {
+								{ " Please try again later." }
+							}
+						</div>
 					</div>
+				}
+				<div class="hero">
+					<div class="hero__logo" aria-hidden="true">
+						@icon.Logo(56)
+					</div>
+					<h1 class="hero__title">Search WordPress Source Code</h1>
+					<p class="hero__sub">Regex across every plugin, theme, and core version published on WordPress.org - in seconds.</p>
 				</div>
-			}
-			<!-- Hero -->
-			<section class="text-center pt-16 lg:pt-24 mb-8">
-				<div class="mb-5">
-					@icon.Logo(56)
-				</div>
-				<h1 class="text-5xl lg:text-[60px] font-extrabold tracking-tight text-text-bright mb-3.5 leading-tight">Search WordPress Source Code</h1>
-				<p class="text-lg lg:text-xl text-text-muted leading-relaxed max-w-[560px] mx-auto">
-					Regex search across every plugin, theme and core version.
-				</p>
-			</section>
-			<!-- Search Container -->
-			<div class="search-container mb-10 lg:mb-12" id="search-container">
-				<form id="search-form" hx-post="/search">
-					<div class="flex flex-col md:flex-row md:items-center gap-3 lg:gap-4">
+				<form class="search" role="search" aria-label="Search WordPress source code" id="search-form" hx-post="/search">
+					<div class="search__row">
+						<div class="search__prompt" aria-hidden="true">/</div>
+						<label for="regex-search" class="sr-only">Regex pattern</label>
 						<input
-							type="text"
-							name="term"
+							class="search__input"
 							id="regex-search"
+							name="term"
+							type="text"
+							spellcheck="false"
+							autocomplete="off"
+							autocapitalize="off"
 							placeholder={ `apply_filters\(\s*['"]` }
 							required
 							disabled?={ !data.SearchEnabled }
-							class="flex-1 bg-transparent border-none outline-none text-text-bright text-lg lg:text-xl font-medium font-mono py-3.5 caret-neon-cyan"
-							aria-label="Enter regex pattern"
-							aria-describedby="search-tip"
+							aria-describedby="searchHint"
 						/>
-						<button
-							type="submit"
-							class="btn-search w-full md:w-auto px-6 lg:px-8 py-3.5 rounded-xl border-none text-white text-base font-bold cursor-pointer shrink-0 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-neon-cyan/40"
-							disabled?={ !data.SearchEnabled }
-						>
+						<button type="submit" class="search__submit" disabled?={ !data.SearchEnabled }>
 							Search
+							@icon.ArrowRight(14)
 						</button>
 					</div>
-					<div class="search-divider"></div>
-					<!-- Source selector + Visibility toggle -->
-					<div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-3.5">
-						<fieldset>
-							<legend class="sr-only">Select source type</legend>
-							<div class="flex gap-1.5 flex-wrap" role="radiogroup" aria-label="Source type">
-								<div>
-									<input type="radio" name="repo" value="plugins" id="repo-plugins" checked class="sr-only peer" disabled?={ !data.SearchEnabled }/>
-									<label for="repo-plugins" class="block px-3 sm:px-5 py-2 rounded-lg text-lg font-medium cursor-pointer text-text-muted hover:text-text-body peer-checked:text-text-active peer-checked:font-semibold peer-checked:bg-white/[0.07] transition relative">
-										Plugins
-										<span class="hidden neon-indicator absolute bottom-0 left-[15%] right-[15%] h-0.5 rounded-sm bg-neon-pink shadow-[0_0_8px_rgba(255,45,123,0.35)]"></span>
-									</label>
-								</div>
-								<div>
-									<input type="radio" name="repo" value="themes" id="repo-themes" class="sr-only peer" disabled?={ !data.SearchEnabled }/>
-									<label for="repo-themes" class="block px-3 sm:px-5 py-2 rounded-lg text-lg font-medium cursor-pointer text-text-muted hover:text-text-body peer-checked:text-text-active peer-checked:font-semibold peer-checked:bg-white/[0.07] transition relative">
-										Themes
-										<span class="hidden neon-indicator absolute bottom-0 left-[15%] right-[15%] h-0.5 rounded-sm bg-neon-purple shadow-[0_0_8px_rgba(180,77,255,0.35)]"></span>
-									</label>
-								</div>
-								<div>
-									<input type="radio" name="repo" value="cores" id="repo-cores" class="sr-only peer" disabled?={ !data.SearchEnabled }/>
-									<label for="repo-cores" class="block px-3 sm:px-5 py-2 rounded-lg text-lg font-medium cursor-pointer text-text-muted hover:text-text-body peer-checked:text-text-active peer-checked:font-semibold peer-checked:bg-white/[0.07] transition relative">
-										Core
-										<span class="hidden neon-indicator absolute bottom-0 left-[15%] right-[15%] h-0.5 rounded-sm bg-neon-gold shadow-[0_0_8px_rgba(255,215,0,0.35)]"></span>
-									</label>
-								</div>
-							</div>
-						</fieldset>
-						<div class="flex-1"></div>
-						<fieldset>
-							<legend class="sr-only">Select visibility</legend>
-							<div class="flex items-center rounded-lg p-0.5 source-toggle">
-								<div>
-									<input type="radio" name="visibility" value="public" id="vis-public" checked class="sr-only peer" disabled?={ !data.SearchEnabled }/>
-									<label for="vis-public" class="block px-4 py-1.5 rounded-md text-sm font-medium cursor-pointer text-text-muted peer-checked:text-text-active peer-checked:font-semibold peer-checked:bg-white/[0.08] transition relative">
-										Public
-										<span class="hidden neon-indicator absolute bottom-px left-1/4 right-1/4 h-0.5 rounded-sm bg-neon-cyan shadow-[0_0_6px_rgba(0,229,255,0.25)]"></span>
-									</label>
-								</div>
-								<div>
-									<input type="radio" name="visibility" value="private" id="vis-private" class="sr-only peer" disabled?={ !data.SearchEnabled }/>
-									<label for="vis-private" class="block px-4 py-1.5 rounded-md text-sm font-medium cursor-pointer text-text-muted peer-checked:text-text-active peer-checked:font-semibold peer-checked:bg-white/[0.08] transition relative">
-										Private
-										<span class="hidden neon-indicator absolute bottom-px left-1/4 right-1/4 h-0.5 rounded-sm bg-neon-pink shadow-[0_0_6px_rgba(255,45,123,0.25)]"></span>
-									</label>
-								</div>
-							</div>
-						</fieldset>
-					</div>
-					<!-- File type + checkboxes -->
-					<div class="flex flex-wrap items-center gap-4">
-						<div class="flex items-center gap-2">
-							<label for="filetype" class="sr-only">File type</label>
-							<select
-								name="filetype"
-								id="filetype"
-								class="rounded-lg text-text-muted text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neon-cyan/30 appearance-none cursor-pointer bg-white/5 border-[1.5px] border-white/10"
-								disabled?={ !data.SearchEnabled }
-							>
-								<option value="">All files</option>
-								<option value="php">PHP (.php)</option>
-								<option value="js">JavaScript (.js)</option>
-								<option value="css">CSS (.css)</option>
-								<option value="html">HTML (.html)</option>
-								<option value="json">JSON (.json)</option>
-								<option value="xml">XML (.xml)</option>
-								<option value="txt">Text (.txt)</option>
-								<option value="md">Markdown (.md)</option>
-								<option value="sql">SQL (.sql)</option>
+					<div class="search__options">
+						<div class="seg" role="group" aria-label="Data source">
+							<label>
+								<input type="radio" name="repo" value="plugins" checked disabled?={ !data.SearchEnabled }/>
+								Plugins
+							</label>
+							<label>
+								<input type="radio" name="repo" value="themes" disabled?={ !data.SearchEnabled }/>
+								Themes
+							</label>
+							<label>
+								<input type="radio" name="repo" value="cores" disabled?={ !data.SearchEnabled }/>
+								Core
+							</label>
+						</div>
+						<label class="check">
+							<input type="checkbox" name="case_sensitive" checked disabled?={ !data.SearchEnabled }/>
+							case-sensitive
+						</label>
+						<label class="check">
+							<input type="checkbox" name="exclude_minified" disabled?={ !data.SearchEnabled }/>
+							exclude-minified
+						</label>
+						<label class="check" style="gap: var(--s-2);">
+							<span>file-type</span>
+							<select name="filetype" class="field" style="height: 28px; font-size: var(--fs-micro);" disabled?={ !data.SearchEnabled }>
+								<option value="">all</option>
+								<option value="php">.php</option>
+								<option value="js">.js</option>
+								<option value="css">.css</option>
+								<option value="html">.html</option>
+								<option value="json">.json</option>
+								<option value="xml">.xml</option>
+								<option value="txt">.txt</option>
+								<option value="md">.md</option>
+								<option value="sql">.sql</option>
 							</select>
+						</label>
+						<span class="spacer"></span>
+						<div class="seg" role="group" aria-label="Visibility">
+							<label>
+								<input type="radio" name="visibility" value="public" checked disabled?={ !data.SearchEnabled }/>
+								Public
+							</label>
+							<label>
+								<input type="radio" name="visibility" value="private" disabled?={ !data.SearchEnabled }/>
+								Private
+							</label>
 						</div>
-						<label class="flex items-center gap-2 cursor-pointer select-none group">
-							<input
-								type="checkbox"
-								name="case_sensitive"
-								checked
-								class="neon-check w-[18px] h-[18px] rounded-md appearance-none cursor-pointer transition-all border-[1.5px] border-white/10 bg-transparent"
-								disabled?={ !data.SearchEnabled }
-							/>
-							<span class="text-sm text-text-muted group-hover:text-text-body transition">Case sensitive</span>
-						</label>
-						<label class="flex items-center gap-2 cursor-pointer select-none group">
-							<input
-								type="checkbox"
-								name="exclude_minified"
-								class="neon-check w-[18px] h-[18px] rounded-md appearance-none cursor-pointer transition-all border-[1.5px] border-white/10 bg-transparent"
-								disabled?={ !data.SearchEnabled }
-							/>
-							<span class="text-sm text-text-muted group-hover:text-text-body transition whitespace-nowrap">Exclude minified</span>
-						</label>
 					</div>
+					<span id="searchHint" class="sr-only">Uses Go RE2 regex syntax. Press enter to search.</span>
 				</form>
-			</div>
-			<!-- Pre-search content -->
-			<div class="animate-fade-up">
-				if len(data.RecentSearches) > 0 {
-					<section class="mb-9 max-w-[900px] mx-auto">
-						<div class="flex items-center gap-2.5 mb-4">
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4e5666" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-								<circle cx="12" cy="12" r="10"></circle>
-								<polyline points="12 6 12 12 16 14"></polyline>
-							</svg>
-							<span class="text-lg text-text-muted font-semibold uppercase tracking-wider">Recent searches</span>
-							<div class="neon-divider bg-gradient-to-r from-neon-gold/30 via-neon-gold/10 to-transparent"></div>
-						</div>
-						<div class="flex flex-col gap-2">
+				<section aria-labelledby="recents-heading" style="margin-top: var(--s-10);">
+					<h2 class="section-label" id="recents-heading">Recent public searches</h2>
+					if len(data.RecentSearches) > 0 {
+						<div class="recents">
 							for _, s := range data.RecentSearches {
-								<a href={ templ.SafeURL("/search/" + s.Search.ID.String()) } class="block p-4 rounded-xl recent-search-card">
-									<div class="flex items-center gap-3.5">
-										<div class="neon-dot-cyan shrink-0"></div>
-										<span class="flex-1 text-base font-mono text-text-active font-medium truncate">{ s.Search.Term }</span>
-										if s.MatchesKnown {
-											<span class="text-lg font-medium shrink-0 px-2.5 py-0.5 rounded-md text-text-muted bg-brand-100 border-l-2 border-neon-pink">{ ui.FormatNumber(s.MatchCount) }</span>
+								<a href={ templ.SafeURL("/search/" + s.Search.ID.String()) } class="recent">
+									<span class="recent__pattern">{ s.Search.Term }</span>
+									<span class="pill recent__source-pill">{ s.Search.Repo }</span>
+									if s.MatchesKnown {
+										if s.MatchCount == 0 {
+											<span class="recent__matches recent__matches--zero">0</span>
+										} else {
+											<span class="recent__matches">{ ui.FormatNumber(s.MatchCount) }</span>
 										}
-										<span class="text-sm text-text-subtle shrink-0">{ ui.TimeAgo(s.Search.CreatedAt) }</span>
-									</div>
+									} else {
+										<span class="recent__matches recent__matches--zero">—</span>
+									}
+									<span class="recent__date">{ ui.TimeAgo(s.Search.CreatedAt) }</span>
 								</a>
 							}
 						</div>
-					</section>
-				}
-				<!-- Data Sources -->
-				<section class="mb-10">
-					<div class="flex items-center gap-2.5 mb-4">
-						<span class="text-text-subtle">
-							@icon.Database(16)
-						</span>
-						<span class="text-lg text-text-muted font-semibold uppercase tracking-wider">Data Sources</span>
-						<div class="neon-divider bg-gradient-to-r from-neon-purple/30 via-neon-purple/10 to-transparent"></div>
-					</div>
-					<div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-						<a href="/data-sources/plugins" class="flex flex-col rounded-xl overflow-hidden data-source-card">
-							<div class="neon-strip-pink"></div>
-							<div class="p-5 flex flex-col gap-3 flex-1">
-								<h3 class="text-xl font-semibold text-text-active mb-0.5">Plugins</h3>
-								<p class="text-lg text-text-muted leading-snug">WordPress Plugins</p>
-							</div>
+					} else {
+						<div class="recents" style="padding: var(--s-5); text-align: center; color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-micro);">
+							No public searches yet — be the first.
+						</div>
+					}
+				</section>
+				<section aria-labelledby="sources-heading" style="margin-top: var(--s-10);">
+					<h2 class="section-label" id="sources-heading">Data sources</h2>
+					<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s-3);">
+						<a href="/data-sources/plugins" class="card" style="padding: var(--s-5); text-decoration: none;">
+							<h3 style="font-size: var(--fs-lead); font-weight: 600; color: var(--text); margin-bottom: var(--s-1);">Plugins</h3>
+							<p style="color: var(--text-dim); font-size: var(--fs-minor);">WordPress plugins</p>
 						</a>
-						<a href="/data-sources/themes" class="flex flex-col rounded-xl overflow-hidden data-source-card">
-							<div class="neon-strip-purple"></div>
-							<div class="p-5 flex flex-col gap-3 flex-1">
-								<h3 class="text-xl font-semibold text-text-active mb-0.5">Themes</h3>
-								<p class="text-lg text-text-muted leading-snug">WordPress Themes</p>
-							</div>
+						<a href="/data-sources/themes" class="card" style="padding: var(--s-5); text-decoration: none;">
+							<h3 style="font-size: var(--fs-lead); font-weight: 600; color: var(--text); margin-bottom: var(--s-1);">Themes</h3>
+							<p style="color: var(--text-dim); font-size: var(--fs-minor);">WordPress themes</p>
 						</a>
-						<a href="/data-sources/cores" class="flex flex-col rounded-xl overflow-hidden data-source-card">
-							<div class="neon-strip-gold"></div>
-							<div class="p-5 flex flex-col gap-3 flex-1">
-								<h3 class="text-xl font-semibold text-text-active mb-0.5">Core</h3>
-								<p class="text-lg text-text-muted leading-snug">WordPress Core Versions</p>
-							</div>
+						<a href="/data-sources/cores" class="card" style="padding: var(--s-5); text-decoration: none;">
+							<h3 style="font-size: var(--fs-lead); font-weight: 600; color: var(--text); margin-bottom: var(--s-1);">Core</h3>
+							<p style="color: var(--text-dim); font-size: var(--fs-minor);">WordPress core versions</p>
 						</a>
 					</div>
 				</section>
 			</div>
-		</div>
+		</section>
 		@homeKeyboardShortcut()
 	}
 }
@@ -219,8 +158,8 @@ templ homeKeyboardShortcut() {
 	<script>
 		document.addEventListener('keydown', function(e) {
 			if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-				e.preventDefault();
-				document.getElementById('regex-search').focus();
+				var input = document.getElementById('regex-search');
+				if (input) { e.preventDefault(); input.focus(); }
 			}
 		});
 	</script>

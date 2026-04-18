@@ -10,106 +10,96 @@ import (
 
 templ Reports(data ui.ReportsPageData) {
 	@layout.Base(data.PageData) {
-		<!-- Heading -->
-		<div class="mb-6 pt-8 lg:pt-10">
-			<h1 class="text-3xl lg:text-4xl font-extrabold tracking-tight text-text-bright mb-2">Reported Searches</h1>
-			<p class="text-sm text-text-body">Review and moderate user-reported searches.</p>
-		</div>
-		if len(data.Reports) > 0 {
-			<div class="glass-inner overflow-hidden">
-				<table class="w-full">
-					<thead style="background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.08);">
-						<tr>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Pattern</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Data Source</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Reporter</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Reason</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Reported</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Visibility</th>
-							<th scope="col" class="px-5 py-4 text-left text-sm font-medium text-text-body">Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						for _, report := range data.Reports {
-							<tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
-								<td class="px-5 py-4">
-									<a href={ templ.SafeURL("/search/" + report.SearchID) } class="font-mono text-sm text-brand-600 bg-brand-50 px-2 py-1 rounded hover:underline">{ report.SearchTerm }</a>
-								</td>
-								<td class="px-5 py-4">
-									<span class="text-sm text-text-body capitalize">{ report.SearchDataSource }</span>
-								</td>
-								<td class="px-5 py-4">
-									<span class="text-sm text-text-body">{ report.ReporterName }</span>
-								</td>
-								<td class="px-5 py-4">
-									if report.Reason != "" {
-										<span class="text-sm text-text-body">{ report.Reason }</span>
-									} else {
-										<span class="text-sm text-text-subtle">--</span>
-									}
-								</td>
-								<td class="px-5 py-4">
-									<span class="text-sm text-text-muted">{ report.ReportedAt }</span>
-								</td>
-								<td class="px-5 py-4">
-									<div id={ "visibility-" + report.ReportID }>
-										if report.SearchPrivate {
-											<div class="flex items-center gap-2">
-												@badge.Visibility(true)
+		<section class="view">
+			<div style="margin-bottom: var(--s-5);">
+				<span class="eyebrow">Admin</span>
+				<h1 style="font-size: var(--fs-h2); font-weight:700; letter-spacing: var(--ls-tight); line-height: var(--lh-tight); margin: var(--s-2) 0 var(--s-1); color: var(--text);">Reported Searches</h1>
+				<p style="color: var(--text-dim); font-size: var(--fs-minor);">Review and moderate user-reported searches.</p>
+			</div>
+			if len(data.Reports) > 0 {
+				<div class="card" style="overflow:hidden;">
+					<table class="table" style="border:0; border-radius:0; box-shadow:none;">
+						<thead>
+							<tr>
+								<th scope="col">Pattern</th>
+								<th scope="col">Data Source</th>
+								<th scope="col">Reporter</th>
+								<th scope="col">Reason</th>
+								<th scope="col">Reported</th>
+								<th scope="col">Visibility</th>
+								<th scope="col">Actions</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, report := range data.Reports {
+								<tr>
+									<td>
+										<a href={ templ.SafeURL("/search/" + report.SearchID) } style="font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--accent-text); background: var(--code-bg); padding: 2px 6px; border: 1px solid var(--border); border-radius: var(--r-xs); text-decoration:none;">{ report.SearchTerm }</a>
+									</td>
+									<td style="text-transform: capitalize; color: var(--text-dim);">{ report.SearchDataSource }</td>
+									<td style="color: var(--text-dim);">{ report.ReporterName }</td>
+									<td>
+										if report.Reason != "" {
+											<span style="color: var(--text-dim);">{ report.Reason }</span>
+										} else {
+											<span style="color: var(--text-faint);">—</span>
+										}
+									</td>
+									<td style="color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-micro);">{ report.ReportedAt }</td>
+									<td>
+										<div id={ "visibility-" + report.ReportID } style="display:flex; align-items:center; gap: var(--s-2);">
+											@badge.Visibility(report.SearchPrivate)
+											if report.SearchPrivate {
 												<button
 													hx-post={ "/admin/search/" + report.SearchID + "/visibility" }
 													hx-target={ "#visibility-" + report.ReportID }
 													hx-swap="innerHTML"
-													class="text-xs text-brand-600 hover:text-brand-700 hover:underline hover:underline-offset-2 font-medium"
+													class="btn btn--ghost"
 												>
 													Make Public
 												</button>
-											</div>
-										} else {
-											<div class="flex items-center gap-2">
-												@badge.Visibility(false)
+											} else {
 												<button
 													hx-post={ "/admin/search/" + report.SearchID + "/visibility" }
 													hx-target={ "#visibility-" + report.ReportID }
 													hx-swap="innerHTML"
-													class="text-xs text-red-600 hover:text-red-700 hover:underline hover:underline-offset-2 font-medium"
+													class="btn btn--danger"
 												>
 													Make Private
 												</button>
-											</div>
-										}
-									</div>
-								</td>
-								<td class="px-5 py-4">
-									<div id={ "actions-" + report.ReportID } class="flex items-center gap-2">
-										<button
-											hx-post={ "/admin/reports/" + report.ReportID + "/resolve" }
-											hx-target={ "#actions-" + report.ReportID }
-											hx-swap="innerHTML"
-											class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-text-body bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition"
-										>
-											@icon.Check(12)
-											Resolve
-										</button>
-									</div>
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
-			</div>
-			@shared.LinkPagination("/admin/reports", data.Page, data.TotalPages)
-		} else {
-			<!-- Empty State -->
-			<div class="glass-inner text-center py-16">
-				<div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/10 border border-white/10 mb-6">
-					<svg class="w-10 h-10 text-text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-					</svg>
+											}
+										</div>
+									</td>
+									<td>
+										<div id={ "actions-" + report.ReportID } style="display:flex; align-items:center; gap: var(--s-2);">
+											<button
+												hx-post={ "/admin/reports/" + report.ReportID + "/resolve" }
+												hx-target={ "#actions-" + report.ReportID }
+												hx-swap="innerHTML"
+												class="btn"
+											>
+												@icon.Check(12)
+												Resolve
+											</button>
+										</div>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
 				</div>
-				<h3 class="text-2xl text-text-body mb-2">No pending reports</h3>
-				<p class="text-text-muted">All reported searches have been resolved.</p>
-			</div>
-		}
+				@shared.LinkPagination("/admin/reports", data.Page, data.TotalPages)
+			} else {
+				<div class="empty">
+					<div class="empty__icon">
+						<svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+						</svg>
+					</div>
+					<div class="empty__title">No pending reports</div>
+					<p class="empty__body">All reported searches have been resolved.</p>
+				</div>
+			}
+		</section>
 	}
 }
