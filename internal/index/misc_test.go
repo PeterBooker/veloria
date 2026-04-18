@@ -161,6 +161,30 @@ func TestIsTextFile_NonexistentFile(t *testing.T) {
 	}
 }
 
+func TestOpen_MissingTrigrams(t *testing.T) {
+	dir := t.TempDir()
+	if got := Open(dir); got != nil {
+		t.Fatalf("Open(%q) = %v, want nil for missing trigrams file", dir, got)
+	}
+}
+
+func TestOpen_CorruptTrigrams(t *testing.T) {
+	dir := t.TempDir()
+	// A handful of junk bytes cannot satisfy the trailer-magic checks in
+	// cindex.Open, which triggers the "corrupt index" panic path.
+	if err := os.WriteFile(filepath.Join(dir, "trigrams"), []byte("not a real index"), 0o644); err != nil {
+		t.Fatalf("failed to write corrupt trigrams file: %v", err)
+	}
+
+	// The whole point of this test: a corrupt index must not panic the caller.
+	// Before the fix, cindex.Open's panic escaped through Open and crashed the
+	// goroutine in manager.NewManager at service startup.
+	got := Open(dir)
+	if got != nil {
+		t.Fatalf("Open(%q) = %v, want nil for corrupt trigrams file", dir, got)
+	}
+}
+
 func TestTruncateMatchLine(t *testing.T) {
 	fre := regexp.MustCompile(`(?i)target`)
 
