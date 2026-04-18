@@ -13,7 +13,9 @@ import (
 
 // Open opens an existing trigram index at the given directory path.
 // The path should point to the directory containing the "trigrams" file.
-func Open(path string) *Index {
+// Returns nil if the trigrams file is missing or the index is corrupt, so
+// callers can delete the bad directory and fall back to a sibling version.
+func Open(path string) (idx *Index) {
 	trigramsPath := filepath.Join(path, "trigrams")
 
 	// Check existence before calling cindex.Open, which log.Fatals on missing files.
@@ -21,15 +23,19 @@ func Open(path string) *Index {
 		return nil
 	}
 
-	ix := cindex.Open(trigramsPath)
-	if ix == nil {
-		log.Printf("failed to open index at: %s", trigramsPath)
-		return nil
-	}
+	// cindex.Open panics with "corrupt index" on malformed data rather than
+	// returning an error. Recover so one bad index cannot crash the service
+	// at startup via the goroutines spawned in manager.NewManager.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("corrupt index at %s: %v", trigramsPath, r)
+			idx = nil
+		}
+	}()
 
 	return &Index{
 		dir: path,
-		idx: ix,
+		idx: cindex.Open(trigramsPath),
 	}
 }
 
