@@ -8,53 +8,49 @@ import (
 )
 
 templ SearchContext(data ui.SearchContextData) {
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4" style="background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);" role="dialog" aria-modal="true">
+	<div role="dialog" aria-modal="true" aria-label="Match context" style="position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding: var(--s-5); background: color-mix(in srgb, var(--bg) 75%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);">
 		<button
 			type="button"
-			class="absolute inset-0 w-full h-full cursor-pointer"
-			aria-label="Close modal"
+			aria-label="Close dialog"
 			onclick="document.getElementById('context-modal').innerHTML = ''"
+			style="position:absolute; inset:0; background:transparent; border:0; cursor:pointer;"
 		></button>
-		<div class="relative z-10 w-full max-w-3xl glass-inner overflow-hidden">
-			<div class="flex items-center justify-between px-4 lg:px-5 py-3 lg:py-4 border-b border-white/10 bg-bg-card">
-				<div>
-					<p class="text-xs text-text-muted uppercase tracking-widest font-semibold mb-1">Match Context</p>
-					<div class="text-sm text-text-bright font-mono truncate font-medium">{ data.Filename }</div>
+		<div class="card card--elevated" style="position:relative; z-index:1; width:100%; max-width: 720px; overflow:hidden;">
+			<div style="display:flex; align-items:center; justify-content:space-between; gap: var(--s-3); padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--border); background: var(--surface-2);">
+				<div style="min-width:0;">
+					<div class="eyebrow">Match Context</div>
+					<div style="font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text); margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title={ data.Filename }>{ data.Filename }</div>
 				</div>
 				<button
 					type="button"
-					class="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text-body hover:bg-white/5 transition"
+					class="btn btn--icon"
 					onclick="document.getElementById('context-modal').innerHTML = ''"
+					aria-label="Close"
 				>
-					<span class="sr-only">Close</span>
-					@icon.Close(18)
+					@icon.Close(16)
 				</button>
 			</div>
-			<div class="p-4 lg:p-5">
+			<div style="background: var(--code-bg);">
 				if data.Error != "" {
-					<div class="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-						{ data.Error }
+					<div class="alert alert--error" style="margin: var(--s-4);">
+						<span>{ data.Error }</span>
 					</div>
 				} else {
-					<div class="rounded-xl overflow-hidden border border-white/[0.06] bg-bg-card">
-						<table class="w-full" style="border-collapse: collapse; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 16px; line-height: 1.65;">
-							<tbody>
-								for _, line := range data.Lines {
-									if line.IsMatch {
-										<tr class="bg-brand-200 transition-colors">
-											<td class="px-2 lg:px-3 py-0.5 text-text-subtle text-right select-none whitespace-nowrap border-r-2 border-brand-400" style="width: 1px;">{ strconv.Itoa(line.Number) }</td>
-											<td class="px-3 lg:px-4 py-0.5 text-text-bright whitespace-pre overflow-x-auto">{ line.Text }</td>
-										</tr>
-									} else {
-										<tr class="bg-white/[0.03] hover:bg-white/5 transition-colors">
-											<td class="px-2 lg:px-3 py-0.5 text-text-subtle text-right select-none whitespace-nowrap border-r-2 border-transparent" style="width: 1px;">{ strconv.Itoa(line.Number) }</td>
-											<td class="px-3 lg:px-4 py-0.5 text-text-body whitespace-pre overflow-x-auto">{ line.Text }</td>
-										</tr>
-									}
-								}
-							</tbody>
-						</table>
-					</div>
+					for _, line := range data.Lines {
+						if line.IsMatch {
+							<div class="codeline" style="background: var(--accent-2-soft);">
+								<div class="codeline__ln" style="color: var(--accent-2-text); border-right-color: color-mix(in srgb, var(--accent-2) 45%, transparent);">{ strconv.Itoa(line.Number) }</div>
+								<div class="codeline__src" style="color: var(--match-text);">{ line.Text }</div>
+								<span></span>
+							</div>
+						} else {
+							<div class="codeline">
+								<div class="codeline__ln">{ strconv.Itoa(line.Number) }</div>
+								<div class="codeline__src">{ line.Text }</div>
+								<span></span>
+							</div>
+						}
+					}
 				}
 			</div>
 		</div>

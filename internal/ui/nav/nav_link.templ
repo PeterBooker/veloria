@@ -4,19 +4,19 @@ import "strings"
 
 // NavItem defines a navigation link.
 type NavItem struct {
-	Href       string
-	Label      string
-	Active     bool
-	AdminOnly  bool
-	AuthOnly   bool
+	Href      string
+	Label     string
+	Active    bool
+	AdminOnly bool
+	AuthOnly  bool
 }
 
 // BuildNavItems returns the standard navigation items with active state set.
 func BuildNavItems(currentPath string, loggedIn, isAdmin bool) []NavItem {
 	items := []NavItem{
-		{Href: "/searches", Label: "Searches", Active: strings.HasPrefix(currentPath, "/search")},
+		{Href: "/searches", Label: "Searches", Active: currentPath == "/searches" || strings.HasPrefix(currentPath, "/search")},
 		{Href: "/data-sources", Label: "Data Sources", Active: strings.HasPrefix(currentPath, "/data-sources")},
-		{Href: "/docs", Label: "Docs", Active: currentPath == "/docs"},
+		{Href: "/docs", Label: "Docs", Active: strings.HasPrefix(currentPath, "/docs")},
 		{Href: "/about", Label: "About", Active: currentPath == "/about"},
 		{Href: "/admin/reports", Label: "Reports", Active: strings.HasPrefix(currentPath, "/admin/reports"), AdminOnly: true},
 	}
@@ -34,10 +34,15 @@ func BuildNavItems(currentPath string, loggedIn, isAdmin bool) []NavItem {
 	return result
 }
 
-templ DesktopNavLink(item NavItem) {
+templ NavLink(item NavItem) {
 	if item.Active {
-		<a href={ templ.SafeURL(item.Href) } class="nav-link nav-link-active">{ item.Label }</a>
+		<a href={ templ.SafeURL(item.Href) } class="nav__link" aria-current="page">{ item.Label }</a>
 	} else {
-		<a href={ templ.SafeURL(item.Href) } class="nav-link">{ item.Label }</a>
+		<a href={ templ.SafeURL(item.Href) } class="nav__link">{ item.Label }</a>
 	}
+}
+
+// DesktopNavLink is kept as a shim for any external callers.
+templ DesktopNavLink(item NavItem) {
+	@NavLink(item)
 }

@@ -11,97 +11,85 @@ import (
 
 templ SearchView(data ui.SearchViewData) {
 	@layout.Base(data.PageData) {
-		if data.ModerationNotice != "" {
-			@shared.InfoAlert(data.ModerationNotice)
-		}
-		<!-- Heading -->
-		<div class="mb-6 pt-8 lg:pt-10">
-			<p class="text-xs text-text-bright uppercase tracking-widest mb-1.5">Search Result</p>
-			<h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight text-text-bright mb-2 break-all">
-				<span class="inline px-2.5 py-1 font-mono text-neon-cyan bg-white/[0.04] border border-white/[0.08] rounded-md">{ data.Search.Term }</span>
-			</h1>
-			<div class="flex items-center gap-2 lg:gap-3 text-xs lg:text-sm text-text-muted flex-wrap">
-				<span class="inline-flex items-center gap-1.5 text-brand-600 font-medium capitalize">
-					@icon.DataSource(data.Search.Repo, 16)
-					{ data.Search.Repo }
-				</span>
-				<span>Created { data.Search.CreatedAt.Format("2006-01-02 15:04") }</span>
+		<section class="view">
+			if data.ModerationNotice != "" {
+				@shared.InfoAlert(data.ModerationNotice)
+			}
+			<div class="results__meta">
+				<span class="eyebrow">Search Result</span>
+				<span class="eyebrow" style="color: var(--text-faint);">#{ data.Search.ID.String()[:8] }</span>
+				<span class="spacer"></span>
+				<a class="btn btn--ghost" href="/">
+					@icon.ArrowLeft(14)
+					Back to search
+				</a>
+			</div>
+			<div class="results__pattern" aria-label="Search pattern">{ data.Search.Term }</div>
+			<div class="results__tags" aria-label="Search metadata">
+				@badge.Status(data.Search.Status)
+				@badge.DataSourceType(data.Search.Repo)
+				<span class="pill">{ data.Search.CreatedAt.Format("2006-01-02 15:04") }</span>
 				if data.DurationMs > 0 {
-					<span>Took { ui.FormatDuration(data.DurationMs) }</span>
+					<span class="pill">{ ui.FormatDuration(data.DurationMs) }</span>
+				}
+				@badge.Visibility(data.Search.Private)
+				if data.User != nil && data.User.IsAdmin {
+					<div id={ "admin-visibility-" + data.Search.ID.String() } style="display:inline-flex;align-items:center;gap:var(--s-2);">
+						if data.Search.Private {
+							<button
+								hx-post={ "/admin/search/" + data.Search.ID.String() + "/visibility" }
+								hx-target={ "#admin-visibility-" + data.Search.ID.String() }
+								hx-swap="innerHTML"
+								class="btn btn--ghost"
+							>
+								Make Public
+							</button>
+						} else {
+							<button
+								hx-post={ "/admin/search/" + data.Search.ID.String() + "/visibility" }
+								hx-target={ "#admin-visibility-" + data.Search.ID.String() }
+								hx-swap="innerHTML"
+								class="btn btn--danger"
+							>
+								Make Private
+							</button>
+						}
+					</div>
+				}
+				if data.User != nil && !data.Search.Private {
+					<div id={ "report-btn-" + data.Search.ID.String() }>
+						<button
+							hx-post={ "/search/" + data.Search.ID.String() + "/report" }
+							hx-target={ "#report-btn-" + data.Search.ID.String() }
+							hx-swap="innerHTML"
+							class="btn btn--ghost"
+						>
+							@icon.Flag(14)
+							Report
+						</button>
+					</div>
 				}
 			</div>
-		</div>
-		if data.Search.Status == searchmodel.StatusQueued || data.Search.Status == searchmodel.StatusProcessing {
-			<div
-				id="search-content"
-				class="flex-1 flex flex-col min-h-0 min-w-0"
-				hx-get={ "/search/" + data.Search.ID.String() }
-				hx-trigger="every 2s"
-				hx-select="#search-content"
-				hx-swap="outerHTML"
-			>
-				@searchContentInner(data)
-			</div>
-		} else {
-			<div id="search-content" class="flex-1 flex flex-col min-h-0 min-w-0">
-				@searchContentInner(data)
-			</div>
-		}
+			if data.Search.Status == searchmodel.StatusQueued || data.Search.Status == searchmodel.StatusProcessing {
+				<div
+					id="search-content"
+					hx-get={ "/search/" + data.Search.ID.String() }
+					hx-trigger="every 2s"
+					hx-select="#search-content"
+					hx-swap="outerHTML"
+				>
+					@searchContentInner(data)
+				</div>
+			} else {
+				<div id="search-content">
+					@searchContentInner(data)
+				</div>
+			}
+		</section>
 	}
 }
 
 templ searchContentInner(data ui.SearchViewData) {
-	<!-- Status & Back -->
-	<div class="flex items-center gap-3 mb-6 flex-wrap">
-		@badge.Status(data.Search.Status)
-		if data.User != nil && data.User.IsAdmin {
-			<div id={ "admin-visibility-" + data.Search.ID.String() }>
-				if data.Search.Private {
-					<div class="flex items-center gap-3">
-						@badge.Visibility(true)
-						<button
-							hx-post={ "/admin/search/" + data.Search.ID.String() + "/visibility" }
-							hx-target={ "#admin-visibility-" + data.Search.ID.String() }
-							hx-swap="innerHTML"
-							class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 bg-white/5 border border-white/10 rounded-lg hover:bg-brand-500/10 hover:border-brand-500/30 transition"
-						>
-							Make Public
-						</button>
-					</div>
-				} else {
-					<div class="flex items-center gap-3">
-						@badge.Visibility(false)
-						<button
-							hx-post={ "/admin/search/" + data.Search.ID.String() + "/visibility" }
-							hx-target={ "#admin-visibility-" + data.Search.ID.String() }
-							hx-swap="innerHTML"
-							class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-white/5 border border-white/10 rounded-lg hover:bg-red-500/10 hover:border-red-500/30 transition"
-						>
-							Make Private
-						</button>
-					</div>
-				}
-			</div>
-		}
-		if data.User != nil && !data.Search.Private {
-			<div id={ "report-btn-" + data.Search.ID.String() }>
-				<button
-					hx-post={ "/search/" + data.Search.ID.String() + "/report" }
-					hx-target={ "#report-btn-" + data.Search.ID.String() }
-					hx-swap="innerHTML"
-					class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-white/5 border border-white/10 rounded-lg hover:bg-red-500/10 hover:border-red-500/30 transition"
-				>
-					@icon.Flag(14)
-					Report
-				</button>
-			</div>
-		}
-		<a href="/searches" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-text-body bg-white/5 border border-white/10 rounded-lg hover:bg-white/[0.08] transition ml-auto">
-			@icon.ChevronLeft(14)
-			<span class="hidden sm:inline">Back to searches</span>
-			<span class="sm:hidden">Back</span>
-		</a>
-	</div>
 	if data.Error != "" {
 		@shared.ErrorAlert(data.Error)
 	}
@@ -109,97 +97,87 @@ templ searchContentInner(data ui.SearchViewData) {
 		if data.MatchCapReached {
 			@shared.InfoAlert("This search hit the maximum cap of 100,000 matches and was terminated before finishing. Some extensions may not have been searched.")
 		}
-		<!-- Results Summary -->
-		<div class="glass-inner p-5 mb-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-			<p class="text-text-body text-base">
-				<span class="text-text-bright font-bold text-lg">{ ui.FormatNumber(data.TotalMatches) }</span> matches across
-				<span class="text-neon-cyan font-bold text-lg">{ ui.FormatNumber(data.TotalExtensions) }</span> extensions
-			</p>
-			<div class="flex items-center gap-3 w-full sm:w-auto">
-				<a
-					href={ templ.SafeURL("/search/" + data.Search.ID.String() + "/export") }
-					hx-boost="false"
-					class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-text-body bg-white/5 border border-white/10 rounded-lg hover:bg-white/[0.08] transition shrink-0"
-				>
-					@icon.Download(14)
-					Export CSV
-				</a>
-				<div class="relative w-full sm:max-w-xs">
-					<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-subtle pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<circle cx="11" cy="11" r="8"></circle>
-						<line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-					</svg>
-					<input
-						type="search"
-						name="search"
-						placeholder="Filter extensions..."
-						aria-label="Filter extensions"
-						hx-get={ "/search/" + data.Search.ID.String() + "/extensions" }
-						hx-trigger="input changed delay:300ms, search"
-						hx-target="#search-extensions"
-						hx-swap="innerHTML"
-						hx-include="this"
-						class="w-full pl-9 pr-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-text-body focus:outline-none focus:border-neon-cyan/40 focus:ring-2 focus:ring-neon-cyan/20 transition"
-					/>
-				</div>
+		<div class="toolbar">
+			<div class="toolbar__count">
+				<strong>{ ui.FormatNumber(data.TotalMatches) }</strong> matches across <strong>{ ui.FormatNumber(data.TotalExtensions) }</strong> extensions
 			</div>
-		</div>
-		<div>
-			<div
-				id="search-extensions"
+			<span class="spacer"></span>
+			<label class="sr-only" for="filter-input">Filter extensions</label>
+			<input
+				class="field"
+				id="filter-input"
+				type="search"
+				name="search"
+				placeholder="filter extensions…"
 				hx-get={ "/search/" + data.Search.ID.String() + "/extensions" }
-				hx-trigger="load"
+				hx-trigger="input changed delay:300ms, search"
+				hx-target="#search-extensions"
 				hx-swap="innerHTML"
-				aria-live="polite"
+				hx-include="this"
+			/>
+			<a
+				class="btn"
+				href={ templ.SafeURL("/search/" + data.Search.ID.String() + "/export") }
+				hx-boost="false"
 			>
-				<div class="flex items-center justify-center gap-2 py-12 text-text-subtle" role="status" aria-label="Loading">
-					<svg class="animate-spin w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-					</svg>
-					<span class="text-sm text-text-muted">Loading extensions...</span>
+				@icon.Download(14)
+				Export CSV
+			</a>
+		</div>
+		<div
+			id="search-extensions"
+			hx-get={ "/search/" + data.Search.ID.String() + "/extensions" }
+			hx-trigger="load"
+			hx-swap="innerHTML"
+			aria-live="polite"
+		>
+			<div class="empty" role="status" aria-label="Loading">
+				<div class="empty__icon">
+					@icon.Spinner(24)
 				</div>
+				<div class="empty__title" style="font-size: var(--fs-minor); font-weight: 500;">Loading extensions…</div>
 			</div>
 		</div>
 		@toggleExtDetailScript()
 	} else if data.Search.Status == searchmodel.StatusCompleted {
-		<!-- No Results -->
-		@shared.EmptyState("No matches found", "Try a different regex pattern or data source.") {
-			<svg class="w-8 h-8 lg:w-10 lg:h-10 text-text-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<circle cx="11" cy="11" r="8"></circle>
-				<path d="m21 21-4.3-4.3"></path>
-				<path d="M8 11h6"></path>
-			</svg>
-		}
-	} else if data.Search.Status == searchmodel.StatusFailed {
-		<!-- Failed State -->
-		<div class="glass-inner text-center py-12 lg:py-16">
-			<div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-red-500/10 border border-red-500/20 mb-4 lg:mb-6">
-				@icon.Close(40)
+		<div class="empty">
+			<div class="empty__icon">
+				<svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<circle cx="11" cy="11" r="8"></circle>
+					<path d="m21 21-4.3-4.3"></path>
+					<path d="M8 11h6"></path>
+				</svg>
 			</div>
-			<h3 class="text-xl lg:text-2xl text-text-body mb-2">Search failed</h3>
-			<p class="text-text-muted text-sm lg:text-base mb-6">This search could not be completed. It may have timed out or encountered an unexpected error.</p>
-			<a href="/" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-text-bright bg-white/5 border border-white/10 rounded-lg hover:bg-white/[0.08] transition">
-				Try a new search
-			</a>
+			<div class="empty__title">No matches found</div>
+			<p class="empty__body">Try a different regex pattern or data source.</p>
+		</div>
+	} else if data.Search.Status == searchmodel.StatusFailed {
+		<div class="empty">
+			<div class="empty__icon" style="color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); border-color: color-mix(in srgb, var(--danger) 40%, transparent);">
+				@icon.Close(28)
+			</div>
+			<div class="empty__title">Search failed</div>
+			<p class="empty__body">This search could not be completed. It may have timed out or encountered an unexpected error.</p>
+			<div style="margin-top: var(--s-5);">
+				<a href="/" class="btn">Try a new search</a>
+			</div>
 		</div>
 	} else {
-		<!-- Processing/Queued State -->
-		<div class="glass-inner text-center py-12 lg:py-16">
-			<div class="inline-flex items-center justify-center w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/5 border border-white/10 mb-4 lg:mb-6">
-				@icon.Spinner(40)
+		<div class="empty">
+			<div class="empty__icon">
+				@icon.Spinner(28)
 			</div>
-			<h3 class="text-xl lg:text-2xl text-text-body mb-2">Search in progress</h3>
+			<div class="empty__title">Search in progress</div>
 			if data.ProgressTotal > 0 {
-				<p class="text-text-muted text-sm lg:text-base mb-4">
-					Searched <span class="text-text-bright font-semibold">{ ui.FormatNumber(data.ProgressSearched) }</span> of
-					<span class="text-brand-600 font-semibold">{ ui.FormatNumber(data.ProgressTotal) }</span> extensions
+				<p class="empty__body">
+					Searched <strong style="color: var(--text); font-family: var(--font-mono);">{ ui.FormatNumber(data.ProgressSearched) }</strong> of
+					<strong style="color: var(--accent-text); font-family: var(--font-mono);">{ ui.FormatNumber(data.ProgressTotal) }</strong> extensions
 				</p>
-				<div class="max-w-xs mx-auto">
+				<div style="max-width: 360px; margin: var(--s-5) auto 0;">
 					@shared.NeonProgress(ui.Percentage(data.ProgressSearched, data.ProgressTotal))
 				</div>
 			} else {
-				<p class="text-text-muted text-sm lg:text-base">Results will appear automatically when the search completes.</p>
+				<p class="empty__body">Results will appear automatically when the search completes.</p>
 			}
 		</div>
 	}
@@ -208,26 +186,25 @@ templ searchContentInner(data ui.SearchViewData) {
 templ toggleExtDetailScript() {
 	<script>
 	function toggleExtDetail(header, url, targetId) {
+		var card = header.closest('.result');
 		var detail = header.nextElementSibling;
-		var chevron = header.querySelector('[data-chevron]');
-		var isOpen = !detail.classList.contains('hidden');
+		if (!detail) return;
+		var isOpen = !detail.hasAttribute('hidden');
 
 		if (isOpen) {
-			detail.classList.add('hidden');
-			chevron.style.transform = '';
+			detail.setAttribute('hidden', '');
 			header.setAttribute('aria-expanded', 'false');
+			if (card) card.classList.remove('is-expanded');
 			return;
 		}
 
-		detail.classList.remove('hidden');
-		chevron.style.transform = 'rotate(90deg)';
+		detail.removeAttribute('hidden');
 		header.setAttribute('aria-expanded', 'true');
+		if (card) card.classList.add('is-expanded');
 
-		// Only fetch if not already loaded
 		var target = document.getElementById(targetId);
-		if (target.dataset.loaded) return;
+		if (!target || target.dataset.loaded) return;
 		target.dataset.loaded = '1';
-
 		htmx.ajax('GET', url, {target: '#' + targetId, swap: 'innerHTML'});
 	}
 	</script>
