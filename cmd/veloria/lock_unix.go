@@ -11,7 +11,7 @@ import (
 // acquireSlugLock takes an exclusive non-blocking flock on path. The kernel
 // releases it even on SIGKILL, so a dead indexer can never leave a slug stuck.
 func acquireSlugLock(path string) (func(), error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o640) // #nosec G304 -- path is built from a validated slug
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) // #nosec G304 -- path is built from a validated slug
 	if err != nil {
 		return nil, err
 	}
