@@ -506,11 +506,20 @@ func (r *ExtensionStore[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn f
 	r.l.Info("Preparing extensions for indexing", zap.Int("count", len(extensions)), zap.String("type", string(r.repoType)))
 
 	var tasks []IndexTask
+	seen := make(map[string]struct{}, len(extensions))
 
 	for _, ext := range extensions {
 		slug := ext.GetSlug()
 		if slug == "" {
 			r.l.Warn("Skipping extension with empty slug", zap.String("type", string(r.repoType)))
+			continue
+		}
+
+		// The updates feed is offset-paginated over a live-sorted list, so a
+		// slug can repeat across pages; duplicate tasks would run concurrently
+		// and race on the staging dir.
+		if _, dup := seen[slug]; dup {
+			r.l.Warn("Skipping duplicate slug in update batch", zap.String("type", string(r.repoType)), zap.String("slug", slug))
 			continue
 		}
 
@@ -544,6 +553,7 @@ func (r *ExtensionStore[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn f
 		taskSlug := slug
 		taskSource := ext.GetSource()
 
+		seen[slug] = struct{}{}
 		tasks = append(tasks, r.makeIndexTask(taskExt, taskSlug, taskSource))
 	}
 
