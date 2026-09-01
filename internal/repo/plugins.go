@@ -355,6 +355,8 @@ func (p *Plugin) UnmarshalJSON(data []byte) error {
 	// RequiresPlugins: sometimes false or an array of strings
 	p.RequiresPlugins = parseStringSlice(aux.ReqPluginsRaw)
 
+	p.normalize()
+
 	return nil
 }
 
