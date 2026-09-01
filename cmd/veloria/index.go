@@ -50,6 +50,16 @@ func (c *IndexCmd) Run() error {
 	indexDir := filepath.Join(base, "index")
 	sourceDir := filepath.Join(base, "source")
 
+	dest := filepath.Join(sourceDir, c.Slug)
+
+	// A file lock rather than in-process locking: an indexer orphaned by a
+	// server crash may still be writing to this slug's directories.
+	releaseLock, err := acquireSlugLock(dest + ".lock")
+	if err != nil {
+		return fmt.Errorf("failed to lock slug %q: %w", c.Slug, err)
+	}
+	defer releaseLock()
+
 	// Download the zip to a temp file.
 	tmpZip, cleanup, err := downloadZip(c.ZipURL)
 	if err != nil {
@@ -60,7 +70,6 @@ func (c *IndexCmd) Run() error {
 	// Extract to a staging directory so the existing source files remain
 	// available for in-flight searches. The staging dir is atomically renamed
 	// to the final path once the index and compression are complete.
-	dest := filepath.Join(sourceDir, c.Slug)
 	stagingDest := dest + ".staging"
 	if err := os.RemoveAll(stagingDest); err != nil {
 		return fmt.Errorf("failed to remove stale staging dir %q: %w", stagingDest, err)
