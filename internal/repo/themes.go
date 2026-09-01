@@ -365,6 +365,8 @@ func (t *Theme) UnmarshalJSON(data []byte) error {
 		t.LastUpdated = parsed
 	}
 
+	t.normalize()
+
 	return nil
 }
 
