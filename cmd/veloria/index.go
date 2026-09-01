@@ -15,13 +15,17 @@ import (
 	"veloria/internal/client"
 	"veloria/internal/config"
 	"veloria/internal/index"
+	"veloria/internal/repo"
 )
 
 const (
-	downloadMaxRetries       = 3
-	downloadDefaultRetryWait = 10 * time.Second
-	downloadMaxRetryWait     = 60 * time.Second
+	downloadMaxRetries   = 3
+	downloadMaxRetryWait = 60 * time.Second
 )
+
+// downloadDefaultRetryWait is the wait between attempts when the upstream
+// sends no Retry-After header. A variable so tests can shorten it.
+var downloadDefaultRetryWait = 10 * time.Second
 
 // IndexCmd downloads a zip, extracts text files, and builds a trigram search index.
 // This command is invoked as a subprocess by the server to maintain process isolation.
@@ -156,11 +160,19 @@ func (c *IndexCmd) Run() error {
 
 // downloadZip fetches a zip file from the given URL into a temporary file.
 // It returns the temp file path, a cleanup function, and any error.
-// On permanently-failing HTTP statuses (400, 403, 404, 410), it returns an
-// exitError with code 2 to signal "download unavailable" to the calling
-// server process, preventing futile retries.
-// On 429 (Too Many Requests), it respects the Retry-After header and retries
-// up to downloadMaxRetries times.
+//
+// The outcome is signalled to the parent server process through the exit
+// code carried by exitError:
+//   - repo.ExitDownloadNotFound (400, 403, 404, 410, or a body that is not a
+//     zip): the URL will never work, so the caller may fall back to another
+//     URL or close the extension.
+//   - repo.ExitDownloadUnavailable (5xx or a transport failure on every
+//     attempt): the URL may work later, so the caller may fall back to
+//     another URL and should retry rather than close.
+//   - a plain error for 429 on every attempt, retried on the caller's next cycle.
+//
+// Between attempts it waits for the Retry-After header when present,
+// otherwise downloadDefaultRetryWait, capped at downloadMaxRetryWait.
 func downloadZip(u string) (string, func(), error) {
 	tmpFile, err := os.CreateTemp("", "download-*.zip")
 	if err != nil {
@@ -171,15 +183,21 @@ func downloadZip(u string) (string, func(), error) {
 		_ = tmpFile.Close()
 		_ = os.Remove(tmpPath)
 	}
+	fail := func(err error) (string, func(), error) {
+		cleanup()
+		return "", func() {}, err
+	}
 
 	c := client.GetZip()
 
-	var lastErr error
-	for attempt := range downloadMaxRetries {
-		req, reqErr := http.NewRequest(http.MethodGet, u, nil)
-		if reqErr != nil {
-			cleanup()
-			return "", func() {}, reqErr
+	var (
+		lastErr   error
+		transient bool // the last failure was a 5xx or transport error rather than a 429
+	)
+	for attempt := 1; attempt <= downloadMaxRetries; attempt++ {
+		req, err := http.NewRequest(http.MethodGet, u, nil)
+		if err != nil {
+			return fail(err)
 		}
 		req.Header.Set("User-Agent", client.UserAgent)
 		// GitHub API release asset URLs require this header to serve the
@@ -188,61 +206,81 @@ func downloadZip(u string) (string, func(), error) {
 			req.Header.Set("Accept", "application/octet-stream")
 		}
 
-		var resp *http.Response
-		resp, err = c.Do(req)
+		resp, err := c.Do(req)
 		if err != nil {
-			cleanup()
-			return "", func() {}, err
-		}
-
-		if isPermanentHTTPFailure(resp.StatusCode) {
-			_ = resp.Body.Close()
-			cleanup()
-			return "", func() {}, &exitError{code: 2, msg: fmt.Sprintf("download unavailable (%d): %s", resp.StatusCode, u)}
-		}
-
-		if resp.StatusCode == http.StatusTooManyRequests {
-			wait := parseRetryAfterHeader(resp.Header.Get("Retry-After"))
-			_ = resp.Body.Close()
-			lastErr = fmt.Errorf("unexpected HTTP status: %s", resp.Status)
-			if attempt < downloadMaxRetries-1 {
-				log.Printf("rate limited (429), waiting %s before retry %d/%d", wait, attempt+2, downloadMaxRetries)
-				time.Sleep(wait)
-			}
+			lastErr, transient = err, true
+			waitBeforeRetry(attempt, "", err.Error())
 			continue
 		}
 
-		if resp.StatusCode != http.StatusOK {
+		switch {
+		case isPermanentHTTPFailure(resp.StatusCode):
 			_ = resp.Body.Close()
-			cleanup()
-			return "", func() {}, fmt.Errorf("unexpected HTTP status: %s url: %s", resp.Status, u)
+			return fail(&exitError{code: repo.ExitDownloadNotFound, msg: fmt.Sprintf("download unavailable (%d)", resp.StatusCode)})
+		case resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500:
+			retryAfter := resp.Header.Get("Retry-After")
+			_ = resp.Body.Close()
+			lastErr = fmt.Errorf("unexpected HTTP status: %s", resp.Status)
+			transient = resp.StatusCode >= 500
+			waitBeforeRetry(attempt, retryAfter, resp.Status)
+			continue
+		case resp.StatusCode != http.StatusOK:
+			_ = resp.Body.Close()
+			return fail(fmt.Errorf("unexpected HTTP status: %s", resp.Status))
 		}
 
-		if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-			_ = resp.Body.Close()
-			cleanup()
-			return "", func() {}, err
-		}
+		_, err = io.Copy(tmpFile, resp.Body)
 		_ = resp.Body.Close()
+		if err != nil {
+			// A partial body is worthless; discard it and fetch again.
+			if terr := truncateFile(tmpFile); terr != nil {
+				return fail(terr)
+			}
+			lastErr, transient = err, true
+			waitBeforeRetry(attempt, "", err.Error())
+			continue
+		}
 		if err := tmpFile.Close(); err != nil {
-			cleanup()
-			return "", func() {}, err
+			return fail(err)
 		}
 
 		// Validate the file is actually a zip by checking the magic bytes (PK\x03\x04).
 		// Some servers return HTML error pages with a 200 status, which would otherwise
 		// cause a confusing "not a valid zip file" error during extraction.
 		if err := validateZipMagic(tmpPath); err != nil {
-			_ = os.Remove(tmpPath)
-			return "", func() {}, &exitError{code: 2, msg: fmt.Sprintf("downloaded file is not a valid zip: %s", u)}
+			return fail(&exitError{code: repo.ExitDownloadNotFound, msg: fmt.Sprintf("downloaded file is not a valid zip: %v", err)})
 		}
-
 		return tmpPath, cleanup, nil
 	}
 
-	// All retries exhausted (only reachable via 429 loop).
 	cleanup()
+	if transient {
+		return "", func() {}, &exitError{
+			code: repo.ExitDownloadUnavailable,
+			msg:  fmt.Sprintf("download failed on all %d attempts: %v", downloadMaxRetries, lastErr),
+		}
+	}
 	return "", func() {}, lastErr
+}
+
+// waitBeforeRetry sleeps before the next download attempt, if there is one.
+func waitBeforeRetry(attempt int, retryAfter, reason string) {
+	if attempt >= downloadMaxRetries {
+		return
+	}
+	wait := parseRetryAfterHeader(retryAfter)
+	log.Printf("download attempt %d/%d failed (%s), retrying in %s", attempt, downloadMaxRetries, reason, wait)
+	time.Sleep(wait)
+}
+
+// truncateFile discards everything written to f so the next attempt starts
+// from an empty file.
+func truncateFile(f *os.File) error {
+	if err := f.Truncate(0); err != nil {
+		return err
+	}
+	_, err := f.Seek(0, io.SeekStart)
+	return err
 }
 
 // validateZipMagic checks that the file starts with the zip magic bytes (PK\x03\x04).

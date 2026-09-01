@@ -12,12 +12,24 @@ import (
 
 // Common errors
 var (
-	ErrNoIndex          = errors.New("extension has no index")
-	ErrExtNotFound      = errors.New("extension not found")
-	ErrEmptySlug        = errors.New("extension has empty slug")
-	ErrIndexNotReady    = errors.New("index not ready")
-	ErrDownloadNotFound = errors.New("download not found")
-	ErrDownloadSkipped  = errors.New("download not found, extension skipped")
+	ErrNoIndex             = errors.New("extension has no index")
+	ErrExtNotFound         = errors.New("extension not found")
+	ErrEmptySlug           = errors.New("extension has empty slug")
+	ErrIndexNotReady       = errors.New("index not ready")
+	ErrDownloadNotFound    = errors.New("download not found")
+	ErrDownloadSkipped     = errors.New("download not found, extension skipped")
+	ErrDownloadUnavailable = errors.New("download unavailable")
+)
+
+// Exit codes with which the "veloria index" subcommand reports the download
+// outcome to the parent server process (see runIndexer and cmd/veloria/index.go).
+const (
+	// ExitDownloadNotFound: the URL will never work (400, 403, 404, 410, or a
+	// body that is not a zip). The caller may fall back or close the extension.
+	ExitDownloadNotFound = 2
+	// ExitDownloadUnavailable: every attempt failed transiently (5xx or a
+	// transport error). The caller may fall back and should retry, not close.
+	ExitDownloadUnavailable = 3
 )
 
 // Extension defines the data contract for all WordPress extension types.
