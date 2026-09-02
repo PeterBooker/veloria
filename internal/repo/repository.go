@@ -58,6 +58,10 @@ type ExtensionStore[T Indexable] struct {
 	repoType ExtensionType
 	filesDir string
 
+	// indexRunner runs the index subprocess for one download URL. It is a
+	// field so tests can exercise the fallback logic without spawning a process.
+	indexRunner func(slug, downloadLink string) (*indexerResult, error)
+
 	// List holds all loaded extensions, keyed by slug
 	List  map[string]T
 	Total int
@@ -88,7 +92,7 @@ type StoreConfig[T Indexable] struct {
 
 // NewExtensionStore creates a new generic extension store.
 func NewExtensionStore[T Indexable](cfg StoreConfig[T]) *ExtensionStore[T] {
-	return &ExtensionStore[T]{
+	s := &ExtensionStore[T]{
 		l:        cfg.Logger,
 		c:        cfg.Config,
 		db:       cfg.DB,
@@ -99,6 +103,8 @@ func NewExtensionStore[T Indexable](cfg StoreConfig[T]) *ExtensionStore[T] {
 		filesDir: filepath.Join(cfg.Config.DataDir, string(cfg.ExtensionType)),
 		List:     make(map[string]T),
 	}
+	s.indexRunner = s.runIndexer
+	return s
 }
 
 // LoadFromDB loads extensions from the database using the provided loader function.
@@ -575,34 +581,45 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 			r.l.Info("Indexing extension", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 
 			primaryURL := taskExt.GetDownloadLink()
-			result, err := r.runIndexer(taskSlug, primaryURL)
+			result, err := r.indexRunner(taskSlug, primaryURL)
 			if err != nil {
-				if errors.Is(err, ErrDownloadNotFound) {
+				primaryErr := err
+				// The wordpress.org fallbacks apply both when the primary URL
+				// is gone for good and when it failed on every attempt: a
+				// mirror can lose, or serve a broken copy of, a single object
+				// while wordpress.org still has it.
+				if downloadFailed(err) {
 					// Try wordpress.org versioned fallback for mirrored packages.
 					fallbackURL := wordpressDownloadURL(r.repoType, taskSlug, taskExt.GetVersion())
 					if taskSource == SourceWordPress && fallbackURL != "" && fallbackURL != primaryURL {
-						r.l.Info("Primary download not found, trying wordpress.org fallback",
+						r.l.Info("Primary download failed, trying wordpress.org fallback",
 							zap.String("type", string(r.repoType)),
 							zap.String("slug", taskSlug),
 							zap.String("fallback_url", fallbackURL),
+							zap.Error(err),
 						)
-						result, err = r.runIndexer(taskSlug, fallbackURL)
+						result, err = r.indexRunner(taskSlug, fallbackURL)
 					}
 				}
-				if errors.Is(err, ErrDownloadNotFound) {
+				if downloadFailed(err) {
 					// Try wordpress.org versionless fallback (some plugins only have slug.zip).
 					versionlessURL := wordpressDownloadURL(r.repoType, taskSlug, "")
 					if taskSource == SourceWordPress && versionlessURL != "" && versionlessURL != primaryURL {
-						r.l.Info("Versioned download not found, trying versionless fallback",
+						r.l.Info("Versioned download failed, trying versionless fallback",
 							zap.String("type", string(r.repoType)),
 							zap.String("slug", taskSlug),
 							zap.String("fallback_url", versionlessURL),
+							zap.Error(err),
 						)
-						result, err = r.runIndexer(taskSlug, versionlessURL)
+						result, err = r.indexRunner(taskSlug, versionlessURL)
 					}
 				}
 				if err != nil {
-					if errors.Is(err, ErrDownloadNotFound) {
+					// Only a primary URL that is gone for good closes the
+					// extension. A transient primary failure stays retryable
+					// even when the fallbacks reported not found, so the
+					// mirror is checked again on a later cycle.
+					if errors.Is(primaryErr, ErrDownloadNotFound) && errors.Is(err, ErrDownloadNotFound) {
 						if taskExt.GetIndexedExtension().HasIndex() {
 							r.l.Warn("Download not found, keeping existing index", zap.String("type", string(r.repoType)), zap.String("slug", taskSlug))
 						} else {
@@ -611,6 +628,9 @@ func (r *ExtensionStore[T]) makeIndexTask(taskExt T, taskSlug, taskSource string
 						}
 						r.markClosed(taskSlug, taskSource)
 						return ErrDownloadSkipped
+					}
+					if errors.Is(primaryErr, ErrDownloadUnavailable) && !errors.Is(err, ErrDownloadUnavailable) {
+						err = fmt.Errorf("%w (fallback: %v)", primaryErr, err)
 					}
 					r.l.Error("Indexer failed", zap.String("slug", taskSlug), zap.Error(err))
 					return err
@@ -686,16 +706,7 @@ func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*indexerResul
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		stderrStr := strings.TrimSpace(stderr.String())
-		// Exit code 2 is the structured signal for "download not found" from
-		// the index subcommand.
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) && exitErr.ExitCode() == 2 {
-			return nil, ErrDownloadNotFound
-		}
-		// Strip the "veloria: error: " prefix that Kong adds to stderr.
-		stderrStr = strings.TrimPrefix(stderrStr, "veloria: error: ")
-		return nil, fmt.Errorf("%s", stderrStr)
+		return nil, indexerError(err, stderr.String())
 	}
 
 	// Parse INDEX_READY:<path> and EXTRACT_STATS:<json> from stdout
@@ -719,6 +730,35 @@ func (r *ExtensionStore[T]) runIndexer(slug, downloadLink string) (*indexerResul
 	}
 
 	return result, nil
+}
+
+// downloadFailed reports whether err is a download outcome for which another
+// URL is worth trying.
+func downloadFailed(err error) bool {
+	return errors.Is(err, ErrDownloadNotFound) || errors.Is(err, ErrDownloadUnavailable)
+}
+
+// indexerError translates a failed "veloria index" run into an error the task
+// logic can act on. ExitDownloadNotFound becomes ErrDownloadNotFound and
+// ExitDownloadUnavailable becomes ErrDownloadUnavailable with the subprocess
+// detail attached; anything else is reported verbatim from stderr.
+func indexerError(err error, stderr string) error {
+	// Strip the "veloria: error: " prefix that Kong adds to stderr.
+	detail := strings.TrimPrefix(strings.TrimSpace(stderr), "veloria: error: ")
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		switch exitErr.ExitCode() {
+		case ExitDownloadNotFound:
+			return ErrDownloadNotFound
+		case ExitDownloadUnavailable:
+			return fmt.Errorf("%w: %s", ErrDownloadUnavailable, detail)
+		}
+	}
+	if detail == "" {
+		// Killed by the index timeout or a signal: nothing was written to stderr.
+		detail = err.Error()
+	}
+	return errors.New(detail)
 }
 
 // markClosed sets ClosedAt for an extension whose download has disappeared.
