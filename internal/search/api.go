@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -14,6 +15,7 @@ import (
 	api "veloria/internal/api"
 	"veloria/internal/index"
 	"veloria/internal/manager"
+	"veloria/internal/repo"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/service"
 	"veloria/internal/storage"
@@ -84,7 +86,7 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 			return
 		}
 
-		req, err := api.DecodeJSON[SearchRequest](r)
+		req, err := api.DecodeJSON[SearchRequest](w, r)
 		if err != nil {
 			api.WriteError(w, err)
 			return
@@ -92,6 +94,11 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 
 		if req.Term == "" {
 			api.WriteError(w, api.ErrBadRequest("term is a required field"))
+			return
+		}
+
+		if len(req.Term) > index.MaxPatternLen {
+			api.WriteError(w, api.ErrBadRequest(fmt.Sprintf("term must be at most %d bytes", index.MaxPatternLen)))
 			return
 		}
 
@@ -104,10 +111,18 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 			req.Repo = "plugins"
 		}
 
-		switch req.Repo {
-		case "plugins", "themes", "cores":
-		default:
+		if !repo.ValidExtensionType(req.Repo) {
 			api.WriteError(w, api.ErrBadRequest("repo must be one of: plugins, themes, cores"))
+			return
+		}
+
+		if err := index.ValidateFileFilter(req.FileMatch); err != nil {
+			api.WriteError(w, api.ErrBadRequest("invalid file_match: "+err.Error()))
+			return
+		}
+
+		if err := index.ValidateFileFilter(req.ExcludeFileMatch); err != nil {
+			api.WriteError(w, api.ErrBadRequest("invalid exclude_file_match: "+err.Error()))
 			return
 		}
 

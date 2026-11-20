@@ -81,9 +81,18 @@ type CompiledSearch struct {
 }
 
 // CompileSearch pre-compiles search patterns from the given term and options.
+// It rejects a term over MaxPatternLen and file filters over MaxFileFilterLen,
+// so the limits hold for every caller, not only those that validate first.
 func CompileSearch(pat string, opt *SearchOptions) (*CompiledSearch, error) {
 	if opt == nil {
 		opt = &SearchOptions{}
+	}
+
+	if len(pat) > MaxPatternLen {
+		return nil, ErrPatternTooLong
+	}
+	if len(opt.FileRegexp) > MaxFileFilterLen || len(opt.ExcludeFileRegexp) > MaxFileFilterLen {
+		return nil, ErrFileFilterTooLong
 	}
 
 	patForRe := pat

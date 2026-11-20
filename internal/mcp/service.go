@@ -611,12 +611,8 @@ func convertManagerResponse(results *manager.SearchResponse) *SearchResponse {
 }
 
 // isValidRepo checks if a repo name is one of the allowed values.
-func isValidRepo(repo string) bool {
-	switch repo {
-	case "plugins", "themes", "cores":
-		return true
-	}
-	return false
+func isValidRepo(name string) bool {
+	return repo.ValidExtensionType(name)
 }
 
 // escapeLike escapes special characters in LIKE/ILIKE patterns.

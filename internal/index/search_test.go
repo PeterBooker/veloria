@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -98,5 +99,52 @@ func TestSearchCompiledStopsWhenContextDone(t *testing.T) {
 	resp, err = idx.SearchCompiled(cancelled, cs)
 	if !errors.Is(err, context.Canceled) || resp != nil {
 		t.Fatalf("cancelled before scan: got error %v (response nil: %t), want context.Canceled and no response", err, resp == nil)
+	}
+}
+
+func TestValidateFileFilter(t *testing.T) {
+	tests := []struct {
+		name    string
+		filter  string
+		wantErr error // nil with ok=false means "any error"
+		ok      bool
+	}{
+		{name: "empty", filter: "", ok: true},
+		{name: "extension", filter: `\.php$`, ok: true},
+		{name: "at the limit", filter: strings.Repeat("a", MaxFileFilterLen), ok: true},
+		{name: "over the limit", filter: strings.Repeat("a", MaxFileFilterLen+1), wantErr: ErrFileFilterTooLong},
+		{name: "does not compile", filter: `\.(php`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateFileFilter(tt.filter)
+			switch {
+			case tt.ok && err != nil:
+				t.Fatalf("unexpected error: %v", err)
+			case !tt.ok && err == nil:
+				t.Fatal("expected an error")
+			case tt.wantErr != nil && !errors.Is(err, tt.wantErr):
+				t.Fatalf("got error %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// CompileSearch is the last point every search passes through, so the size
+// limits hold there too, whichever handler the request came from.
+func TestCompileSearchRejectsOversizedInput(t *testing.T) {
+	long := strings.Repeat("a", 256)
+
+	if _, err := CompileSearch(long, nil); !errors.Is(err, ErrPatternTooLong) {
+		t.Fatalf("256-byte term: got %v, want ErrPatternTooLong", err)
+	}
+	if _, err := CompileSearch("needle", &SearchOptions{FileRegexp: long}); !errors.Is(err, ErrFileFilterTooLong) {
+		t.Fatalf("256-byte file filter: got %v, want ErrFileFilterTooLong", err)
+	}
+	if _, err := CompileSearch("needle", &SearchOptions{ExcludeFileRegexp: long}); !errors.Is(err, ErrFileFilterTooLong) {
+		t.Fatalf("256-byte exclude filter: got %v, want ErrFileFilterTooLong", err)
+	}
+	if _, err := CompileSearch(long[:MaxPatternLen], &SearchOptions{FileRegexp: long[:MaxFileFilterLen], ExcludeFileRegexp: long[:MaxFileFilterLen]}); err != nil {
+		t.Fatalf("input at the limits: unexpected error %v", err)
 	}
 }

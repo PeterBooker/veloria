@@ -46,6 +46,18 @@ const (
 	TypeCores   ExtensionType = "cores"
 )
 
+// ValidExtensionType reports whether name is one of the fixed data sources
+// (plugins, themes, cores). Every path that accepts a repo name from a client
+// checks it with this function, so stored searches and metric labels only
+// ever carry one of these values.
+func ValidExtensionType(name string) bool {
+	switch ExtensionType(name) {
+	case TypePlugins, TypeThemes, TypeCores:
+		return true
+	}
+	return false
+}
+
 // ExtensionStore is a generic in-memory store for managing WordPress extensions.
 // It provides common functionality for loading, indexing, and searching extensions.
 type ExtensionStore[T Indexable] struct {

@@ -127,10 +127,10 @@ Create a new code search. This is an asynchronous operation — the search is qu
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `term` | string | yes | Search term (regex supported) |
+| `term` | string | yes | Search term (regex supported), at most 255 bytes |
 | `repo` | string | yes | Extension type: `plugins`, `themes`, or `cores` |
-| `file_match` | string | no | Regex to include only matching filenames |
-| `exclude_file_match` | string | no | Regex to exclude matching filenames |
+| `file_match` | string | no | Regex to include only matching filenames, at most 255 bytes |
+| `exclude_file_match` | string | no | Regex to exclude matching filenames, at most 255 bytes |
 | `case_sensitive` | bool | no | Case-sensitive search (default: false) |
 | `public` | bool | no | Whether the search is publicly visible (default: true) |
 
@@ -148,8 +148,11 @@ Create a new code search. This is an asynchronous operation — the search is qu
 }
 ```
 
+The request body is limited to 1 MiB.
+
 **Errors:**
-- `400` — Missing or invalid fields
+- `400` — Missing or invalid fields, including a term or file filter that is too long or not a valid regex
+- `413` — Request body larger than 1 MiB
 - `503` — Search unavailable
 
 ### GET /api/v1/search/{id}

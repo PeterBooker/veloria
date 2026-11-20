@@ -22,6 +22,7 @@ import (
 	"veloria/internal/auth"
 	"veloria/internal/index"
 	"veloria/internal/manager"
+	"veloria/internal/repo"
 	searchmodel "veloria/internal/search/model"
 	"veloria/internal/telemetry"
 	typespb "veloria/internal/types"
@@ -289,7 +290,7 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 		}
 
 		term := r.FormValue("term")
-		repo := r.FormValue("repo")
+		repoType := r.FormValue("repo")
 		visibility := r.FormValue("visibility")
 		filetype := r.FormValue("filetype")
 		caseSensitive := r.FormValue("case_sensitive") == "on"
@@ -299,17 +300,32 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			renderSearchError(d, w, r, "Search term is required")
 			return
 		}
+		if len(term) > index.MaxPatternLen {
+			renderSearchError(d, w, r, fmt.Sprintf("Search term must be at most %d bytes", index.MaxPatternLen))
+			return
+		}
 		if err := index.ValidatePattern(term); err != nil {
 			renderSearchError(d, w, r, "Invalid regex pattern: "+err.Error())
 			return
 		}
-		if repo == "" {
-			repo = "plugins"
+		if repoType == "" {
+			repoType = "plugins"
+		}
+		// The data source is shown on public search listings and used as a
+		// metric label, so it must be one of the fixed values before a row is
+		// stored or the background search starts.
+		if !repo.ValidExtensionType(repoType) {
+			renderSearchError(d, w, r, "Data source must be one of: plugins, themes, cores")
+			return
 		}
 
 		var fileMatch string
 		if filetype != "" {
 			fileMatch = `\.` + regexp.QuoteMeta(filetype) + `$`
+		}
+		if err := index.ValidateFileFilter(fileMatch); err != nil {
+			renderSearchError(d, w, r, "Invalid file type: "+err.Error())
+			return
 		}
 
 		var excludeMatch string
@@ -328,7 +344,7 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			Status:  searchmodel.StatusQueued,
 			Private: private,
 			Term:    term,
-			Repo:    repo,
+			Repo:    repoType,
 		}
 		if currentUser != nil {
 			s.UserID = &currentUser.ID
@@ -338,7 +354,7 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			return
 		}
 
-		go runSearchAsync(d, s.ID, repo, term, fileMatch, excludeMatch, !caseSensitive) // #nosec G118 -- goroutine intentionally outlives request; search runs in background
+		go runSearchAsync(d, s.ID, repoType, term, fileMatch, excludeMatch, !caseSensitive) // #nosec G118 -- goroutine intentionally outlives request; search runs in background
 
 		w.Header().Set("HX-Redirect", "/search/"+s.ID.String())
 		w.WriteHeader(http.StatusOK)

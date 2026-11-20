@@ -106,3 +106,16 @@ func TestSearchStopsScanWhenContextDone(t *testing.T) {
 		t.Fatalf("got %d results from a cancelled search, want none", len(results))
 	}
 }
+
+func TestValidExtensionType(t *testing.T) {
+	for _, name := range []string{"plugins", "themes", "cores"} {
+		if !ValidExtensionType(name) {
+			t.Errorf("ValidExtensionType(%q) = false, want true", name)
+		}
+	}
+	for _, name := range []string{"", "plugin", "Plugins", "plugins ", "searches", "Buy cheap things at spam-site.example"} {
+		if ValidExtensionType(name) {
+			t.Errorf("ValidExtensionType(%q) = true, want false", name)
+		}
+	}
+}
