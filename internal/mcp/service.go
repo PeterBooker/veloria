@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -55,14 +57,31 @@ type SearchService interface {
 	ReadFile(ctx context.Context, repo, slug, path string, startLine, maxLines int) (*ReadFileResponse, error)
 
 	// GrepFile searches within a single extension's source files using regex.
-	// Unlike Search, this bypasses the trigram engine and does not acquire
-	// the search semaphore.
+	// Unlike Search, this bypasses the trigram engine. It shares the file
+	// tool slots with ListFiles and ReadFile rather than the search slots.
 	GrepFile(ctx context.Context, params GrepFileParams) (*GrepFileResponse, error)
 }
 
-// searchSem limits concurrent MCP searches to 1 to prevent concurrent
-// MCP tool calls from overloading the trigram search engine.
-var searchSem = make(chan struct{}, 1)
+const (
+	// mcpSearchSlots is how many MCP searches may run on the trigram search
+	// engine at once, so MCP tool calls cannot overload it.
+	mcpSearchSlots = 3
+	// mcpSearchSlotWait bounds how long a search waits for a free slot.
+	mcpSearchSlotWait = 10 * time.Second
+	// mcpSearchTimeout is the engine deadline web and API searches also use.
+	mcpSearchTimeout = 60 * time.Second
+
+	// fileToolSlots is how many list_files, read_file and grep_file calls
+	// may read extension source trees at once.
+	fileToolSlots = 4
+	// fileToolSlotWait bounds how long a file tool call waits for a free slot.
+	fileToolSlotWait = 5 * time.Second
+)
+
+var (
+	errSearchBusy    = errors.New("search queue full, try again later")
+	errFileToolsBusy = errors.New("file tools are busy, try again later")
+)
 
 var (
 	// gzipMagicHeader identifies gzip-compressed files.
@@ -71,17 +90,46 @@ var (
 	contextLinesTable = [maxContext + 1]uint{0, 1, 2, 3, 4, 5}
 )
 
-func acquireSearchSlot(ctx context.Context) error {
+// slotLimiter bounds how many calls run at once and how long a caller waits
+// for a free slot before it is told to retry.
+type slotLimiter struct {
+	slots chan struct{}
+	wait  time.Duration
+	busy  error
+}
+
+func newSlotLimiter(slots int, wait time.Duration, busy error) *slotLimiter {
+	return &slotLimiter{slots: make(chan struct{}, slots), wait: wait, busy: busy}
+}
+
+// acquire takes a slot, waiting at most l.wait. It returns l.busy when no slot
+// frees up in time and the context error when the caller goes away first.
+func (l *slotLimiter) acquire(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	select {
-	case searchSem <- struct{}{}:
+	case l.slots <- struct{}{}:
 		return nil
+	default:
+	}
+
+	timer := time.NewTimer(l.wait)
+	defer timer.Stop()
+
+	select {
+	case l.slots <- struct{}{}:
+		return nil
+	case <-timer.C:
+		return l.busy
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func releaseSearchSlot() {
-	<-searchSem
+func (l *slotLimiter) release() {
+	<-l.slots
 }
 
 func contextLinesToUint(v int) uint {
@@ -93,12 +141,22 @@ type DirectService struct {
 	manager *manager.Manager
 	db      *gorm.DB
 	s3      storage.ResultStorage
+
+	// The slots are per service; the application runs a single one.
+	searchSlots *slotLimiter
+	fileSlots   *slotLimiter
 }
 
 // NewDirectService creates a DirectService backed by the application's
 // Manager (for search), DB (for search records), and S3 (for result persistence).
 func NewDirectService(m *manager.Manager, db *gorm.DB, s3 storage.ResultStorage) *DirectService {
-	return &DirectService{manager: m, db: db, s3: s3}
+	return &DirectService{
+		manager:     m,
+		db:          db,
+		s3:          s3,
+		searchSlots: newSlotLimiter(mcpSearchSlots, mcpSearchSlotWait, errSearchBusy),
+		fileSlots:   newSlotLimiter(fileToolSlots, fileToolSlotWait, errFileToolsBusy),
+	}
 }
 
 func (s *DirectService) Search(ctx context.Context, params SearchParams) (string, *SearchResponse, error) {
@@ -106,13 +164,39 @@ func (s *DirectService) Search(ctx context.Context, params SearchParams) (string
 		return "", nil, fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
-	if err := acquireSearchSlot(ctx); err != nil {
-		return "", nil, fmt.Errorf("search queue full, try again later")
+	// The search slot is free again before the results are persisted.
+	results, err := s.runSearch(ctx, params)
+	if err != nil {
+		return "", nil, err
 	}
-	defer releaseSearchSlot()
+
+	resp := convertManagerResponse(results)
+
+	// Persist to DB + S3 so pagination loads from cache instead of re-searching.
+	searchID, err := s.persistSearch(ctx, params, results, resp)
+	if err != nil {
+		// Non-fatal: search still succeeded, pagination just won't work.
+		// Return results without a search_id.
+		return "", resp, nil
+	}
+
+	return searchID, resp, nil
+}
+
+// runSearch runs the engine search under a search slot and the search
+// deadline. The slot is held only for the engine call, and the deferred
+// release also runs when the engine panics.
+func (s *DirectService) runSearch(ctx context.Context, params SearchParams) (*manager.SearchResponse, error) {
+	if err := s.searchSlots.acquire(ctx); err != nil {
+		return nil, err
+	}
+	defer s.searchSlots.release()
+
+	searchCtx, cancel := context.WithTimeout(ctx, mcpSearchTimeout)
+	defer cancel()
 
 	searchStart := time.Now()
-	results, err := s.manager.Search(ctx, params.Repo, params.Query, &manager.SearchParams{
+	results, err := s.manager.Search(searchCtx, params.Repo, params.Query, &manager.SearchParams{
 		FileMatch:        params.FileMatch,
 		ExcludeFileMatch: params.ExcludeFileMatch,
 		CaseInsensitive:  !params.CaseSensitive,
@@ -128,20 +212,10 @@ func (s *DirectService) Search(ctx context.Context, params SearchParams) (string
 	telemetry.SearchDuration.Record(context.Background(), searchElapsed, attrs)
 
 	if err != nil {
-		return "", nil, fmt.Errorf("search failed: %w", err)
+		return nil, fmt.Errorf("search failed: %w", err)
 	}
 
-	resp := convertManagerResponse(results)
-
-	// Persist to DB + S3 so pagination loads from cache instead of re-searching.
-	searchID, err := s.persistSearch(ctx, params, results, resp)
-	if err != nil {
-		// Non-fatal: search still succeeded, pagination just won't work.
-		// Return results without a search_id.
-		return "", resp, nil
-	}
-
-	return searchID, resp, nil
+	return results, nil
 }
 
 func (s *DirectService) LoadSearch(ctx context.Context, searchID string) (*SearchResponse, error) {
@@ -363,7 +437,20 @@ func (s *DirectService) GetRepoStats(_ context.Context, repoType string) ([]Repo
 	return results, nil
 }
 
-func (s *DirectService) ListFiles(_ context.Context, repoType, slug, pattern string) (*ListFilesResponse, error) {
+const (
+	// maxListFiles caps how many entries one list_files call returns.
+	maxListFiles = 5000
+	// maxReadLines caps how many lines one read_file call returns.
+	maxReadLines = 500
+	// maxReadBytes caps how much file content one read_file call returns.
+	maxReadBytes = 1 << 20
+	// maxScanLineBytes is the longest line the file tools can scan.
+	maxScanLineBytes = 1 << 20
+	// scanBufferSize is the initial line buffer of a file scan.
+	scanBufferSize = 64 << 10
+)
+
+func (s *DirectService) ListFiles(ctx context.Context, repoType, slug, pattern string) (*ListFilesResponse, error) {
 	if !isValidRepo(repoType) {
 		return nil, fmt.Errorf("unknown repo: %s", repoType)
 	}
@@ -377,10 +464,21 @@ func (s *DirectService) ListFiles(_ context.Context, repoType, slug, pattern str
 	// scope to the slug-specific subdirectory.
 	slugDir := filepath.Join(sourceDir, slug)
 
-	var files []FileEntry
+	if err := s.fileSlots.acquire(ctx); err != nil {
+		return nil, err
+	}
+	defer s.fileSlots.release()
+
+	var (
+		files []FileEntry
+		total int
+	)
 	err = filepath.WalkDir(slugDir, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		if d.IsDir() {
 			return nil
@@ -404,6 +502,12 @@ func (s *DirectService) ListFiles(_ context.Context, repoType, slug, pattern str
 			}
 		}
 
+		total++
+		if len(files) >= maxListFiles {
+			// Past the cap only the count is kept.
+			return nil
+		}
+
 		info, infoErr := d.Info()
 		if infoErr != nil {
 			return infoErr
@@ -417,16 +521,15 @@ func (s *DirectService) ListFiles(_ context.Context, repoType, slug, pattern str
 	}
 
 	return &ListFilesResponse{
-		Slug:  slug,
-		Repo:  repoType,
-		Total: len(files),
-		Files: files,
+		Slug:      slug,
+		Repo:      repoType,
+		Total:     total,
+		Files:     files,
+		Truncated: total > len(files),
 	}, nil
 }
 
-const maxReadLines = 500
-
-func (s *DirectService) ReadFile(_ context.Context, repoType, slug, filePath string, startLine, maxLines int) (*ReadFileResponse, error) {
+func (s *DirectService) ReadFile(ctx context.Context, repoType, slug, filePath string, startLine, maxLines int) (*ReadFileResponse, error) {
 	if !isValidRepo(repoType) {
 		return nil, fmt.Errorf("unknown repo: %s", repoType)
 	}
@@ -454,7 +557,12 @@ func (s *DirectService) ReadFile(_ context.Context, repoType, slug, filePath str
 		}
 	}
 
-	lines, totalLines, err := readFileRange(actualPath, startLine, maxLines)
+	if err := s.fileSlots.acquire(ctx); err != nil {
+		return nil, err
+	}
+	defer s.fileSlots.release()
+
+	lines, totalLines, more, err := readFileRange(ctx, actualPath, startLine, maxLines)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -472,36 +580,86 @@ func (s *DirectService) ReadFile(_ context.Context, repoType, slug, filePath str
 		StartLine:  startLine,
 		EndLine:    endLine,
 		Content:    formatNumberedLines(lines, startLine),
+		More:       more,
 	}, nil
 }
 
-// readFileRange reads lines [startLine, startLine+maxLines) from a file,
-// transparently handling gzip-compressed sources.
-// Returns the lines read and the total line count of the file.
-func readFileRange(path string, startLine, maxLines int) ([]string, int, error) {
-	file, err := os.Open(path) // #nosec G304 -- path validated by SafeJoin
-	if err != nil {
-		return nil, 0, err
-	}
-	defer func() { _ = file.Close() }()
+// sourceFile reads an extension source file, transparently decompressing
+// gzip-compressed sources.
+type sourceFile struct {
+	io.Reader
+	file *os.File
+	gz   *gzip.Reader
+}
 
-	var r io.Reader = file
+func openSourceFile(path string) (*sourceFile, error) {
+	file, err := os.Open(path) // #nosec G304 -- callers pass paths inside a validated source directory
+	if err != nil {
+		return nil, err
+	}
+	src := &sourceFile{Reader: file, file: file}
 
 	// Detect gzip by magic bytes.
 	var header [2]byte
 	n, _ := io.ReadFull(file, header[:])
 	isGzip := n == len(header) && bytes.Equal(header[:], gzipMagicHeader[:])
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return nil, 0, err
+		_ = file.Close()
+		return nil, err
 	}
 	if isGzip {
 		gz, err := gzip.NewReader(file)
 		if err != nil {
-			return nil, 0, err
+			_ = file.Close()
+			return nil, err
 		}
-		defer func() { _ = gz.Close() }()
-		r = gz
+		src.Reader, src.gz = gz, gz
 	}
+
+	return src, nil
+}
+
+func (f *sourceFile) Close() error {
+	if f.gz != nil {
+		_ = f.gz.Close()
+	}
+	return f.file.Close()
+}
+
+// scanReader reads from r up to a byte limit and fails once ctx is done, so a
+// scan can neither outgrow its budget nor outlive its caller.
+type scanReader struct {
+	ctx       context.Context
+	r         io.Reader
+	remaining int64
+}
+
+func (s *scanReader) Read(p []byte) (int, error) {
+	if err := s.ctx.Err(); err != nil {
+		return 0, err
+	}
+	if s.remaining <= 0 {
+		return 0, io.EOF
+	}
+	if int64(len(p)) > s.remaining {
+		p = p[:s.remaining]
+	}
+	n, err := s.r.Read(p)
+	s.remaining -= int64(n)
+	return n, err
+}
+
+// readFileRange reads up to maxLines lines starting at startLine from a file,
+// transparently handling gzip-compressed sources. It stops as soon as the
+// range is filled or the lines read reach maxReadBytes, and then reports
+// more=true instead of scanning the rest of the file. totalLines is the line
+// count of the file and is only known when its end was reached (more=false).
+func readFileRange(ctx context.Context, path string, startLine, maxLines int) (lines []string, totalLines int, more bool, err error) {
+	src, err := openSourceFile(path)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	defer func() { _ = src.Close() }()
 
 	if maxLines <= 0 || maxLines > maxReadLines {
 		maxLines = maxReadLines
@@ -510,21 +668,36 @@ func readFileRange(path string, startLine, maxLines int) ([]string, int, error) 
 		startLine = 1
 	}
 
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024) // handle long lines
+	scanner := bufio.NewScanner(&scanReader{ctx: ctx, r: src, remaining: math.MaxInt64})
+	scanner.Buffer(make([]byte, 0, scanBufferSize), maxScanLineBytes) // handle long lines
 
-	var lines []string
-	lineNum := 0
-	endLine := startLine + maxLines
-
+	var (
+		lineNum int
+		size    int
+	)
 	for scanner.Scan() {
 		lineNum++
-		if lineNum >= startLine && lineNum < endLine {
-			lines = append(lines, scanner.Text())
+		if lineNum < startLine {
+			continue
 		}
+
+		line := scanner.Bytes()
+
+		// A line past the requested range or the byte budget shows there is
+		// more to read. The first line is always returned so that a caller
+		// paging through the file makes progress.
+		if len(lines) == maxLines || (len(lines) > 0 && size+len(line) > maxReadBytes) {
+			return lines, 0, true, nil
+		}
+
+		size += len(line)
+		lines = append(lines, string(line))
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, 0, false, err
 	}
 
-	return lines, lineNum, scanner.Err()
+	return lines, lineNum, false, nil
 }
 
 // formatNumberedLines prepends line numbers to each line.
@@ -629,9 +802,21 @@ func escapeLike(s string) string {
 	return s
 }
 
-const maxGrepMatches = 1000
+const (
+	// maxGrepMatches caps the matches one grep_file call returns.
+	maxGrepMatches = 1000
+	// maxGrepFileBytes caps the decompressed bytes grep_file scans in one file.
+	maxGrepFileBytes = 8 << 20
+	// maxGrepCallBytes caps the decompressed bytes one grep_file call scans.
+	maxGrepCallBytes = 128 << 20
+	// maxGrepLineLen and grepTruncateRadius mirror maxLineLen and
+	// truncateRadius in internal/index, so grep_file returns lines no longer
+	// than the trigram search engine does.
+	maxGrepLineLen     = 250
+	grepTruncateRadius = 100
+)
 
-func (s *DirectService) GrepFile(_ context.Context, params GrepFileParams) (*GrepFileResponse, error) {
+func (s *DirectService) GrepFile(ctx context.Context, params GrepFileParams) (*GrepFileResponse, error) {
 	if !isValidRepo(params.Repo) {
 		return nil, fmt.Errorf("unknown repo: %s", params.Repo)
 	}
@@ -653,15 +838,40 @@ func (s *DirectService) GrepFile(_ context.Context, params GrepFileParams) (*Gre
 
 	contextLines := clampInt(params.ContextLines, 0, maxContext)
 
+	if err := s.fileSlots.acquire(ctx); err != nil {
+		return nil, err
+	}
+	defer s.fileSlots.release()
+
 	resp := &GrepFileResponse{
 		Slug:  params.Slug,
 		Repo:  params.Repo,
 		Query: params.Query,
 	}
 
-	err = filepath.WalkDir(slugDir, func(path string, d os.DirEntry, walkErr error) error {
-		if walkErr != nil || d.IsDir() {
+	if err := grepTree(ctx, slugDir, params.FileMatch, re, contextLines, maxGrepCallBytes, resp); err != nil {
+		return nil, fmt.Errorf("grep failed: %w", err)
+	}
+
+	return resp, nil
+}
+
+// grepTree greps the files under slugDir whose base name matches the fileMatch
+// glob and adds their matches to resp. It reads at most callBytes decompressed
+// bytes in total and stops early at the match cap, when that budget is spent,
+// or when ctx is done.
+func grepTree(ctx context.Context, slugDir, fileMatch string, re *regexp.Regexp, contextLines int, callBytes int64, resp *GrepFileResponse) error {
+	buf := make([]byte, 0, scanBufferSize)
+
+	return filepath.WalkDir(slugDir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
 			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
 		}
 		if resp.TotalMatches >= maxGrepMatches {
 			return filepath.SkipAll
@@ -670,8 +880,8 @@ func (s *DirectService) GrepFile(_ context.Context, params GrepFileParams) (*Gre
 		relPath, _ := filepath.Rel(slugDir, path)
 		relPath = strings.TrimSuffix(relPath, ".gz")
 
-		if params.FileMatch != "" {
-			matched, matchErr := filepath.Match(params.FileMatch, filepath.Base(relPath))
+		if fileMatch != "" {
+			matched, matchErr := filepath.Match(fileMatch, filepath.Base(relPath))
 			if matchErr != nil {
 				return fmt.Errorf("invalid glob: %w", matchErr)
 			}
@@ -680,18 +890,26 @@ func (s *DirectService) GrepFile(_ context.Context, params GrepFileParams) (*Gre
 			}
 		}
 
-		matches, grepErr := grepSingleFile(path, re, contextLines)
+		if callBytes <= 0 {
+			// Files remain but the scan budget is spent.
+			resp.Truncated = true
+			return filepath.SkipAll
+		}
+
+		limit := min(callBytes, maxGrepFileBytes)
+		matches, read, truncated, grepErr := grepSingleFile(ctx, path, re, contextLines, maxGrepMatches-resp.TotalMatches, limit, buf)
+		callBytes -= read
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if grepErr != nil {
 			return nil // skip unreadable files
 		}
+		if truncated {
+			resp.Truncated = true
+		}
 		if len(matches) == 0 {
 			return nil
-		}
-
-		// Enforce global cap.
-		remaining := maxGrepMatches - resp.TotalMatches
-		if len(matches) > remaining {
-			matches = matches[:remaining]
 		}
 
 		resp.Files = append(resp.Files, GrepFileMatch{
@@ -701,76 +919,127 @@ func (s *DirectService) GrepFile(_ context.Context, params GrepFileParams) (*Gre
 		resp.TotalMatches += len(matches)
 		return nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("grep failed: %w", err)
-	}
-
-	return resp, nil
 }
 
-// grepSingleFile searches a file for regex matches, transparently handling
-// gzip-compressed sources. Returns matches with optional context lines.
-func grepSingleFile(path string, re *regexp.Regexp, contextLines int) ([]GrepLineMatch, error) {
-	file, err := os.Open(path) // #nosec G304 -- path from WalkDir within validated slugDir
+// grepSingleFile streams a file and returns up to maxMatches regex matches
+// with optional context lines, transparently handling gzip-compressed sources.
+// Only the ring of context lines is held in memory, and at most limit
+// decompressed bytes are read: read reports how many, and truncated whether
+// the file went on past the limit. buf is the scan buffer, which the caller
+// reuses across files.
+func grepSingleFile(ctx context.Context, path string, re *regexp.Regexp, contextLines, maxMatches int, limit int64, buf []byte) (matches []GrepLineMatch, read int64, truncated bool, err error) {
+	src, err := openSourceFile(path)
 	if err != nil {
-		return nil, err
+		return nil, 0, false, err
 	}
-	defer func() { _ = file.Close() }()
+	defer func() { _ = src.Close() }()
 
-	var r io.Reader = file
+	limited := &scanReader{ctx: ctx, r: src, remaining: limit}
+	scanner := bufio.NewScanner(limited)
+	scanner.Buffer(buf[:0], maxScanLineBytes)
 
-	// Detect gzip by magic bytes.
-	var header [2]byte
-	n, _ := io.ReadFull(file, header[:])
-	isGzip := n == len(header) && bytes.Equal(header[:], gzipMagicHeader[:])
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return nil, err
-	}
-	if isGzip {
-		gz, err := gzip.NewReader(file)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = gz.Close() }()
-		r = gz
-	}
-
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-	var allLines []string
+	var (
+		before  = lineRing{bufs: make([][]byte, contextLines)}
+		pending []int // indexes of matches still collecting After lines
+		lineNum int
+		capped  bool
+	)
 	for scanner.Scan() {
-		allLines = append(allLines, scanner.Text())
+		lineNum++
+		line := scanner.Bytes()
+
+		if len(pending) > 0 {
+			after := string(line[:min(len(line), maxGrepLineLen)])
+			open := pending[:0]
+			for _, i := range pending {
+				matches[i].After = append(matches[i].After, after)
+				if len(matches[i].After) < contextLines {
+					open = append(open, i)
+				}
+			}
+			pending = open
+		}
+
+		if len(matches) < maxMatches {
+			if re.Match(line) {
+				matches = append(matches, GrepLineMatch{
+					Line:    lineNum,
+					Content: truncateMatchLine(line, re),
+					Before:  before.lines(),
+				})
+				if contextLines > 0 {
+					pending = append(pending, len(matches)-1)
+				}
+			}
+		} else if len(pending) == 0 {
+			capped = true
+			break
+		}
+
+		before.push(line)
 	}
+	read = limit - limited.remaining
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, read, false, err
 	}
 
-	var matches []GrepLineMatch
-	for i, line := range allLines {
-		if !re.MatchString(line) {
-			continue
-		}
-
-		m := GrepLineMatch{
-			Line:    i + 1,
-			Content: line,
-		}
-
-		if contextLines > 0 {
-			start := max(i-contextLines, 0)
-			if start < i {
-				m.Before = allLines[start:i]
-			}
-
-			end := min(i+1+contextLines, len(allLines))
-			if i+1 < end {
-				m.After = allLines[i+1 : end]
-			}
-		}
-
-		matches = append(matches, m)
+	if !capped && limited.remaining <= 0 {
+		// The limit was reached; see whether it cut the file short.
+		var probe [1]byte
+		n, _ := io.ReadFull(src, probe[:])
+		truncated = n > 0
 	}
 
-	return matches, nil
+	return matches, read, truncated, nil
+}
+
+// lineRing holds the last len(bufs) lines of a scan, each cut to
+// maxGrepLineLen. It reuses its buffers, so a scan allocates nothing per line.
+type lineRing struct {
+	bufs [][]byte
+	next int // slot the next line is written to
+	held int // lines currently held
+}
+
+func (r *lineRing) push(line []byte) {
+	if len(r.bufs) == 0 {
+		return
+	}
+	r.bufs[r.next] = append(r.bufs[r.next][:0], line[:min(len(line), maxGrepLineLen)]...)
+	r.next = (r.next + 1) % len(r.bufs)
+	if r.held < len(r.bufs) {
+		r.held++
+	}
+}
+
+// lines returns the held lines, oldest first.
+func (r *lineRing) lines() []string {
+	if r.held == 0 {
+		return nil
+	}
+	out := make([]string, 0, r.held)
+	oldest := (r.next - r.held + len(r.bufs)) % len(r.bufs)
+	for i := range r.held {
+		out = append(out, string(r.bufs[(oldest+i)%len(r.bufs)]))
+	}
+	return out
+}
+
+// truncateMatchLine cuts a matched line the way the trigram search engine
+// does: a line over maxGrepLineLen keeps grepTruncateRadius bytes either side
+// of where the match starts.
+func truncateMatchLine(line []byte, re *regexp.Regexp) string {
+	if len(line) <= maxGrepLineLen {
+		return string(line)
+	}
+
+	center := 0
+	if loc := re.FindIndex(line); loc != nil {
+		center = loc[0]
+	}
+
+	start := max(center-grepTruncateRadius, 0)
+	end := min(center+grepTruncateRadius, len(line))
+
+	return string(line[start:end])
 }

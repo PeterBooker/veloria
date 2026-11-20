@@ -162,9 +162,9 @@ func New(deps RouterDeps) *chi.Mux {
 	if opts.MCPEnabled {
 		mcpHandler := dynamicMCPHandler(reg)
 		if opts.RateLimitEnabled {
-			r.With(mcpWriteDeadline, httprate.LimitByIP(100, time.Minute)).Mount("/mcp", mcpHandler)
+			r.With(mcpWriteDeadline, mcpBodyLimit, httprate.LimitByIP(100, time.Minute)).Mount("/mcp", mcpHandler)
 		} else {
-			r.With(mcpWriteDeadline).Mount("/mcp", mcpHandler)
+			r.With(mcpWriteDeadline, mcpBodyLimit).Mount("/mcp", mcpHandler)
 		}
 	}
 
@@ -425,6 +425,17 @@ func mcpWriteDeadline(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rc := http.NewResponseController(w)
 		_ = rc.SetWriteDeadline(time.Now().Add(5 * time.Minute))
+		next.ServeHTTP(w, r)
+	})
+}
+
+// mcpMaxBodyBytes caps an MCP request body at the size the other POST routes allow.
+const mcpMaxBodyBytes = 1 << 20 // 1 MB
+
+// mcpBodyLimit caps the body of MCP requests, which are small JSON documents.
+func mcpBodyLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, mcpMaxBodyBytes)
 		next.ServeHTTP(w, r)
 	})
 }
