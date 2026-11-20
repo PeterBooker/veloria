@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
@@ -246,27 +247,49 @@ func ExportCSV(d *web.Deps) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="search-%s.csv"`, s.ID))
 
-		cw := csv.NewWriter(w)
-		_ = cw.Write([]string{"Extension", "Slug", "Version", "Active Installs", "File", "Line Number", "Line"})
+		writeResultsCSV(w, results)
+	}
+}
 
-		for _, result := range results.Results {
-			for _, fm := range result.Matches {
-				for _, m := range fm.Matches {
-					_ = cw.Write([]string{
-						result.Name,
-						result.Slug,
-						result.Version,
-						strconv.Itoa(result.ActiveInstalls),
-						fm.Filename,
-						strconv.Itoa(m.LineNumber),
-						m.Line,
-					})
-				}
+// writeResultsCSV writes one CSV row per match. Every cell that carries
+// upstream or indexed content goes through csvCell; the two numeric columns
+// are generated here and are written as they are.
+func writeResultsCSV(w io.Writer, results *manager.SearchResponse) {
+	cw := csv.NewWriter(w)
+	_ = cw.Write([]string{"Extension", "Slug", "Version", "Active Installs", "File", "Line Number", "Line"})
+
+	for _, result := range results.Results {
+		for _, fm := range result.Matches {
+			for _, m := range fm.Matches {
+				_ = cw.Write([]string{
+					csvCell(result.Name),
+					csvCell(result.Slug),
+					csvCell(result.Version),
+					strconv.Itoa(result.ActiveInstalls),
+					csvCell(fm.Filename),
+					strconv.Itoa(m.LineNumber),
+					csvCell(m.Line),
+				})
 			}
 		}
-
-		cw.Flush()
 	}
+
+	cw.Flush()
+}
+
+// csvCell neutralizes a cell that a spreadsheet application would otherwise
+// treat as a formula. A cell whose first character is '=', '+', '-', '@', tab
+// or carriage return is prefixed with a single quote, as OWASP recommends for
+// CSV injection.
+func csvCell(s string) string {
+	if s == "" {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + s
+	}
+	return s
 }
 
 // SubmitSearch handles search form submissions by creating a search record
