@@ -2,6 +2,7 @@ package partial
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"veloria/internal/ui"
@@ -9,32 +10,39 @@ import (
 )
 
 func searchExtensionsURL(searchID string, page int, search string) string {
-	url := "/search/" + searchID + "/extensions?page=" + strconv.Itoa(page)
+	u := "/search/" + url.PathEscape(searchID) + "/extensions?page=" + strconv.Itoa(page)
 	if search != "" {
-		url += "&search=" + search
+		u += "&search=" + url.QueryEscape(search)
 	}
-	return url
+	return u
 }
 
-func extDetailAttrs(searchID, slug string) templ.Attributes {
-	jsCall := "toggleExtDetail(this, '/search/" + searchID + "/extension/" + slug + "', 'ext-detail-" + slug + "')"
-	return templ.Attributes{
-		"aria-expanded": "false",
-		"aria-controls": "ext-detail-" + slug,
-		"onclick":       jsCall,
-		"onkeydown":     "if(event.key==='Enter'||event.key===' '){event.preventDefault();" + jsCall + "}",
-	}
+// extDetailURL returns the HTMX endpoint for one extension's matches. The slug
+// is upstream data, so it is escaped as a single path segment.
+func extDetailURL(searchID, slug string) string {
+	return "/search/" + url.PathEscape(searchID) + "/extension/" + url.PathEscape(slug)
+}
+
+// extDetailID returns the element ID of the detail panel for the i-th result
+// on the page. It is built from the position rather than the slug, so no
+// upstream data ends up in an ID or in a selector derived from one.
+func extDetailID(i int) string {
+	return "ext-detail-" + strconv.Itoa(i)
 }
 
 templ SearchExtensions(data ui.SearchExtensionsData) {
 	if len(data.Extensions) > 0 {
 		<div id="result-list" aria-label="Search results">
-			for _, ext := range data.Extensions {
+			for i, ext := range data.Extensions {
 				<article class="result">
 					<button
 						type="button"
 						class="result__head"
-						{ extDetailAttrs(data.SearchID, ext.Slug)... }
+						aria-expanded="false"
+						aria-controls={ extDetailID(i) }
+						data-ext-url={ extDetailURL(data.SearchID, ext.Slug) }
+						onclick="toggleExtDetail(this)"
+						onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleExtDetail(this)}"
 					>
 						<div class="result__info">
 							<div class="result__title">{ ext.Name }</div>
@@ -50,7 +58,7 @@ templ SearchExtensions(data ui.SearchExtensionsData) {
 						<span class="result__chev" aria-hidden="true">›</span>
 					</button>
 					<div class="result__body" hidden>
-						<div id={ "ext-detail-" + ext.Slug }>
+						<div id={ extDetailID(i) }>
 							<div class="codeline" role="status" aria-label="Loading">
 								<div class="codeline__ln">…</div>
 								<div class="codeline__src" style="color: var(--text-faint);">Loading matches…</div>

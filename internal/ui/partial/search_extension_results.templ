@@ -2,6 +2,7 @@ package partial
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"veloria/internal/ui"
@@ -9,7 +10,8 @@ import (
 )
 
 func contextURL(searchID, searchDataSource, slug, filename string, lineNumber int) string {
-	return "/search/" + searchID + "/context?repo=" + searchDataSource + "&slug=" + slug + "&file=" + filename + "&line=" + strconv.Itoa(lineNumber)
+	return "/search/" + url.PathEscape(searchID) + "/context?repo=" + url.QueryEscape(searchDataSource) +
+		"&slug=" + url.QueryEscape(slug) + "&file=" + url.QueryEscape(filename) + "&line=" + strconv.Itoa(lineNumber)
 }
 
 func matchCountLabel(count int) string {

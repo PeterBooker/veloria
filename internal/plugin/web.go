@@ -77,7 +77,7 @@ func ViewPage(d *web.Deps) http.HandlerFunc {
 			Rating:           row.Rating,
 			ActiveInstalls:   row.ActiveInstalls,
 			Downloaded:       row.Downloaded,
-			DownloadLink:     row.DownloadLink,
+			DownloadLink:     web.SafeDownloadLink(row.DownloadLink),
 			Tags:             web.ParseTags(row.Tags),
 			Indexed:          indexStatus[row.Slug],
 			FileCount:        row.FileCount,
