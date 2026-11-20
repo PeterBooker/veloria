@@ -1,6 +1,7 @@
 package index
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,7 +36,7 @@ func TestSearch(t *testing.T) {
 		MaxResults:    10,
 	}
 
-	resp, err := idx.Search("function", opt)
+	resp, err := idx.Search(context.Background(), "function", opt)
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}

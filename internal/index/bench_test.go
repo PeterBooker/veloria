@@ -2,6 +2,7 @@ package index
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"testing"
 
@@ -67,13 +68,13 @@ func BenchmarkSearchCompiled(b *testing.B) {
 			}
 
 			// Warm the DFA pool
-			_, _ = idx.SearchCompiled(cs)
+			_, _ = idx.SearchCompiled(context.Background(), cs)
 
 			b.ReportAllocs()
 			b.ResetTimer()
 
 			for b.Loop() {
-				resp, err := idx.SearchCompiled(cs)
+				resp, err := idx.SearchCompiled(context.Background(), cs)
 				if err != nil {
 					b.Fatal(err)
 				}

@@ -319,7 +319,7 @@ Each `IndexTask.Run()` closure handles the full pipeline: download ZIP, extract 
 2. Handler calls `SearchService.Search(repoType, term, params)`
 3. Manager dispatches to the correct DataSource
 4. `ExtensionStore.Search()` fans out across all indexed extensions using `SEARCH_CONCURRENCY` workers
-5. Each worker calls `IndexedExtension.SearchCompiled()` on the extension's in-memory index
+5. Each worker calls `IndexedExtension.SearchCompiled()` on the extension's in-memory index. The scan checks the search context before each file, so the search deadline stops a scan in progress
 6. Results are collected, sorted by active installs (descending), and returned
 
 ### Discovery

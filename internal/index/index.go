@@ -3,6 +3,7 @@ package index
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/klauspost/compress/gzip"
 	"io"
@@ -155,17 +156,21 @@ type FileMatch struct {
 }
 
 // Search searches the index for the given pattern and returns matching results.
-func (i *Index) Search(pat string, opt *SearchOptions) (*SearchResponse, error) {
+func (i *Index) Search(ctx context.Context, pat string, opt *SearchOptions) (*SearchResponse, error) {
 	cs, err := CompileSearch(pat, opt)
 	if err != nil {
 		return nil, err
 	}
-	return i.SearchCompiled(cs)
+	return i.SearchCompiled(ctx, cs)
 }
 
 // SearchCompiled searches the index using pre-compiled search patterns.
 // Use CompileSearch to create a CompiledSearch, then reuse it across multiple indexes.
-func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
+//
+// ctx is checked before each candidate file. Once it is done the scan stops
+// and its error is returned, so a search deadline bounds the scan itself and
+// not only the gap between two indexes.
+func (i *Index) SearchCompiled(ctx context.Context, cs *CompiledSearch) (*SearchResponse, error) {
 	startedAt := time.Now()
 
 	// Compile a fresh DFA regexp for this call. The codesearch DFA regexp is
@@ -206,6 +211,9 @@ func (i *Index) SearchCompiled(cs *CompiledSearch) (*SearchResponse, error) {
 	for _, fileID := range files {
 		if matchesCollected >= cs.maxResults {
 			break
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 
 		name := idx.Name(fileID).String()

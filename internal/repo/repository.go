@@ -461,9 +461,13 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 				return
 			}
 
-			resp, err := ie.SearchCompiled(cs)
+			resp, err := ie.SearchCompiled(ctx, cs)
 			if err != nil {
-				r.l.Warn("Failed to search extension", zap.String("slug", e.GetSlug()), zap.Error(err))
+				// A scan cut short by the deadline is reported once, by the
+				// ctx.Err() check after wg.Wait, not once per worker.
+				if ctx.Err() == nil {
+					r.l.Warn("Failed to search extension", zap.String("slug", e.GetSlug()), zap.Error(err))
+				}
 				return
 			}
 			if resp == nil {
