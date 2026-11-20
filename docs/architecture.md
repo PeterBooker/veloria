@@ -32,7 +32,13 @@ veloria index --repo <type> --slug <name> --zipurl <url>
 
 This command is not meant to be run manually. The server invokes it as a subprocess for process isolation. It downloads the ZIP (with retry on 429), extracts text files into `<datadir>/<repo>/source/<slug>/`, builds a trigram index at `<datadir>/<repo>/index/<slug>/trigrams`, then gzip-compresses the source files. Outputs `INDEX_READY:<path>` and `EXTRACT_STATS:<json>` on stdout for the parent process.
 
-Exit code 2 signals a permanent download failure (400/403/404/410), telling the server not to retry.
+Exit code 2 signals a permanent download failure (400/403/404/410, a body that is not a ZIP, or a body over 1 GiB), telling the server not to retry.
+
+The ZIP URL comes from upstream metadata, so the download client is restricted: `http` and `https` only, at most 5 redirects, no environment proxy (`HTTP_PROXY`/`HTTPS_PROXY` are ignored for archive downloads), and no connection to a non-public address (loopback, private, link-local, unique-local, CGNAT, multicast, or reserved ranges). The address check runs on every connection, so it also covers redirects and DNS answers. A refused download exits with code 3, like an unavailable one, after a single attempt.
+
+Extraction is bounded per archive: 256 MiB per file, 4 GiB in total, and 250,000 entries. An archive over a limit fails and its partial output is removed.
+
+The failed-indexing list on the public data source pages shows a fixed category per failure (`Download not found`, `Download unavailable`, `Invalid archive`, `Indexing failed`). The full error text is kept in the `index_events` table and the server log.
 
 ### `veloria migrate`
 
