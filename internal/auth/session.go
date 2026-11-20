@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/http"
 
 	"github.com/antonlindstrom/pgstore"
@@ -57,12 +58,39 @@ func (s *SessionStore) Close() {
 	}
 }
 
-// SetUser stores the user ID in the session.
+// SetUser signs the user in on a new session. The session the request
+// presented is destroyed and its ID is never reused, so an ID that was known
+// before login cannot become an authenticated one.
 func (s *SessionStore) SetUser(w http.ResponseWriter, r *http.Request, userID uuid.UUID) error {
 	session, _ := s.store.Get(r, sessionName)
-	session.Values["user_id"] = userID.String()
-	return session.Save(r, w)
+
+	if session.ID != "" {
+		// A negative MaxAge makes the store delete the row. The expired cookie
+		// it writes is dropped: the response carries the new session's cookie.
+		maxAge := session.Options.MaxAge
+		session.Options.MaxAge = -1
+		err := s.store.Save(r, discardResponseWriter{header: http.Header{}}, session)
+		session.Options.MaxAge = maxAge
+		if err != nil {
+			return fmt.Errorf("destroying pre-login session: %w", err)
+		}
+	}
+
+	// With no ID the store generates a fresh one on save.
+	session.ID = ""
+	session.IsNew = true
+	session.Values = map[any]any{"user_id": userID.String()}
+	return s.store.Save(r, w, session)
 }
+
+// discardResponseWriter is an http.ResponseWriter whose output is thrown away.
+type discardResponseWriter struct {
+	header http.Header
+}
+
+func (d discardResponseWriter) Header() http.Header       { return d.header }
+func (discardResponseWriter) Write(b []byte) (int, error) { return len(b), nil }
+func (discardResponseWriter) WriteHeader(int)             {}
 
 // GetUser retrieves the current user from the session.
 func (s *SessionStore) GetUser(r *http.Request) (*user.User, error) {
