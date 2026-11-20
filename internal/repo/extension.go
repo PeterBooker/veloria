@@ -24,11 +24,14 @@ var (
 // Exit codes with which the "veloria index" subcommand reports the download
 // outcome to the parent server process (see runIndexer and cmd/veloria/index.go).
 const (
-	// ExitDownloadNotFound: the URL will never work (400, 403, 404, 410, or a
-	// body that is not a zip). The caller may fall back or close the extension.
+	// ExitDownloadNotFound: the URL will never work (400, 403, 404, 410, a body
+	// over the size limit, or a body that is not a zip). The caller may fall
+	// back or close the extension.
 	ExitDownloadNotFound = 2
 	// ExitDownloadUnavailable: every attempt failed transiently (5xx or a
-	// transport error). The caller may fall back and should retry, not close.
+	// transport error), or the download client refused the request (non-public
+	// address, scheme, redirect limit). The caller may fall back and should
+	// retry, not close.
 	ExitDownloadUnavailable = 3
 )
 

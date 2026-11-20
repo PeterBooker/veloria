@@ -143,6 +143,7 @@ func TestValidateZipMagic(t *testing.T) {
 }
 
 func TestDownloadZip_PermanentFailure(t *testing.T) {
+	allowLoopbackDownloads(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -159,6 +160,7 @@ func TestDownloadZip_PermanentFailure(t *testing.T) {
 }
 
 func TestDownloadZip_InvalidZipContent(t *testing.T) {
+	allowLoopbackDownloads(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = fmt.Fprint(w, "<html>Error</html>")
 	}))
@@ -175,6 +177,7 @@ func TestDownloadZip_InvalidZipContent(t *testing.T) {
 }
 
 func TestDownloadZip_429RetriesAndSucceeds(t *testing.T) {
+	allowLoopbackDownloads(t)
 	attempt := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempt++
@@ -220,6 +223,7 @@ func TestIsGitHubReleaseAsset(t *testing.T) {
 }
 
 func TestDownloadZip_GitHubAcceptHeader(t *testing.T) {
+	allowLoopbackDownloads(t)
 	var gotAccept string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAccept = r.Header.Get("Accept")

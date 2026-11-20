@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -26,6 +27,14 @@ const (
 // downloadDefaultRetryWait is the wait between attempts when the upstream
 // sends no Retry-After header. A variable so tests can shorten it.
 var downloadDefaultRetryWait = 10 * time.Second
+
+// downloadMaxSize is the largest archive downloadZip accepts (1 GiB), counted
+// in bytes written to disk. A variable so tests can lower it.
+var downloadMaxSize int64 = 1 << 30
+
+// zipHTTPClient returns the client used for archive downloads. Only tests
+// replace it: their servers listen on loopback, which client.GetZip refuses.
+var zipHTTPClient = client.GetZip
 
 // IndexCmd downloads a zip, extracts text files, and builds a trigram search index.
 // This command is invoked as a subprocess by the server to maintain process isolation.
@@ -163,12 +172,13 @@ func (c *IndexCmd) Run() error {
 //
 // The outcome is signalled to the parent server process through the exit
 // code carried by exitError:
-//   - repo.ExitDownloadNotFound (400, 403, 404, 410, or a body that is not a
-//     zip): the URL will never work, so the caller may fall back to another
-//     URL or close the extension.
+//   - repo.ExitDownloadNotFound (400, 403, 404, 410, a body larger than
+//     downloadMaxSize, or a body that is not a zip): the URL will never work,
+//     so the caller may fall back to another URL or close the extension.
 //   - repo.ExitDownloadUnavailable (5xx or a transport failure on every
-//     attempt): the URL may work later, so the caller may fall back to
-//     another URL and should retry rather than close.
+//     attempt, or a request the client refused on policy grounds): the URL
+//     may work later, so the caller may fall back to another URL and should
+//     retry rather than close.
 //   - a plain error for 429 on every attempt, retried on the caller's next cycle.
 //
 // Between attempts it waits for the Retry-After header when present,
@@ -188,7 +198,7 @@ func downloadZip(u string) (string, func(), error) {
 		return "", func() {}, err
 	}
 
-	c := client.GetZip()
+	c := zipHTTPClient()
 
 	var (
 		lastErr   error
@@ -208,6 +218,11 @@ func downloadZip(u string) (string, func(), error) {
 
 		resp, err := c.Do(req)
 		if err != nil {
+			if errors.Is(err, client.ErrDownloadRefused) {
+				// A refused address, scheme or redirect chain: another
+				// attempt in this run would be refused the same way.
+				return fail(&exitError{code: repo.ExitDownloadUnavailable, msg: err.Error()})
+			}
 			lastErr, transient = err, true
 			waitBeforeRetry(attempt, "", err.Error())
 			continue
@@ -229,8 +244,16 @@ func downloadZip(u string) (string, func(), error) {
 			return fail(fmt.Errorf("unexpected HTTP status: %s", resp.Status))
 		}
 
-		_, err = io.Copy(tmpFile, resp.Body)
+		if resp.ContentLength > downloadMaxSize {
+			_ = resp.Body.Close()
+			return fail(errDownloadTooLarge())
+		}
+		// One byte over the limit is enough to tell that the body exceeds it.
+		written, err := io.Copy(tmpFile, io.LimitReader(resp.Body, downloadMaxSize+1))
 		_ = resp.Body.Close()
+		if written > downloadMaxSize {
+			return fail(errDownloadTooLarge())
+		}
 		if err != nil {
 			// A partial body is worthless; discard it and fetch again.
 			if terr := truncateFile(tmpFile); terr != nil {
@@ -261,6 +284,14 @@ func downloadZip(u string) (string, func(), error) {
 		}
 	}
 	return "", func() {}, lastErr
+}
+
+// errDownloadTooLarge is the permanent failure for a body over downloadMaxSize.
+func errDownloadTooLarge() error {
+	return &exitError{
+		code: repo.ExitDownloadNotFound,
+		msg:  fmt.Sprintf("download exceeds maximum size of %d bytes", downloadMaxSize),
+	}
 }
 
 // waitBeforeRetry sleeps before the next download attempt, if there is one.
