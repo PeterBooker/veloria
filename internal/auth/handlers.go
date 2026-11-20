@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"context"
+	"crypto/rand"
 	"errors"
 	"net/http"
 
@@ -34,17 +34,37 @@ func NewHandler(db *gorm.DB, sessionStore *SessionStore, log *zap.Logger) *Handl
 	return h
 }
 
+// gothic reads the OAuth state and the provider name through package-level
+// hooks whose defaults take both from the query string. They are replaced once,
+// before any request is served, with functions that hold no shared state.
+func init() {
+	gothic.SetState = newOAuthState
+	gothic.GetProviderName = routeProvider
+}
+
+// newOAuthState returns the state for a new OAuth flow. It is always generated
+// here, so a callback is accepted only for a flow this server started; a state
+// supplied in the request is ignored.
+func newOAuthState(*http.Request) string {
+	return rand.Text()
+}
+
+// routeProvider names the provider from the route parameter and nothing else.
+func routeProvider(r *http.Request) (string, error) {
+	if provider := chi.URLParam(r, "provider"); provider != "" {
+		return provider, nil
+	}
+	return "", errors.New("no provider in route")
+}
+
 // BeginAuth starts the OAuth flow for a provider.
 func (h *Handler) BeginAuth(w http.ResponseWriter, r *http.Request) {
-	provider := chi.URLParam(r, "provider")
-	r = r.WithContext(context.WithValue(r.Context(), gothic.ProviderParamKey, provider))
 	gothic.BeginAuthHandler(w, r)
 }
 
 // Callback handles the OAuth callback from the provider.
 func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
-	r = r.WithContext(context.WithValue(r.Context(), gothic.ProviderParamKey, provider))
 
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
