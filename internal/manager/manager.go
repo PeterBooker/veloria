@@ -546,6 +546,52 @@ type SearchResponse struct {
 	Total   int             `json:"total"`
 }
 
+// Approximate per-object overheads used by SearchResponse.CacheSize: the
+// struct itself, the pointer to it, and its string and slice headers.
+const (
+	responseOverhead  = 64
+	resultOverhead    = 128
+	fileMatchOverhead = 64
+	matchOverhead     = 96
+	lineOverhead      = 16
+)
+
+var _ cache.Sizer = (*SearchResponse)(nil)
+
+// CacheSize estimates the memory held by the response in bytes. It implements
+// cache.Sizer so the shared cache charges a response by its size.
+func (r *SearchResponse) CacheSize() int64 {
+	if r == nil {
+		return 0
+	}
+	size := int64(responseOverhead)
+	for _, res := range r.Results {
+		if res == nil {
+			continue
+		}
+		size += int64(resultOverhead + len(res.Slug) + len(res.Name) + len(res.Version))
+		for _, fm := range res.Matches {
+			if fm == nil {
+				continue
+			}
+			size += int64(fileMatchOverhead + len(fm.Filename))
+			for _, m := range fm.Matches {
+				if m == nil {
+					continue
+				}
+				size += int64(matchOverhead + len(m.Line))
+				for _, line := range m.Before {
+					size += int64(lineOverhead + len(line))
+				}
+				for _, line := range m.After {
+					size += int64(lineOverhead + len(line))
+				}
+			}
+		}
+	}
+	return size
+}
+
 // ProgressFunc is called during search to report progress.
 // searched is the number of extensions searched so far, total is the total count.
 type ProgressFunc func(searched, total int)
