@@ -29,7 +29,7 @@ templ FailedIndex(data ui.FailedIndexData) {
 								<a href={ templ.SafeURL("/data-sources/" + data.DataSource + "/" + ev.Slug) } style="color: var(--accent-text); font-family: var(--font-mono); font-size: var(--fs-micro); text-decoration:none;">{ ev.Slug }</a>
 							</td>
 							<td style="max-width: 480px;">
-								<span style="color: var(--text-faint); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title={ ev.ErrorMessage }>{ ev.ErrorMessage }</span>
+								<span style="color: var(--text-faint); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{ ev.Category }</span>
 							</td>
 							<td style="white-space:nowrap; color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-micro);">{ ui.TimeAgo(ev.CreatedAt) }</td>
 						</tr>

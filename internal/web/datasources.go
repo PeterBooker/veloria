@@ -6,11 +6,13 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
+	"veloria/internal/repo"
 	"veloria/internal/ui/page"
 	"veloria/internal/ui/partial"
 )
@@ -156,6 +158,57 @@ func DataSourceItemsPartial(d *Deps, repoType string) http.HandlerFunc {
 	}
 }
 
+// Categories shown on the public failed-indexing page.
+const (
+	failureDownloadNotFound    = "Download not found"
+	failureDownloadUnavailable = "Download unavailable"
+	failureInvalidArchive      = "Invalid archive"
+	failureIndexing            = "Indexing failed"
+)
+
+// failedIndexRow is one unindexed extension with its latest stored error.
+type failedIndexRow struct {
+	Slug         string
+	ErrorMessage string
+	CreatedAt    time.Time
+}
+
+// failureCategory reduces a stored indexing error to a fixed category. The
+// stored text stays in index_events and the server log for operators; it can
+// carry URLs, addresses, upstream status lines and file paths, none of which
+// belong on a public page. The prefixes are those of the repo download errors
+// and of the "veloria index" errors in cmd/veloria/index.go; anything
+// unrecognised falls back to the generic category.
+func failureCategory(msg string) string {
+	switch {
+	case msg == "":
+		// Not attempted yet, or no failure recorded.
+		return ""
+	case strings.HasPrefix(msg, repo.ErrDownloadNotFound.Error()):
+		return failureDownloadNotFound
+	case strings.HasPrefix(msg, repo.ErrDownloadUnavailable.Error()),
+		strings.HasPrefix(msg, "failed to download zip"):
+		return failureDownloadUnavailable
+	case strings.HasPrefix(msg, "failed to unzip files"):
+		return failureInvalidArchive
+	default:
+		return failureIndexing
+	}
+}
+
+// failedIndexEvents converts stored rows into what the page may show.
+func failedIndexEvents(rows []failedIndexRow) []FailedIndexEvent {
+	events := make([]FailedIndexEvent, len(rows))
+	for i, row := range rows {
+		events[i] = FailedIndexEvent{
+			Slug:      row.Slug,
+			Category:  failureCategory(row.ErrorMessage),
+			CreatedAt: row.CreatedAt,
+		}
+	}
+	return events
+}
+
 // FailedIndexPartial renders the paginated failed indexing table as an HTMX partial.
 func FailedIndexPartial(d *Deps, repoType string) http.HandlerFunc {
 	table, slugCol := datasourceTableAndSlugCol(repoType)
@@ -190,7 +243,7 @@ func FailedIndexPartial(d *Deps, repoType string) http.HandlerFunc {
 		offset := (pg - 1) * pageSize
 
 		// Fetch unindexed extensions with their latest error from index_events.
-		var events []FailedIndexEvent
+		var rows []failedIndexRow
 		d.DB().Raw(`
 			SELECT t.`+slugCol+` AS slug,
 			       COALESCE(ie.error_message, '') AS error_message,
@@ -205,11 +258,11 @@ func FailedIndexPartial(d *Deps, repoType string) http.HandlerFunc {
 			) ie ON true
 			WHERE t.deleted_at IS NULL AND t.index_status != 'indexed'
 			ORDER BY t.last_attempt_at DESC NULLS LAST
-			LIMIT ? OFFSET ?`, repoType, pageSize, offset).Scan(&events)
+			LIMIT ? OFFSET ?`, repoType, pageSize, offset).Scan(&rows)
 
 		data := FailedIndexData{
 			DataSource: repoType,
-			Events:     events,
+			Events:     failedIndexEvents(rows),
 			Page:       pg,
 			TotalPages: totalPages,
 			TotalCount: int(total),
