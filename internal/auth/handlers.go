@@ -19,15 +19,19 @@ type Handler struct {
 	db           *gorm.DB
 	sessionStore *SessionStore
 	log          *zap.Logger
+	// resolveUser maps a provider identity to a local user.
+	resolveUser func(goth.User) (*user.User, error)
 }
 
 // NewHandler creates a new auth handler.
 func NewHandler(db *gorm.DB, sessionStore *SessionStore, log *zap.Logger) *Handler {
-	return &Handler{
+	h := &Handler{
 		db:           db,
 		sessionStore: sessionStore,
 		log:          log,
 	}
+	h.resolveUser = h.findOrCreateUser
+	return h
 }
 
 // BeginAuth starts the OAuth flow for a provider.
@@ -50,7 +54,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Find or create user
-	u, err := h.findOrCreateUser(gothUser)
+	u, err := h.resolveUser(gothUser)
 	if err != nil {
 		h.log.Error("Failed to process user", zap.Error(err), zap.String("provider", provider))
 		http.Redirect(w, r, "/login?error=user_failed", http.StatusSeeOther)

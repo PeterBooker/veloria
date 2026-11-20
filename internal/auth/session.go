@@ -24,8 +24,9 @@ const sessionName = "veloria-session"
 
 // SessionStore manages user sessions.
 type SessionStore struct {
-	store *pgstore.PGStore
-	db    *gorm.DB
+	store      sessions.Store
+	closeStore func()
+	db         *gorm.DB
 }
 
 // NewSessionStore creates a new session store using PostgreSQL.
@@ -46,13 +47,13 @@ func NewSessionStore(sqlDB *sql.DB, db *gorm.DB, cfg *config.Config) (*SessionSt
 	// Configure gothic to use our session store
 	gothic.Store = store
 
-	return &SessionStore{store: store, db: db}, nil
+	return &SessionStore{store: store, closeStore: store.Close, db: db}, nil
 }
 
 // Close cleans up the session store.
 func (s *SessionStore) Close() {
-	if s.store != nil {
-		s.store.Close()
+	if s.closeStore != nil {
+		s.closeStore()
 	}
 }
 
