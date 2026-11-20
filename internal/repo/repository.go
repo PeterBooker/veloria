@@ -74,6 +74,14 @@ type ExtensionStore[T Indexable] struct {
 	// field so tests can exercise the fallback logic without spawning a process.
 	indexRunner func(slug, downloadLink string) (*indexerResult, error)
 
+	// searchLimiter bounds the extension scans running at once. It is shared
+	// with the other stores, so the bound holds across all searches.
+	searchLimiter *SearchLimiter
+
+	// scanExtension searches one extension's index. It is a field so tests
+	// can observe how many scans run at once.
+	scanExtension func(ctx context.Context, ext T, cs *index.CompiledSearch) (*index.SearchResponse, error)
+
 	// List holds all loaded extensions, keyed by slug
 	List  map[string]T
 	Total int
@@ -100,6 +108,10 @@ type StoreConfig[T Indexable] struct {
 	Cache         cache.Cache
 	API           *APIClient
 	ExtensionType ExtensionType
+
+	// SearchLimiter is the scan limiter shared by all stores. When nil the
+	// store gets one of its own, sized by Config.SearchConcurrency.
+	SearchLimiter *SearchLimiter
 }
 
 // NewExtensionStore creates a new generic extension store.
@@ -116,7 +128,22 @@ func NewExtensionStore[T Indexable](cfg StoreConfig[T]) *ExtensionStore[T] {
 		List:     make(map[string]T),
 	}
 	s.indexRunner = s.runIndexer
+	s.scanExtension = scanIndexedExtension[T]
+	s.searchLimiter = cfg.SearchLimiter
+	if s.searchLimiter == nil {
+		s.searchLimiter = NewSearchLimiter(cfg.Config.SearchConcurrency)
+	}
 	return s
+}
+
+// scanIndexedExtension searches ext's index with the compiled patterns.
+// It returns a nil response when ext has no index.
+func scanIndexedExtension[T Indexable](ctx context.Context, ext T, cs *index.CompiledSearch) (*index.SearchResponse, error) {
+	ie := ext.GetIndexedExtension()
+	if ie == nil {
+		return nil, nil
+	}
+	return ie.SearchCompiled(ctx, cs)
 }
 
 // LoadFromDB loads extensions from the database using the provided loader function.
@@ -376,7 +403,9 @@ func (r *ExtensionStore[T]) UpdateIndex(idx *index.Index, slug string) error {
 
 // Search searches all extensions for the given term.
 // It compiles regex once, snapshots the extension list to minimize lock scope,
-// and searches extensions concurrently with a worker pool.
+// and searches extensions concurrently. Each scan holds a slot of the shared
+// SearchLimiter, so concurrent Search calls divide SEARCH_CONCURRENCY between
+// them instead of each running that many scans.
 // If progressFn is non-nil, it is called after each extension is searched
 // with the number of extensions searched so far and the total count.
 func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.SearchOptions, progressFn func(searched, total int)) ([]*SearchResult, int, error) {
@@ -408,9 +437,6 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 		return nil, totalExtensions, nil
 	}
 
-	// Parallel search with worker pool
-	workers := min(r.c.SearchConcurrency, len(extensions))
-
 	var (
 		mu           sync.Mutex
 		results      []*SearchResult
@@ -420,7 +446,9 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 
 	total := len(extensions)
 
-	sem := make(chan struct{}, workers)
+	// Scans run in parallel, bounded by the limiter shared with every other
+	// search in the process.
+	sem := r.searchLimiter.slots
 	var wg sync.WaitGroup
 
 	for _, ext := range extensions {
@@ -431,16 +459,19 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 			break
 		}
 
+		acquired := false
 		select {
 		case <-ctx.Done():
 		case sem <- struct{}{}:
+			acquired = true
 		}
-
-		if ctx.Err() != nil {
+		if !acquired {
 			break
 		}
 
-		if totalMatches.Load() >= globalMatchCap {
+		// The slot belongs to every search in the process, so it must go
+		// back on each path that does not hand it to a worker.
+		if ctx.Err() != nil || totalMatches.Load() >= globalMatchCap {
 			<-sem
 			break
 		}
@@ -468,12 +499,7 @@ func (r *ExtensionStore[T]) Search(ctx context.Context, term string, opt *index.
 				return
 			}
 
-			ie := e.GetIndexedExtension()
-			if ie == nil {
-				return
-			}
-
-			resp, err := ie.SearchCompiled(ctx, cs)
+			resp, err := r.scanExtension(ctx, e, cs)
 			if err != nil {
 				// A scan cut short by the deadline is reported once, by the
 				// ctx.Err() check after wg.Wait, not once per worker.

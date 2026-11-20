@@ -338,6 +338,16 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			private = true
 		}
 
+		// Take a search slot before anything is stored: when the engine is at
+		// capacity the request is refused here, with no row and no goroutine.
+		slot, err := d.Search().ReserveSearch()
+		if err != nil {
+			w.Header().Set("Retry-After", searchBusyRetryAfter)
+			w.WriteHeader(http.StatusServiceUnavailable)
+			renderSearchError(d, w, r, "Search is busy. Please try again in a few seconds.")
+			return
+		}
+
 		currentUser := auth.UserFromContext(r.Context())
 
 		s := searchmodel.Search{
@@ -350,18 +360,23 @@ func SubmitSearch(d *web.Deps) http.HandlerFunc {
 			s.UserID = &currentUser.ID
 		}
 		if err := d.DB().Create(&s).Error; err != nil {
+			slot.Release()
 			renderSearchError(d, w, r, "Failed to create search")
 			return
 		}
 
-		go runSearchAsync(d, s.ID, repoType, term, fileMatch, excludeMatch, !caseSensitive) // #nosec G118 -- goroutine intentionally outlives request; search runs in background
+		go runSearchAsync(d, slot, s.ID, repoType, term, fileMatch, excludeMatch, !caseSensitive) // #nosec G118 -- goroutine intentionally outlives request; search runs in background
 
 		w.Header().Set("HX-Redirect", "/search/"+s.ID.String())
 		w.WriteHeader(http.StatusOK)
 	}
 }
 
-func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excludeMatch string, caseInsensitive bool) {
+// runSearchAsync executes a search in the background and persists results.
+// It owns slot and returns it when the search and the upload are done.
+func runSearchAsync(d *web.Deps, slot *manager.SearchSlot, searchID uuid.UUID, repo, term, fileMatch, excludeMatch string, caseInsensitive bool) {
+	defer slot.Release()
+
 	d.DB().Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusProcessing)
 	defer d.Progress.Delete(searchID)
 
@@ -369,7 +384,7 @@ func runSearchAsync(d *web.Deps, searchID uuid.UUID, repo, term, fileMatch, excl
 	defer searchCancel()
 
 	searchStart := time.Now()
-	results, err := d.Search().Search(searchCtx, repo, term, &manager.SearchParams{
+	results, err := slot.Search(searchCtx, repo, term, &manager.SearchParams{
 		FileMatch:        fileMatch,
 		ExcludeFileMatch: excludeMatch,
 		CaseInsensitive:  caseInsensitive,

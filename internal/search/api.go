@@ -24,6 +24,10 @@ import (
 	"veloria/internal/web"
 )
 
+// searchBusyRetryAfter is the Retry-After value, in seconds, sent with the 503
+// that refuses a search while manager.MaxInFlightSearches are already running.
+const searchBusyRetryAfter = "5"
+
 type SearchRequest struct {
 	Term             string `json:"term"`
 	Repo             string `json:"repo"`
@@ -134,6 +138,15 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 			private = true
 		}
 
+		// Take a search slot before anything is stored: when the engine is at
+		// capacity the request is refused here, with no row and no goroutine.
+		slot, err := m.ReserveSearch()
+		if err != nil {
+			w.Header().Set("Retry-After", searchBusyRetryAfter)
+			api.WriteError(w, err)
+			return
+		}
+
 		s := searchmodel.Search{
 			Status:  searchmodel.StatusQueued,
 			Private: private,
@@ -141,6 +154,7 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 			Repo:    req.Repo,
 		}
 		if err := db.Create(&s).Error; err != nil {
+			slot.Release()
 			api.WriteError(w, api.ErrInternal("failed to create search record"))
 			return
 		}
@@ -148,21 +162,24 @@ func CreateSearchV1(reg *service.Registry) http.Handler {
 		// Run search asynchronously — the client polls GET /api/v1/search/{id}
 		// for results. This avoids HTTP write timeout issues when searches are
 		// slow (e.g. during heavy indexing).
-		go runAPISearchAsync(db, m, s3, s.ID, req) // #nosec G118 -- goroutine intentionally outlives request; search runs in background
+		go runAPISearchAsync(db, slot, s3, s.ID, req) // #nosec G118 -- goroutine intentionally outlives request; search runs in background
 
 		api.WriteSuccessJSON(w, http.StatusAccepted, s)
 	})
 }
 
 // runAPISearchAsync executes a search in the background and persists results.
-func runAPISearchAsync(db *gorm.DB, m *manager.Manager, s3 storage.ResultStorage, searchID uuid.UUID, req SearchRequest) {
+// It owns slot and returns it when the search and the upload are done.
+func runAPISearchAsync(db *gorm.DB, slot *manager.SearchSlot, s3 storage.ResultStorage, searchID uuid.UUID, req SearchRequest) {
+	defer slot.Release()
+
 	db.Model(&searchmodel.Search{}).Where("id = ?", searchID).Update("status", searchmodel.StatusProcessing)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	searchStart := time.Now()
-	results, err := m.Search(ctx, req.Repo, req.Term, &manager.SearchParams{
+	results, err := slot.Search(ctx, req.Repo, req.Term, &manager.SearchParams{
 		FileMatch:        req.FileMatch,
 		ExcludeFileMatch: req.ExcludeFileMatch,
 		CaseInsensitive:  !req.CaseSensitive,

@@ -22,6 +22,12 @@ import (
 const (
 	maxRetries       = 3
 	stalenessWarning = 15 * time.Minute
+
+	// MaxInFlightSearches is how many searches may run at once, counting the
+	// web form, the API and MCP together. A search fans out over every indexed
+	// extension for up to a minute, so a few at a time already use all of
+	// SEARCH_CONCURRENCY; further requests are refused rather than queued.
+	MaxInFlightSearches = 4
 )
 
 // NotFoundError is a domain error indicating the requested extension was not found.
@@ -40,10 +46,18 @@ type QueueFullError struct{}
 func (e *QueueFullError) Error() string   { return "reindex queue is full" }
 func (e *QueueFullError) StatusCode() int { return 429 }
 
-// Reindex error sentinels. Pointer identity is preserved for errors.Is checks.
+// SearchBusyError indicates MaxInFlightSearches searches are already running.
+// Implements api.StatusCoder so the transport layer maps it to HTTP 503.
+type SearchBusyError struct{}
+
+func (e *SearchBusyError) Error() string   { return "too many searches in progress, try again shortly" }
+func (e *SearchBusyError) StatusCode() int { return 503 }
+
+// Error sentinels. Pointer identity is preserved for errors.Is checks.
 var (
 	ErrExtNotFound = &NotFoundError{Msg: "extension not found"}
 	ErrQueueFull   = &QueueFullError{}
+	ErrSearchBusy  = &SearchBusyError{}
 )
 
 // retryEntry tracks a task waiting to be retried.
@@ -66,6 +80,7 @@ type Manager struct {
 	done        chan struct{}            // closed when updater goroutine exits
 	api         *repo.APIClient          // for health checks
 	cache       cache.Cache              // shared app cache (may be nil)
+	searchSlots chan struct{}            // one token per in-flight search
 
 	// Failure tracking (read by health endpoint, written by updater goroutine).
 	mu                  sync.RWMutex
@@ -120,6 +135,7 @@ func NewManager(ctx context.Context, l *zap.Logger, sources []repo.DataSource, c
 		done:                make(chan struct{}),
 		api:                 api,
 		cache:               c,
+		searchSlots:         make(chan struct{}, MaxInFlightSearches),
 		consecutiveFailures: make(map[repo.ExtensionType]int),
 		lastSuccessUpdate:   make(map[repo.ExtensionType]time.Time),
 	}
@@ -144,6 +160,7 @@ func NewTestManager(l *zap.Logger, sources []repo.DataSource) (*Manager, error) 
 		sourceOrder:         order,
 		adhocCh:             make(chan repo.IndexTask, 32),
 		done:                make(chan struct{}),
+		searchSlots:         make(chan struct{}, MaxInFlightSearches),
 		consecutiveFailures: make(map[repo.ExtensionType]int),
 		lastSuccessUpdate:   make(map[repo.ExtensionType]time.Time),
 	}, nil
@@ -566,8 +583,52 @@ func searchCacheKey(repoType string, term string, params *SearchParams) string {
 		params.FileMatch, params.ExcludeFileMatch, params.LinesOfContext)
 }
 
-// Search searches the specified source for the given term.
+// SearchSlot is a reservation for one in-flight search, obtained from
+// Manager.ReserveSearch. The holder runs its search with Search and must call
+// Release when the work the slot stands for is finished.
+type SearchSlot struct {
+	m       *Manager
+	release sync.Once
+}
+
+// ReserveSearch takes one of the MaxInFlightSearches slots without waiting.
+// It returns ErrSearchBusy when they are all in use, so a handler can refuse
+// a request before it stores anything or starts a goroutine.
+func (m *Manager) ReserveSearch() (*SearchSlot, error) {
+	select {
+	case m.searchSlots <- struct{}{}:
+		return &SearchSlot{m: m}, nil
+	default:
+		return nil, ErrSearchBusy
+	}
+}
+
+// Release returns the slot. It is safe to call more than once.
+func (s *SearchSlot) Release() {
+	s.release.Do(func() { <-s.m.searchSlots })
+}
+
+// Search runs a search under this reservation. See Manager.Search.
+func (s *SearchSlot) Search(ctx context.Context, repoType string, term string, params *SearchParams) (*SearchResponse, error) {
+	return s.m.search(ctx, repoType, term, params)
+}
+
+// Search searches the specified source for the given term. It holds a search
+// slot for the duration of the call and returns ErrSearchBusy when none is
+// free. Callers that must refuse before starting background work reserve the
+// slot themselves with ReserveSearch and search through it.
 func (m *Manager) Search(ctx context.Context, repoType string, term string, params *SearchParams) (*SearchResponse, error) {
+	slot, err := m.ReserveSearch()
+	if err != nil {
+		return nil, err
+	}
+	defer slot.Release()
+
+	return m.search(ctx, repoType, term, params)
+}
+
+// search runs a search. The caller holds a search slot.
+func (m *Manager) search(ctx context.Context, repoType string, term string, params *SearchParams) (*SearchResponse, error) {
 	if params == nil {
 		params = &SearchParams{}
 	}

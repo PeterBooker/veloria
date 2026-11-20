@@ -105,12 +105,20 @@ func newSearchFixture(t *testing.T) *searchFixture {
 	t.Helper()
 
 	pool := &recordingPool{}
-	db, err := gorm.Open(postgres.New(postgres.Config{Conn: pool}), &gorm.Config{Logger: logger.Discard})
+	f := newSearchFixtureWith(t, pool, &testutil.FakeDataSource{TypeVal: repo.TypePlugins})
+	f.pool = pool
+	return f
+}
+
+// newSearchFixtureWith builds the fixture on a given database connection and
+// plugins data source.
+func newSearchFixtureWith(t *testing.T, conn gorm.ConnPool, plugins repo.DataSource) *searchFixture {
+	t.Helper()
+
+	db, err := gorm.Open(postgres.New(postgres.Config{Conn: conn}), &gorm.Config{Logger: logger.Discard})
 	require.NoError(t, err)
 
-	m, err := manager.NewTestManager(testutil.NopLogger(), []repo.DataSource{
-		&testutil.FakeDataSource{TypeVal: repo.TypePlugins},
-	})
+	m, err := manager.NewTestManager(testutil.NopLogger(), []repo.DataSource{plugins})
 	require.NoError(t, err)
 
 	reg := &service.Registry{}
@@ -121,7 +129,6 @@ func newSearchFixture(t *testing.T) *searchFixture {
 	return &searchFixture{
 		reg:     reg,
 		deps:    web.NewDeps(reg, nil, &config.Config{}),
-		pool:    pool,
 		manager: m,
 	}
 }

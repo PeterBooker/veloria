@@ -9,6 +9,10 @@ import (
 // SearchService performs code searches across extension stores.
 type SearchService interface {
 	Search(ctx context.Context, repoType string, term string, params *manager.SearchParams) (*manager.SearchResponse, error)
+
+	// ReserveSearch takes an in-flight search slot without waiting, or
+	// returns manager.ErrSearchBusy when the search engine is at capacity.
+	ReserveSearch() (*manager.SearchSlot, error)
 }
 
 // ReindexService queues ad-hoc re-index tasks.

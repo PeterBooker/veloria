@@ -2,7 +2,7 @@
 
 All API endpoints are under `/api/v1/`. Requests must include `Content-Type: application/json`.
 
-Rate limiting is enabled by default: 100 requests/minute for general API routes, 10 requests/minute for search.
+Rate limiting is enabled by default: 100 requests/minute for general API routes, 10 requests/minute for search. The web search form (`POST /search`) has the same 10 requests/minute limit.
 
 ## Response Format
 
@@ -153,7 +153,7 @@ The request body is limited to 1 MiB.
 **Errors:**
 - `400` — Missing or invalid fields, including a term or file filter that is too long or not a valid regex
 - `413` — Request body larger than 1 MiB
-- `503` — Search unavailable
+- `503` — Search unavailable, or four searches are already running (sent with a `Retry-After` header; retry after that many seconds)
 
 ### GET /api/v1/search/{id}
 
@@ -218,7 +218,7 @@ These serve the HTML web interface:
 | GET | `/search/{uuid}/extension/{slug}` | Extension-specific results page |
 | GET | `/search/{uuid}/export` | Export search results as CSV |
 | GET | `/search/{uuid}/og.png` | OG image for search (rate limited) |
-| POST | `/search` | Submit search (web form) |
+| POST | `/search` | Submit search (web form, rate limited) |
 | GET | `/searches/own` | Current user's searches |
 | GET | `/my-searches` | Redirect to `/searches/own` |
 | POST | `/search/{uuid}/report` | Report a search (requires login) |

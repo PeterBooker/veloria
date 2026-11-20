@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -117,5 +119,151 @@ func TestValidExtensionType(t *testing.T) {
 		if ValidExtensionType(name) {
 			t.Errorf("ValidExtensionType(%q) = true, want false", name)
 		}
+	}
+}
+
+// scanGauge counts the extension scans running at one moment and remembers
+// the highest count seen.
+type scanGauge struct {
+	running atomic.Int64
+	peak    atomic.Int64
+}
+
+// watch makes store report its scans to the gauge. Each scan is held for a
+// moment so that scans from concurrent searches overlap.
+func (g *scanGauge) watch(store *ExtensionStore[*Plugin]) {
+	scan := store.scanExtension
+	store.scanExtension = func(ctx context.Context, ext *Plugin, cs *index.CompiledSearch) (*index.SearchResponse, error) {
+		n := g.running.Add(1)
+		defer g.running.Add(-1)
+		for {
+			peak := g.peak.Load()
+			if n <= peak || g.peak.CompareAndSwap(peak, n) {
+				break
+			}
+		}
+		time.Sleep(2 * time.Millisecond)
+		return scan(ctx, ext, cs)
+	}
+}
+
+// SEARCH_CONCURRENCY is a limit for the process: however many searches run at
+// once, the extension scans in progress never exceed it.
+func TestSearchSharesScanLimitAcrossCalls(t *testing.T) {
+	const (
+		concurrency = 3
+		callers     = 4
+		extensions  = 8
+	)
+	store := newSearchStore(t, extensions, 1, concurrency)
+	var gauge scanGauge
+	gauge.watch(store)
+
+	opt := &index.SearchOptions{LiteralSearch: true, MaxResults: 1000}
+	var wg sync.WaitGroup
+	errs := make(chan error, callers)
+	for range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results, _, err := store.Search(context.Background(), "needle", opt, nil)
+			if err == nil && len(results) != extensions {
+				err = fmt.Errorf("got %d results, want %d", len(results), extensions)
+			}
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if peak := gauge.peak.Load(); peak > concurrency {
+		t.Fatalf("%d concurrent searches ran %d extension scans at once, want at most SEARCH_CONCURRENCY=%d", callers, peak, concurrency)
+	}
+	if n := len(store.searchLimiter.slots); n != 0 {
+		t.Fatalf("%d scan slots still held after every search returned", n)
+	}
+}
+
+// The limiter is shared between stores, so searches of different data sources
+// count against the same limit.
+func TestSearchSharesScanLimitAcrossStores(t *testing.T) {
+	const (
+		concurrency = 2
+		extensions  = 6
+	)
+	limiter := NewSearchLimiter(concurrency)
+	var gauge scanGauge
+	stores := make([]*ExtensionStore[*Plugin], 3)
+	for i := range stores {
+		stores[i] = newSearchStore(t, extensions, 1, 24)
+		stores[i].searchLimiter = limiter
+		gauge.watch(stores[i])
+	}
+
+	opt := &index.SearchOptions{LiteralSearch: true, MaxResults: 1000}
+	var wg sync.WaitGroup
+	for _, store := range stores {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, _, err := store.Search(context.Background(), "needle", opt, nil); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if peak := gauge.peak.Load(); peak > concurrency {
+		t.Fatalf("searches on %d stores ran %d extension scans at once, want at most %d", len(stores), peak, concurrency)
+	}
+}
+
+func TestNewExtensionStoreUsesSharedLimiter(t *testing.T) {
+	limiter := NewSearchLimiter(5)
+	cfg := StoreConfig[*Plugin]{
+		Ctx:           context.Background(),
+		Config:        &config.Config{DataDir: t.TempDir(), SearchConcurrency: 24},
+		Logger:        zap.NewNop(),
+		ExtensionType: TypePlugins,
+		SearchLimiter: limiter,
+	}
+	if got := NewExtensionStore(cfg).searchLimiter; got != limiter {
+		t.Fatal("store did not keep the limiter it was given")
+	}
+
+	cfg.SearchLimiter = nil
+	if got := cap(NewExtensionStore(cfg).searchLimiter.slots); got != 24 {
+		t.Fatalf("store without a shared limiter allows %d scans, want SEARCH_CONCURRENCY=24", got)
+	}
+}
+
+// A search whose context ends while it is taking a scan slot must give the
+// slot back. The limiter is shared by the whole process, so a slot lost on
+// this path would be lost to every later search.
+func TestSearchReturnsScanSlotsWhenCancelled(t *testing.T) {
+	const concurrency = 2
+	store := newSearchStore(t, 4, 1, concurrency)
+	opt := &index.SearchOptions{LiteralSearch: true, MaxResults: 1000}
+
+	// Cancel on each of the first checks in turn, to cover every point of
+	// the dispatch loop, including just after a slot was taken.
+	for n := int64(1); n <= 12; n++ {
+		ctx := newCancelOnCheck(n)
+		_, _, _ = store.Search(ctx, "needle", opt, nil)
+		ctx.cancel()
+
+		if held := len(store.searchLimiter.slots); held != 0 {
+			t.Fatalf("context cancelled on check %d: %d scan slots still held after Search returned", n, held)
+		}
+	}
+
+	results, _, err := store.Search(context.Background(), "needle", opt, nil)
+	if err != nil || len(results) != 4 {
+		t.Fatalf("search after cancelled searches: got %d results and error %v, want 4 results", len(results), err)
 	}
 }

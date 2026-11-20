@@ -93,8 +93,8 @@ type PluginStore struct {
 	*ExtensionStore[*Plugin]
 }
 
-// NewPluginStore creates a new plugin store.
-func NewPluginStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Logger, ch cache.Cache, api *APIClient) *PluginStore {
+// NewPluginStore creates a new plugin store. sl is the scan limiter shared by all stores.
+func NewPluginStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Logger, ch cache.Cache, api *APIClient, sl *SearchLimiter) *PluginStore {
 	repo := NewExtensionStore[*Plugin](StoreConfig[*Plugin]{
 		Ctx:           ctx,
 		DB:            db,
@@ -103,6 +103,7 @@ func NewPluginStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.L
 		Cache:         ch,
 		API:           api,
 		ExtensionType: TypePlugins,
+		SearchLimiter: sl,
 	})
 
 	return &PluginStore{

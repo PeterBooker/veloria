@@ -78,7 +78,7 @@ Configuration is parsed using [caarlos0/env/v10](https://github.com/caarlos0/env
 | Variable | Default | Description |
 |---|---|---|
 | `INDEXER_CONCURRENCY` | `1` | Number of parallel indexing goroutines |
-| `SEARCH_CONCURRENCY` | `24` | Max concurrent search fan-out workers |
+| `SEARCH_CONCURRENCY` | `24` | Max extension scans running at once, shared by all searches in the process |
 
 ## AspireCloud API
 

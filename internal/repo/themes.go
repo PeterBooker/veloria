@@ -88,8 +88,8 @@ type ThemeStore struct {
 	*ExtensionStore[*Theme]
 }
 
-// NewThemeStore creates a new theme store.
-func NewThemeStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Logger, ch cache.Cache, api *APIClient) *ThemeStore {
+// NewThemeStore creates a new theme store. sl is the scan limiter shared by all stores.
+func NewThemeStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Logger, ch cache.Cache, api *APIClient, sl *SearchLimiter) *ThemeStore {
 	repo := NewExtensionStore[*Theme](StoreConfig[*Theme]{
 		Ctx:           ctx,
 		DB:            db,
@@ -98,6 +98,7 @@ func NewThemeStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Lo
 		Cache:         ch,
 		API:           api,
 		ExtensionType: TypeThemes,
+		SearchLimiter: sl,
 	})
 
 	return &ThemeStore{

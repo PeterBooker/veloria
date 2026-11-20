@@ -244,3 +244,93 @@ func TestSentinelErrors_WorkWithErrorsIs(t *testing.T) {
 	assert.True(t, errors.Is(manager.ErrExtNotFound, manager.ErrExtNotFound))
 	assert.True(t, errors.Is(manager.ErrQueueFull, manager.ErrQueueFull))
 }
+
+// At most MaxInFlightSearches searches hold a slot; the next is refused at
+// once instead of queued.
+func TestReserveSearch_RefusesOverCap(t *testing.T) {
+	m := newTestManager(t)
+
+	slots := make([]*manager.SearchSlot, 0, manager.MaxInFlightSearches)
+	for i := range manager.MaxInFlightSearches {
+		slot, err := m.ReserveSearch()
+		if err != nil {
+			t.Fatalf("reservation %d of %d refused: %v", i+1, manager.MaxInFlightSearches, err)
+		}
+		slots = append(slots, slot)
+	}
+
+	_, err := m.ReserveSearch()
+	if !errors.Is(err, manager.ErrSearchBusy) {
+		t.Fatalf("reservation over the cap: got %v, want ErrSearchBusy", err)
+	}
+	var sc api.StatusCoder
+	if !errors.As(err, &sc) || sc.StatusCode() != 503 {
+		t.Fatalf("ErrSearchBusy should map to HTTP 503, got %v", err)
+	}
+
+	// Releasing twice frees one slot, not two.
+	slots[0].Release()
+	slots[0].Release()
+	if _, err := m.ReserveSearch(); err != nil {
+		t.Fatalf("reservation after a release refused: %v", err)
+	}
+	if _, err := m.ReserveSearch(); !errors.Is(err, manager.ErrSearchBusy) {
+		t.Fatalf("double release freed a second slot: got %v, want ErrSearchBusy", err)
+	}
+}
+
+// Manager.Search is the entry point MCP uses: it takes a slot for the call,
+// returns ErrSearchBusy without searching when none is free, and gives the
+// slot back when it returns.
+func TestSearch_RefusedWhenBusy(t *testing.T) {
+	searches := 0
+	ds := &testutil.FakeDataSource{
+		TypeVal: repo.TypePlugins,
+		SearchFunc: func(_ context.Context, _ string, _ *index.SearchOptions, _ func(int, int)) ([]*repo.SearchResult, int, error) {
+			searches++
+			return nil, 0, nil
+		},
+	}
+	m := newTestManager(t, ds)
+
+	// Slots are returned: many more sequential searches than slots succeed.
+	for range 3 * manager.MaxInFlightSearches {
+		if _, err := m.Search(context.Background(), "plugins", "term", nil); err != nil {
+			t.Fatalf("sequential search refused: %v", err)
+		}
+	}
+	// An error path returns the slot too.
+	for range 3 * manager.MaxInFlightSearches {
+		if _, err := m.Search(context.Background(), "nonexistent", "term", nil); errors.Is(err, manager.ErrSearchBusy) {
+			t.Fatal("failed searches leaked their slots")
+		}
+	}
+
+	var held []*manager.SearchSlot
+	for range manager.MaxInFlightSearches {
+		slot, err := m.ReserveSearch()
+		if err != nil {
+			t.Fatalf("unexpected refusal: %v", err)
+		}
+		held = append(held, slot)
+	}
+
+	before := searches
+	if _, err := m.Search(context.Background(), "plugins", "term", nil); !errors.Is(err, manager.ErrSearchBusy) {
+		t.Fatalf("search with every slot taken: got %v, want ErrSearchBusy", err)
+	}
+	if searches != before {
+		t.Fatal("a refused search still reached the data source")
+	}
+
+	// A reserved slot can run its search while the cap is reached.
+	if _, err := held[0].Search(context.Background(), "plugins", "term", nil); err != nil {
+		t.Fatalf("search through a held slot failed: %v", err)
+	}
+	for _, slot := range held {
+		slot.Release()
+	}
+	if _, err := m.Search(context.Background(), "plugins", "term", nil); err != nil {
+		t.Fatalf("search after slots were released refused: %v", err)
+	}
+}
