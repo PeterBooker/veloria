@@ -3,6 +3,7 @@ package router
 import (
 	"io/fs"
 	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ type Options struct {
 	AppURL           string   // Target URL for legacy domain redirects (e.g., "https://veloria.dev")
 	RedirectDomains  []string // Legacy domains to redirect (e.g., ["wpdirectory.net", "www.wpdirectory.net"])
 	MCPEnabled       bool
+	TrustedProxies   []netip.Prefix // Reverse proxies whose X-Forwarded-For is honoured; empty means the TCP peer address is always used
 }
 
 // RouterDeps holds all dependencies needed to construct the router.
@@ -64,7 +66,10 @@ func New(deps RouterDeps) *chi.Mux {
 
 	r.Use(veloriamd.Recoverer(deps.Logger))
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
+	// The client address is the TCP peer unless that peer is a trusted proxy.
+	if len(opts.TrustedProxies) > 0 {
+		r.Use(veloriamd.ClientIP(opts.TrustedProxies))
+	}
 	r.Use(veloriamd.AccessLog(deps.Logger))
 	handlerTimeout := 5 * time.Second
 	if opts.HandlerTimeout > 0 {

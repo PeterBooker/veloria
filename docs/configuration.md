@@ -28,6 +28,9 @@ Configuration is parsed using [caarlos0/env/v10](https://github.com/caarlos0/env
 | `HTTP_IDLE_TIMEOUT` | `60s` | Max idle time for keep-alive connections |
 | `HTTP_SHUTDOWN_TIMEOUT` | `10s` | Max time for graceful shutdown |
 | `HTTP_RATE_LIMIT_ENABLED` | `true` | Enable rate limiting on API routes |
+| `TRUSTED_PROXIES` | (empty) | Comma-separated CIDRs of reverse proxies in front of the server (e.g. `10.0.0.0/8,2001:db8::/32`) |
+
+Rate limits and the access log use the address of the TCP connection. When the server runs behind a reverse proxy or CDN, set `TRUSTED_PROXIES` to the proxy's address ranges: for connections from those ranges the client address is taken from `X-Forwarded-For`, reading from the right and skipping trusted proxies. `X-Real-IP` and `True-Client-IP` are never used. An entry that is not a valid CIDR stops the server at start-up. Only list proxies that append the connecting address to `X-Forwarded-For`, and block direct access to the server from anywhere else.
 
 ## Database (PostgreSQL)
 
