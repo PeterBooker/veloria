@@ -27,7 +27,7 @@ veloria index --repo <type> --slug <name> --zipurl <url>
 | Flag | Required | Description |
 |---|---|---|
 | `--repo` | No | Repository type: `plugins`, `themes`, or `cores` (default: `plugins`) |
-| `--slug` | Yes | Extension slug — used as the folder name under `source/` and `index/` |
+| `--slug` | Yes | Extension slug — used as the folder name under `source/` and `index/`. Plugins and themes: 1–200 bytes of Unicode letters and digits, `-`, `_` and `%` only. Cores: a release version such as `6.8.1` |
 | `--zipurl` | Yes | URL of the ZIP file to download |
 
 This command is not meant to be run manually. The server invokes it as a subprocess for process isolation. It downloads the ZIP (with retry on 429), extracts text files into `<datadir>/<repo>/source/<slug>/`, builds a trigram index at `<datadir>/<repo>/index/<slug>/trigrams`, then gzip-compresses the source files. Outputs `INDEX_READY:<path>` and `EXTRACT_STATS:<json>` on stdout for the parent process.
@@ -39,6 +39,8 @@ The ZIP URL comes from upstream metadata, so the download client is restricted: 
 Extraction is bounded per archive: 256 MiB per file, 4 GiB in total, and 250,000 entries. An archive over a limit fails and its partial output is removed.
 
 The failed-indexing list on the public data source pages shows a fixed category per failure (`Download not found`, `Download unavailable`, `Invalid archive`, `Indexing failed`). The full error text is kept in the `index_events` table and the server log.
+
+A slug that breaks the rule above (for example `.`, `..`, or anything containing a dot, slash, quote, or whitespace) is rejected before anything is downloaded or written. The same rule (`repo.ValidSlug`) is applied when upstream records are ingested: a record with an invalid slug is skipped with a warning and never saved or indexed.
 
 ### `veloria migrate`
 

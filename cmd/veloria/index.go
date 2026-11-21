@@ -44,11 +44,23 @@ type IndexCmd struct {
 	Slug   string `name:"slug" help:"Destination folder name under source/." required:""`
 }
 
+// Validate applies the same slug rule as ingestion (repo.ValidSlug), so tasks
+// built from existing database rows are held to it as well.
 func (c *IndexCmd) Validate() error {
-	if strings.ContainsAny(c.Slug, `/\`) {
-		return fmt.Errorf("invalid slug %q: must not contain path separators", c.Slug)
+	if !repo.ValidSlug(repo.ExtensionType(c.Repo), c.Slug) {
+		return fmt.Errorf("invalid slug %+q for repo %q", c.Slug, c.Repo)
 	}
 	return nil
+}
+
+// directChild joins name onto root and returns the result only when it is a
+// direct child of root whose final element is name itself.
+func directChild(root, name string) (string, error) {
+	p := filepath.Join(root, name)
+	if filepath.Dir(p) != filepath.Clean(root) || filepath.Base(p) != name {
+		return "", fmt.Errorf("%+q does not name a direct child of %q", name, root)
+	}
+	return p, nil
 }
 
 func (c *IndexCmd) Run() error {
@@ -56,14 +68,25 @@ func (c *IndexCmd) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	if err := cfg.EnsureDirs(); err != nil {
-		return fmt.Errorf("failed to ensure data directories: %w", err)
-	}
 	base := filepath.Join(cfg.DataDir, c.Repo)
 	indexDir := filepath.Join(base, "index")
 	sourceDir := filepath.Join(base, "source")
 
-	dest := filepath.Join(sourceDir, c.Slug)
+	// Defence in depth behind Validate: the paths below are renamed and
+	// removed, so each must be a direct child of its root whatever the slug
+	// rule allows. Checked before anything on disk is touched.
+	dest, err := directChild(sourceDir, c.Slug)
+	if err != nil {
+		return fmt.Errorf("invalid slug: %w", err)
+	}
+	slugDir, err := directChild(indexDir, c.Slug)
+	if err != nil {
+		return fmt.Errorf("invalid slug: %w", err)
+	}
+
+	if err := cfg.EnsureDirs(); err != nil {
+		return fmt.Errorf("failed to ensure data directories: %w", err)
+	}
 
 	// A file lock rather than in-process locking: an indexer orphaned by a
 	// server crash may still be writing to this slug's directories.
@@ -105,7 +128,6 @@ func (c *IndexCmd) Run() error {
 
 	// Build the trigram index from the staging directory. Paths stored in the
 	// index use the final dest so the index is valid immediately after rename.
-	slugDir := filepath.Join(indexDir, c.Slug)
 	tmpPath := filepath.Join(slugDir, "trigrams.tmp")
 	finalPath := filepath.Join(slugDir, "trigrams")
 

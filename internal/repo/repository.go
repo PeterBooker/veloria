@@ -558,8 +558,10 @@ func (r *ExtensionStore[T]) PrepareUpdates(fetchFn func() ([]T, error), saveFn f
 
 	for _, ext := range extensions {
 		slug := ext.GetSlug()
-		if slug == "" {
-			r.l.Warn("Skipping extension with empty slug", zap.String("type", string(r.repoType)))
+		// The slug becomes a directory name and a store key; drop anything
+		// that is not a plain name before it is saved or scheduled.
+		if !ValidSlug(r.repoType, slug) {
+			r.l.Warn("Skipping extension with invalid slug", zap.String("type", string(r.repoType)), zap.String("slug", quoteSlug(slug)))
 			continue
 		}
 
