@@ -57,7 +57,7 @@ templ Extension(data ui.ExtensionData) {
 					<div id="reindex-btn" class="ml-auto">
 						<button
 							hx-post="/admin/reindex"
-							hx-vals={ `{"repo_type": "` + data.DataSourceType + `", "slug": "` + data.Slug + `"}` }
+							hx-vals={ templ.JSONString(map[string]string{"repo_type": data.DataSourceType, "slug": data.Slug}) }
 							hx-target="#reindex-btn"
 							hx-swap="innerHTML"
 							class="btn btn--ghost"
@@ -147,7 +147,7 @@ templ Extension(data ui.ExtensionData) {
 							<div class="flex justify-between items-center">
 								<dt class="text-text-faint">Download</dt>
 								<dd>
-									<a href={ templ.SafeURL(data.DownloadLink) } class="text-accent-text hover:text-accent-2-text hover:underline hover:underline-offset-2 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
+									<a href={ data.DownloadLink } class="text-accent-text hover:text-accent-2-text hover:underline hover:underline-offset-2 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
 								</dd>
 							</div>
 						}
@@ -174,7 +174,7 @@ templ Extension(data ui.ExtensionData) {
 						<div class="flex justify-between items-center">
 							<dt class="text-text-faint">Download</dt>
 							<dd>
-								<a href={ templ.SafeURL(data.DownloadLink) } class="text-accent-text hover:text-accent-2-text hover:underline hover:underline-offset-2 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
+								<a href={ data.DownloadLink } class="text-accent-text hover:text-accent-2-text hover:underline hover:underline-offset-2 font-medium transition-colors" target="_blank" rel="noopener">v{ data.Version } zip</a>
 							</dd>
 						</div>
 					}

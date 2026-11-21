@@ -2,6 +2,7 @@ package partial
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"veloria/internal/ui"
@@ -9,11 +10,11 @@ import (
 )
 
 func datasourceItemsURL(dsType string, page int, search string) string {
-	url := "/data-sources/" + dsType + "/items?page=" + strconv.Itoa(page)
+	u := "/data-sources/" + url.PathEscape(dsType) + "/items?page=" + strconv.Itoa(page)
 	if search != "" {
-		url += "&search=" + search
+		u += "&search=" + url.QueryEscape(search)
 	}
-	return url
+	return u
 }
 
 templ DataSourceItems(data ui.DataSourceItemsData) {

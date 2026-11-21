@@ -185,7 +185,9 @@ templ searchContentInner(data ui.SearchViewData) {
 
 templ toggleExtDetailScript() {
 	<script>
-	function toggleExtDetail(header, url, targetId) {
+	// The request URL and the detail panel ID are read from the button's
+	// attributes; no data is ever written into handler source text.
+	function toggleExtDetail(header) {
 		var card = header.closest('.result');
 		var detail = header.nextElementSibling;
 		if (!detail) return;
@@ -202,10 +204,11 @@ templ toggleExtDetailScript() {
 		header.setAttribute('aria-expanded', 'true');
 		if (card) card.classList.add('is-expanded');
 
-		var target = document.getElementById(targetId);
-		if (!target || target.dataset.loaded) return;
+		var url = header.dataset.extUrl;
+		var target = document.getElementById(header.getAttribute('aria-controls'));
+		if (!url || !target || target.dataset.loaded) return;
 		target.dataset.loaded = '1';
-		htmx.ajax('GET', url, {target: '#' + targetId, swap: 'innerHTML'});
+		htmx.ajax('GET', url, {target: target, swap: 'innerHTML'});
 	}
 	</script>
 }

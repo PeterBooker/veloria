@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -122,6 +123,21 @@ func ParseTags(data []byte) map[string]string {
 		return nil
 	}
 	return tags
+}
+
+// SafeDownloadLink returns raw when it is an absolute http or https URL with a
+// host, and "" otherwise. Download links come from upstream API records, so
+// they are checked here before a template renders them as an href; a link
+// with any other scheme is dropped rather than rendered.
+func SafeDownloadLink(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return ""
+	}
+	return raw
 }
 
 // SafeJoin safely joins a base directory with a relative path, preventing directory traversal.
