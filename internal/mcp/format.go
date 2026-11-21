@@ -204,6 +204,10 @@ func FormatFileList(resp *ListFilesResponse) string {
 		fmt.Fprintf(&b, "  %-8s %s\n", formatBytes(f.Size), f.Path)
 	}
 
+	if resp.Truncated {
+		fmt.Fprintf(&b, "\nListing capped at the first %s files. Narrow it with pattern.\n", formatNumber(len(resp.Files)))
+	}
+
 	return b.String()
 }
 
@@ -211,16 +215,21 @@ func FormatFileList(resp *ListFilesResponse) string {
 func FormatReadFile(resp *ReadFileResponse) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "%s/%s — %s (%d lines total)\n", resp.Repo, resp.Slug, resp.Path, resp.TotalLines)
+	// The total is unknown when the read stopped before the end of the file.
+	if resp.More && resp.TotalLines == 0 {
+		fmt.Fprintf(&b, "%s/%s — %s\n", resp.Repo, resp.Slug, resp.Path)
+	} else {
+		fmt.Fprintf(&b, "%s/%s — %s (%d lines total)\n", resp.Repo, resp.Slug, resp.Path, resp.TotalLines)
+	}
 
-	if resp.TotalLines > 0 {
+	if resp.TotalLines > 0 || resp.More {
 		fmt.Fprintf(&b, "Showing lines %d–%d\n", resp.StartLine, resp.EndLine)
 	}
 
 	b.WriteString("\n")
 	b.WriteString(resp.Content)
 
-	if resp.EndLine < resp.TotalLines {
+	if resp.More || resp.EndLine < resp.TotalLines {
 		fmt.Fprintf(&b, "\nMore lines available. Use start_line=%d to continue reading.", resp.EndLine+1)
 	}
 
@@ -256,6 +265,11 @@ func FormatGrepFile(resp *GrepFileResponse) string {
 
 	if resp.TotalMatches >= maxGrepMatches {
 		b.WriteString("Results capped at 1,000 matches. Narrow your search with file_match or a more specific query.\n")
+	}
+
+	if resp.Truncated {
+		fmt.Fprintf(&b, "Search incomplete: grep_file scans at most %s of each file and %s per call. Narrow your search with file_match.\n",
+			formatBytes(maxGrepFileBytes), formatBytes(maxGrepCallBytes))
 	}
 
 	return b.String()

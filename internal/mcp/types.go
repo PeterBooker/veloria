@@ -98,6 +98,8 @@ type ListFilesResponse struct {
 	Repo  string      `json:"repo"`
 	Total int         `json:"total"`
 	Files []FileEntry `json:"files"`
+	// Truncated is set when Files holds only the first maxListFiles entries.
+	Truncated bool `json:"truncated"`
 }
 
 // ReadFileResponse holds the contents of a file from an extension.
@@ -109,6 +111,9 @@ type ReadFileResponse struct {
 	StartLine  int    `json:"start_line"`
 	EndLine    int    `json:"end_line"`
 	Content    string `json:"content"`
+	// More is set when the file continues past EndLine. The read then stopped
+	// before the end of the file, so TotalLines is zero.
+	More bool `json:"more"`
 }
 
 // GrepFileParams holds the parameters for a grep_file request.
@@ -128,6 +133,9 @@ type GrepFileResponse struct {
 	Query        string          `json:"query"`
 	TotalMatches int             `json:"total_matches"`
 	Files        []GrepFileMatch `json:"files"`
+	// Truncated is set when a scan limit stopped the grep before it had read
+	// every matching file in full.
+	Truncated bool `json:"truncated"`
 }
 
 // GrepFileMatch holds matches within a single file.

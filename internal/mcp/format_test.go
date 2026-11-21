@@ -491,3 +491,50 @@ func TestFormatGrepFile_Capped(t *testing.T) {
 		t.Errorf("should show cap warning, got:\n%s", text)
 	}
 }
+
+func TestFormatReadFile_MoreWithoutTotal(t *testing.T) {
+	resp := &ReadFileResponse{
+		Slug:      "woocommerce",
+		Repo:      "plugins",
+		Path:      "woocommerce.php",
+		StartLine: 1,
+		EndLine:   2,
+		Content:   "1  <?php\n2  // WooCommerce\n",
+		More:      true,
+	}
+
+	text := FormatReadFile(resp)
+
+	if strings.Contains(text, "lines total") {
+		t.Errorf("should not claim a total it did not count, got:\n%s", text)
+	}
+	if !strings.Contains(text, "Showing lines 1–2") {
+		t.Errorf("should show line range, got:\n%s", text)
+	}
+	if !strings.Contains(text, "start_line=3") {
+		t.Errorf("should show pagination hint, got:\n%s", text)
+	}
+}
+
+func TestFormatGrepFile_Truncated(t *testing.T) {
+	resp := &GrepFileResponse{
+		Slug:         "woocommerce",
+		Repo:         "plugins",
+		Query:        "wpdb",
+		TotalMatches: 1,
+		Files: []GrepFileMatch{
+			{Path: "a.php", Matches: []GrepLineMatch{{Line: 1, Content: "$wpdb"}}},
+		},
+		Truncated: true,
+	}
+
+	text := FormatGrepFile(resp)
+	if !strings.Contains(text, "Search incomplete") || !strings.Contains(text, "8.0 MB of each file and 128.0 MB per call") {
+		t.Errorf("should show the scan limits, got:\n%s", text)
+	}
+
+	resp.Truncated = false
+	if text := FormatGrepFile(resp); strings.Contains(text, "Search incomplete") {
+		t.Errorf("should not show the notice for a complete grep, got:\n%s", text)
+	}
+}

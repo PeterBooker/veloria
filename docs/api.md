@@ -194,6 +194,16 @@ Prometheus-format metrics endpoint.
 
 Streamable HTTP endpoint for the Model Context Protocol. Provides code search tools for AI agents. Rate limited to 100 requests/minute when rate limiting is enabled.
 
+The endpoint is stateless: `initialize` returns no `Mcp-Session-Id` and the server keeps no session between requests. Request bodies are limited to 1 MB.
+
+Tool limits:
+
+- `search_code` runs at most 3 searches at once, each with a 60 second deadline. A call that waits 10 seconds for a free slot fails with `search queue full, try again later`.
+- `list_files`, `read_file`, and `grep_file` share 4 slots. A call that waits 5 seconds for a free slot fails with `file tools are busy, try again later`.
+- `list_files` returns the first 5,000 files and says when the listing was capped.
+- `read_file` returns at most 500 lines or 1 MB per call, with a `start_line` hint when the file continues. The total line count is only reported when the read reached the end of the file.
+- `grep_file` returns lines of at most 250 characters, and scans at most 8 MB of each file and 128 MB per call. The result says when a scan limit left the search incomplete.
+
 ## Web Routes
 
 These serve the HTML web interface:
