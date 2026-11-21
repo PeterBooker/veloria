@@ -133,6 +133,7 @@ func New(ctx context.Context) (*App, error) {
 			AppURL:           c.AppURL,
 			RedirectDomains:  c.RedirectDomains,
 			MCPEnabled:       c.MCPEnabled,
+			TrustedProxies:   c.TrustedProxies,
 		},
 	})
 

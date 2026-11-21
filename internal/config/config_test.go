@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/netip"
 	"os"
 	"testing"
 	"time"
@@ -53,6 +54,7 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, "", cfg.AspireCloudAPIKey)
 	assert.Equal(t, "", cfg.CloudflareAPIToken)
 	assert.Equal(t, 24, cfg.SearchConcurrency)
+	assert.Empty(t, cfg.TrustedProxies)
 }
 
 func TestConfigWithEnv(t *testing.T) {
@@ -192,6 +194,30 @@ func TestConfigValidation_CloudflareTokenNotRequiredWithoutAppURL(t *testing.T) 
 	cfg, err := New()
 	require.NoError(t, err)
 	assert.Equal(t, "", cfg.CloudflareAPIToken)
+}
+
+func TestConfigTrustedProxies(t *testing.T) {
+	os.Clearenv()
+	setEnv(t, "TRUSTED_PROXIES", "10.0.0.0/8, 192.168.1.7/24,2001:db8::/32,")
+	cfg, err := New()
+	require.NoError(t, err)
+	assert.Equal(t, []netip.Prefix{
+		netip.MustParsePrefix("10.0.0.0/8"),
+		netip.MustParsePrefix("192.168.1.0/24"),
+		netip.MustParsePrefix("2001:db8::/32"),
+	}, cfg.TrustedProxies)
+}
+
+func TestConfigValidation_InvalidTrustedProxies(t *testing.T) {
+	for _, value := range []string{"10.0.0.1", "10.0.0.0/33", "proxy.example.com", "10.0.0.0/8,nope"} {
+		t.Run(value, func(t *testing.T) {
+			os.Clearenv()
+			setEnv(t, "TRUSTED_PROXIES", value)
+			_, err := New()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "TRUSTED_PROXIES")
+		})
+	}
 }
 
 func TestConfigValidation_RequiredFields(t *testing.T) {

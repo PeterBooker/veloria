@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,6 +107,13 @@ type Config struct {
 	ACMEEmail          string   `env:"ACME_EMAIL" envDefault:""`
 	CloudflareAPIToken string   `env:"CLOUDFLARE_API_TOKEN" envDefault:""`
 	RedirectDomains    []string `env:"REDIRECT_DOMAINS" envSeparator:"," envDefault:""`
+
+	// TrustedProxyCIDRs lists the reverse proxies (CIDRs) allowed to report the
+	// client address in X-Forwarded-For. Empty (default): the TCP peer address
+	// is always used.
+	TrustedProxyCIDRs []string `env:"TRUSTED_PROXIES" envSeparator:"," envDefault:""`
+	// TrustedProxies is TrustedProxyCIDRs parsed and validated by New.
+	TrustedProxies []netip.Prefix
 }
 
 // EnsureDirs creates all required data directories if they don't already exist.
@@ -180,9 +188,32 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
+	trusted, err := parseTrustedProxies(c.TrustedProxyCIDRs)
+	if err != nil {
+		return nil, fmt.Errorf("invalid configuration: TRUSTED_PROXIES: %w", err)
+	}
+	c.TrustedProxies = trusted
+
 	if c.Env != "development" && c.AppURL != "" && c.CloudflareAPIToken == "" {
 		return nil, fmt.Errorf("invalid configuration: CLOUDFLARE_API_TOKEN is required when APP_URL is set in non-development mode")
 	}
 
 	return c, nil
+}
+
+// parseTrustedProxies parses a list of CIDRs, ignoring empty entries.
+func parseTrustedProxies(cidrs []string) ([]netip.Prefix, error) {
+	var prefixes []netip.Prefix
+	for _, cidr := range cidrs {
+		cidr = strings.TrimSpace(cidr)
+		if cidr == "" {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			return nil, fmt.Errorf("%q is not a valid CIDR: %w", cidr, err)
+		}
+		prefixes = append(prefixes, prefix.Masked())
+	}
+	return prefixes, nil
 }
