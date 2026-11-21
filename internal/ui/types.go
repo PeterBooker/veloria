@@ -158,10 +158,12 @@ type LargestExtension struct {
 }
 
 // FailedIndexEvent represents a failed indexing attempt for display.
+// Category is one of a fixed set of labels. The stored error text can name
+// URLs, hosts and file paths, so it never reaches this public page.
 type FailedIndexEvent struct {
-	Slug         string
-	ErrorMessage string
-	CreatedAt    time.Time
+	Slug      string
+	Category  string
+	CreatedAt time.Time
 }
 
 // FailedIndexData contains data for the failed indexing HTMX partial.

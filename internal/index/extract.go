@@ -3,6 +3,7 @@ package index
 import (
 	"archive/zip"
 	"container/heap"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -18,6 +19,30 @@ import (
 
 // maxDecompressSize is the maximum allowed size for a single decompressed file (256 MB).
 const maxDecompressSize = 256 << 20
+
+// maxExtractTotalSize is the maximum allowed total size of all files extracted
+// from one archive (4 GiB).
+const maxExtractTotalSize = 4 << 30
+
+// maxExtractEntries is the maximum allowed number of entries in one archive.
+const maxExtractEntries = 250_000
+
+// extractLimits bounds what a single archive may write to disk.
+type extractLimits struct {
+	fileSize  int64 // bytes per extracted file
+	totalSize int64 // bytes across all extracted files
+	entries   int   // archive entries, directories included
+}
+
+// defaultExtractLimits are the limits UnzipWithStats applies.
+var defaultExtractLimits = extractLimits{
+	fileSize:  maxDecompressSize,
+	totalSize: maxExtractTotalSize,
+	entries:   maxExtractEntries,
+}
+
+// errOverLimit reports that a file was cut off at the limit it was given.
+var errOverLimit = errors.New("extraction limit exceeded")
 
 // FileStat holds information about a single file.
 type FileStat struct {
@@ -86,12 +111,15 @@ func indexableExtensions() map[string]bool {
 // UnzipWithStats extracts all files from the ZIP and returns extraction statistics
 // including file count, total size, and the top 100 largest files.
 // TextFileCount tracks files matching indexableExtensions() for index coverage reporting.
+//
+// dest must be a directory used for this extraction only: when extraction
+// fails part-way, dest is removed so no partial tree is left behind.
 func UnzipWithStats(src, dest string) (*ExtractStats, error) {
-	return unzipWithFilterAndStats(src, dest, nil, 100)
+	return unzipWithFilterAndStats(src, dest, nil, 100, defaultExtractLimits)
 }
 
 // unzipWithFilterAndStats extracts files and collects statistics.
-func unzipWithFilterAndStats(src, dest string, filter func(*zip.File) bool, topN int) (stats *ExtractStats, err error) {
+func unzipWithFilterAndStats(src, dest string, filter func(*zip.File) bool, topN int, limits extractLimits) (stats *ExtractStats, err error) {
 	zr, err := zip.OpenReader(src)
 	if err != nil {
 		return nil, err
@@ -99,6 +127,17 @@ func unzipWithFilterAndStats(src, dest string, filter func(*zip.File) bool, topN
 	defer func() {
 		if cerr := zr.Close(); err == nil && cerr != nil {
 			err = cerr
+		}
+	}()
+
+	if len(zr.File) > limits.entries {
+		return nil, fmt.Errorf("archive has %d entries, more than the maximum of %d", len(zr.File), limits.entries)
+	}
+
+	// From here on files are written; a failure must not leave some of them behind.
+	defer func() {
+		if err != nil {
+			_ = os.RemoveAll(dest)
 		}
 	}()
 
@@ -140,7 +179,16 @@ func unzipWithFilterAndStats(src, dest string, filter func(*zip.File) bool, topN
 			return nil, err
 		}
 
-		written, err := extractFileWithSize(f, fpath)
+		// The total is enforced on bytes written, not on the sizes the archive
+		// declares, so each file may use at most what is left of the total.
+		fileLimit := min(limits.fileSize, limits.totalSize-stats.TotalSize)
+		written, err := extractFileWithSize(f, fpath, fileLimit)
+		if errors.Is(err, errOverLimit) {
+			if fileLimit < limits.fileSize {
+				return nil, fmt.Errorf("archive exceeds maximum total extracted size of %d bytes", limits.totalSize)
+			}
+			return nil, fmt.Errorf("file exceeds maximum decompressed size of %d bytes", limits.fileSize)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +223,8 @@ func unzipWithFilterAndStats(src, dest string, filter func(*zip.File) bool, topN
 }
 
 // extractFileWithSize extracts a file and returns the number of bytes written.
-func extractFileWithSize(f *zip.File, fpath string) (written int64, err error) {
+// It stops with errOverLimit once the file turns out to be larger than limit.
+func extractFileWithSize(f *zip.File, fpath string, limit int64) (written int64, err error) {
 	rc, err := f.Open()
 	if err != nil {
 		return 0, err
@@ -196,12 +245,12 @@ func extractFileWithSize(f *zip.File, fpath string) (written int64, err error) {
 		}
 	}()
 
-	written, err = io.Copy(outFile, io.LimitReader(rc, maxDecompressSize+1))
+	written, err = io.Copy(outFile, io.LimitReader(rc, limit+1))
 	if err != nil {
 		return 0, err
 	}
-	if written > maxDecompressSize {
-		return 0, fmt.Errorf("file exceeds maximum decompressed size of %d bytes", maxDecompressSize)
+	if written > limit {
+		return 0, errOverLimit
 	}
 	return written, nil
 }
