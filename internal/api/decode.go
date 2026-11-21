@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -38,14 +39,33 @@ const MaxJSONBodyBytes = 1 << 20
 // the limit and yields a 413 error.
 func DecodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, error) {
 	var v T
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxJSONBodyBytes))
+	body := &limitedBody{r: http.MaxBytesReader(w, r.Body, MaxJSONBodyBytes)}
+	dec := json.NewDecoder(body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&v); err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
+		if body.tooLarge {
 			return v, ErrTooLarge("request body too large")
 		}
 		return v, ErrBadRequest("failed to decode JSON body")
 	}
 	return v, nil
+}
+
+// limitedBody records whether the size limit was hit while reading. The
+// decoder does not reliably keep http.MaxBytesError in the error it returns
+// (it is lost under GOEXPERIMENT=jsonv2), so the limit is observed here.
+type limitedBody struct {
+	r        io.Reader
+	tooLarge bool
+}
+
+func (b *limitedBody) Read(p []byte) (int, error) {
+	n, err := b.r.Read(p)
+	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			b.tooLarge = true
+		}
+	}
+	return n, err
 }
