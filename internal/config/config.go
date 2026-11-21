@@ -65,7 +65,8 @@ type Config struct {
 	// Indexer concurrency: number of parallel goroutines for indexing
 	IndexerConcurrency int `env:"INDEXER_CONCURRENCY" envDefault:"1" validate:"min=1"`
 
-	// Search concurrency: max concurrent search requests
+	// Search concurrency: max extension scans running at once, shared by all
+	// searches in the process
 	SearchConcurrency int `env:"SEARCH_CONCURRENCY" envDefault:"24" validate:"min=1"`
 
 	// AspireCloud API

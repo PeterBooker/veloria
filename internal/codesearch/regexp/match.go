@@ -16,17 +16,39 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"veloria/internal/codesearch/sparse"
 )
 
+// maxDFACacheBytes bounds the memory one matcher keeps in cached DFA states.
+//
+// The DFA is built lazily: every distinct set of NFA threads met while
+// scanning becomes a dstate, and each dstate costs dstateBytes (a 256-entry
+// transition table, about 2 KiB) plus its encoded thread set. Ordinary search
+// terms settle on tens to a few hundred states, well under 1 MiB, but a term
+// such as `e.{200}\x00` makes a new state for almost every byte of varied
+// input and would otherwise grow without limit. 8 MiB (also RE2's default
+// memory budget) holds about 3,900 states of a small program, an order of
+// magnitude above ordinary use, and 24 matchers scanning at once (the default
+// SEARCH_CONCURRENCY) hold at most 192 MiB between them.
+//
+// The budget is checked after each new transition, so the cache can pass it
+// by the few states one transition creates. It is then dropped and rebuilt on
+// demand, as RE2 does: matching stays correct and only gets slower.
+const maxDFACacheBytes = 8 << 20
+
+// dstateBytes is the fixed size of one cached DFA state.
+const dstateBytes = int(unsafe.Sizeof(dstate{}))
+
 // A matcher holds the state for running regular expression search.
 type matcher struct {
-	prog      *syntax.Prog       // compiled program
-	dstate    map[string]*dstate // dstate cache
-	start     *dstate            // start state
-	startLine *dstate            // start state for beginning of line
-	z1, z2    nstate             // two temporary nstates
+	prog       *syntax.Prog       // compiled program
+	dstate     map[string]*dstate // dstate cache
+	cacheBytes int                // approximate size of the states in dstate
+	start      *dstate            // start state
+	startLine  *dstate            // start state for beginning of line
+	z1, z2     nstate             // two temporary nstates
 }
 
 // An nstate corresponds to an NFA state.
@@ -275,9 +297,33 @@ func (m *matcher) cache(z *nstate) *dstate {
 
 	d = &dstate{enc: enc}
 	m.dstate[enc] = d
+	m.cacheBytes += dstateBytes + len(enc)
 	d.matchNL = m.computeNext(d, '\n') == &dmatch
 	d.matchEOT = m.computeNext(d, endText) == &dmatch
 	return d
+}
+
+// reset drops every cached DFA state and rebuilds the start states, so that
+// nothing the matcher holds still points into the old state graph and the
+// garbage collector can free it. d is the state the caller is about to enter;
+// reset returns its equivalent in the new cache.
+func (m *matcher) reset(d *dstate) *dstate {
+	start, startLine := m.start.enc, m.startLine.enc
+	clear(m.dstate)
+	m.cacheBytes = 0
+	m.start = m.recache(start)
+	m.startLine = m.recache(startLine)
+	if d == &dmatch {
+		return d
+	}
+	return m.recache(d.enc)
+}
+
+// recache returns the cached DFA state for the encoded nstate enc,
+// creating it if needed.
+func (m *matcher) recache(enc string) *dstate {
+	m.z1.dec(enc)
+	return m.cache(&m.z1)
 }
 
 func (m *matcher) match(b []byte, beginText, endText bool) (end int) {
@@ -299,6 +345,9 @@ func (m *matcher) match(b []byte, beginText, endText bool) (end int) {
 				d1 = m.startLine
 			} else {
 				d1 = m.computeNext(d, int(c))
+				if m.cacheBytes > maxDFACacheBytes {
+					d1 = m.reset(d1)
+				}
 			}
 			d.next[c] = d1
 		}
@@ -328,6 +377,9 @@ func (m *matcher) matchString(b string, beginText, endText bool) (end int) {
 				d1 = m.startLine
 			} else {
 				d1 = m.computeNext(d, int(c))
+				if m.cacheBytes > maxDFACacheBytes {
+					d1 = m.reset(d1)
+				}
 			}
 			d.next[c] = d1
 		}

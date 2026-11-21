@@ -43,6 +43,11 @@ func ErrNotFound(msg string) *APIError {
 	return &APIError{Status: http.StatusNotFound, Message: msg}
 }
 
+// ErrTooLarge creates a 413 error.
+func ErrTooLarge(msg string) *APIError {
+	return &APIError{Status: http.StatusRequestEntityTooLarge, Message: msg}
+}
+
 // ErrInternal creates a 500 error.
 func ErrInternal(msg string) *APIError {
 	return &APIError{Status: http.StatusInternalServerError, Message: msg}

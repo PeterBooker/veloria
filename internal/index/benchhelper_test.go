@@ -1,6 +1,7 @@
 package index
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -182,7 +183,7 @@ func logIndexStats(b *testing.B, idx *Index) {
 	if err != nil {
 		return
 	}
-	resp, err := idx.SearchCompiled(cs)
+	resp, err := idx.SearchCompiled(context.Background(), cs)
 	if err != nil {
 		return
 	}

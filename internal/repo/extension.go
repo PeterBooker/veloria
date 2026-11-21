@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -84,7 +85,7 @@ func (ie *IndexedExtension) HasIndex() bool {
 }
 
 // Search searches the extension's index for the given term.
-func (ie *IndexedExtension) Search(term string, opt *index.SearchOptions) (*index.SearchResponse, error) {
+func (ie *IndexedExtension) Search(ctx context.Context, term string, opt *index.SearchOptions) (*index.SearchResponse, error) {
 	ie.mu.RLock()
 	idx := ie.idx
 	ie.mu.RUnlock()
@@ -93,11 +94,12 @@ func (ie *IndexedExtension) Search(term string, opt *index.SearchOptions) (*inde
 		return nil, ErrNoIndex
 	}
 
-	return idx.Search(term, opt)
+	return idx.Search(ctx, term, opt)
 }
 
 // SearchCompiled searches the extension's index using pre-compiled patterns.
-func (ie *IndexedExtension) SearchCompiled(cs *index.CompiledSearch) (*index.SearchResponse, error) {
+// The scan stops with ctx's error once ctx is done.
+func (ie *IndexedExtension) SearchCompiled(ctx context.Context, cs *index.CompiledSearch) (*index.SearchResponse, error) {
 	ie.mu.RLock()
 	idx := ie.idx
 	ie.mu.RUnlock()
@@ -106,7 +108,7 @@ func (ie *IndexedExtension) SearchCompiled(cs *index.CompiledSearch) (*index.Sea
 		return nil, ErrNoIndex
 	}
 
-	return idx.SearchCompiled(cs)
+	return idx.SearchCompiled(ctx, cs)
 }
 
 // UpdateIndex safely swaps the current index with a new one.

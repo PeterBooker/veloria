@@ -179,9 +179,12 @@ func (a *App) initDBDependents(ctx context.Context, appCache cache.Cache) {
 	eventRecorder := repo.NewIndexEventRecorder(db, l)
 	t.AddJob(repo.CleanupOldEvents(db, l, 30*24*time.Hour), 1*time.Hour)
 
-	pr := repo.NewPluginStore(ctx, db, c, l, appCache, apiClient)
-	tr := repo.NewThemeStore(ctx, db, c, l, appCache, apiClient)
-	cr := repo.NewCoreStore(ctx, db, c, l, appCache, apiClient)
+	// One limiter for all three stores: SEARCH_CONCURRENCY bounds the extension
+	// scans of the whole process, not of each search.
+	searchLimiter := repo.NewSearchLimiter(c.SearchConcurrency)
+	pr := repo.NewPluginStore(ctx, db, c, l, appCache, apiClient, searchLimiter)
+	tr := repo.NewThemeStore(ctx, db, c, l, appCache, apiClient, searchLimiter)
+	cr := repo.NewCoreStore(ctx, db, c, l, appCache, apiClient, searchLimiter)
 
 	m, err := manager.NewManager(ctx, l, []repo.DataSource{pr, tr, cr}, c.IndexerConcurrency, eventRecorder, apiClient, appCache)
 	if err != nil {

@@ -137,7 +137,13 @@ func New(deps RouterDeps) *chi.Mux {
 				r.Get("/search/{uuid}/og.png", ogHandler)
 			}
 		}
-		r.Post("/search", search.SubmitSearch(deps.WebDeps))
+		// Search creation gets the same per-address limit as POST /api/v1/search.
+		submitSearch := search.SubmitSearch(deps.WebDeps)
+		if opts.RateLimitEnabled {
+			r.With(httprate.LimitByIP(10, time.Minute)).Post("/search", submitSearch)
+		} else {
+			r.Post("/search", submitSearch)
+		}
 		r.Get("/searches/own", search.ListOwnPage(deps.WebDeps))
 		r.Get("/my-searches", search.MyListRedirect())
 

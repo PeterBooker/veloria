@@ -2,7 +2,7 @@
 
 All API endpoints are under `/api/v1/`. Requests must include `Content-Type: application/json`.
 
-Rate limiting is enabled by default: 100 requests/minute for general API routes, 10 requests/minute for search.
+Rate limiting is enabled by default: 100 requests/minute for general API routes, 10 requests/minute for search. The web search form (`POST /search`) has the same 10 requests/minute limit.
 
 ## Response Format
 
@@ -127,10 +127,10 @@ Create a new code search. This is an asynchronous operation — the search is qu
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `term` | string | yes | Search term (regex supported) |
+| `term` | string | yes | Search term (regex supported), at most 255 bytes |
 | `repo` | string | yes | Extension type: `plugins`, `themes`, or `cores` |
-| `file_match` | string | no | Regex to include only matching filenames |
-| `exclude_file_match` | string | no | Regex to exclude matching filenames |
+| `file_match` | string | no | Regex to include only matching filenames, at most 255 bytes |
+| `exclude_file_match` | string | no | Regex to exclude matching filenames, at most 255 bytes |
 | `case_sensitive` | bool | no | Case-sensitive search (default: false) |
 | `public` | bool | no | Whether the search is publicly visible (default: true) |
 
@@ -148,9 +148,12 @@ Create a new code search. This is an asynchronous operation — the search is qu
 }
 ```
 
+The request body is limited to 1 MiB.
+
 **Errors:**
-- `400` — Missing or invalid fields
-- `503` — Search unavailable
+- `400` — Missing or invalid fields, including a term or file filter that is too long or not a valid regex
+- `413` — Request body larger than 1 MiB
+- `503` — Search unavailable, or four searches are already running (sent with a `Retry-After` header; retry after that many seconds)
 
 ### GET /api/v1/search/{id}
 
@@ -215,7 +218,7 @@ These serve the HTML web interface:
 | GET | `/search/{uuid}/extension/{slug}` | Extension-specific results page |
 | GET | `/search/{uuid}/export` | Export search results as CSV |
 | GET | `/search/{uuid}/og.png` | OG image for search (rate limited) |
-| POST | `/search` | Submit search (web form) |
+| POST | `/search` | Submit search (web form, rate limited) |
 | GET | `/searches/own` | Current user's searches |
 | GET | `/my-searches` | Redirect to `/searches/own` |
 | POST | `/search/{uuid}/report` | Report a search (requires login) |

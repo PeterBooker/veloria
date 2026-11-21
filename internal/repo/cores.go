@@ -67,8 +67,8 @@ type CoreStore struct {
 	*ExtensionStore[*Core]
 }
 
-// NewCoreStore creates a new core store.
-func NewCoreStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Logger, ch cache.Cache, api *APIClient) *CoreStore {
+// NewCoreStore creates a new core store. sl is the scan limiter shared by all stores.
+func NewCoreStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Logger, ch cache.Cache, api *APIClient, sl *SearchLimiter) *CoreStore {
 	store := NewExtensionStore[*Core](StoreConfig[*Core]{
 		Ctx:           ctx,
 		DB:            db,
@@ -77,6 +77,7 @@ func NewCoreStore(ctx context.Context, db *gorm.DB, c *config.Config, l *zap.Log
 		Cache:         ch,
 		API:           api,
 		ExtensionType: TypeCores,
+		SearchLimiter: sl,
 	})
 
 	return &CoreStore{
